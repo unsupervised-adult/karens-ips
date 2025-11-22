@@ -184,9 +184,39 @@ patch_app_html() {
         fi
     fi
 
-    # Manual patch failed
-    warn "app.html patch failed - manual integration required"
-    warn "Please follow instructions in $karens_ips_dir/slips_integration/README.md"
+    # Manual patch fallback
+    warn "Patch file failed, attempting manual integration..."
+
+    local app_html="webinterface/templates/app.html"
+
+    # Add CSS link in <head> section after general.css
+    if ! grep -q "ml_detector.css" "$app_html"; then
+        sed -i '/<link rel="stylesheet" type="text\/css" href="{{url_for('\''general.static'\'', filename='\''css\/general.css'\'')}}" \/>/a\  <link rel="stylesheet" type="text/css" href="{{url_for('\''ml_detector.static'\'', filename='\''css\/ml_detector.css'\'')}}" />' "$app_html"
+    fi
+
+    # Add ML Detector tab in navigation (after Documentation tab)
+    if ! grep -q "nav-ml-detector-tab" "$app_html"; then
+        sed -i '/<a class="nav-link" type="button" id="nav-documentation-tab"/,/<\/li>/ {
+            /<\/li>/a\      <li class="nav-item">\n        <a class="nav-link" type="button" id="nav-ml-detector-tab" data-bs-toggle="tab" data-bs-target="#nav-ml-detector" role="tab"\n        aria-controls="nav-ml-detector" aria-selected="false">\n          ML Detector\n        </a>\n      </li>
+        }' "$app_html"
+    fi
+
+    # Add ML Detector tab content (after documentation tab content)
+    if ! grep -q "ml_detector.html" "$app_html"; then
+        sed -i '/{%.*include.*documentation.html.*%}/a\      <div class="tab-pane fade" id="nav-ml-detector" role="tabpanel" aria-labelledby="nav-ml-detector-tab">\n        {% include '\''ml_detector.html'\'' %}\n      </div>' "$app_html"
+    fi
+
+    # Add Chart.js library before closing </body>
+    if ! grep -q "chart.js" "$app_html"; then
+        sed -i '/<script src="https:\/\/cdn.jsdelivr.net\/npm\/bootstrap@4.5.3\/dist\/js\/bootstrap.bundle.min.js"/a\<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>' "$app_html"
+    fi
+
+    # Add ML Detector JavaScript before closing </html>
+    if ! grep -q "ml_detector.js" "$app_html"; then
+        sed -i '/<\/html>/i\<script src="{{url_for('\''ml_detector.static'\'', filename='\''js\/ml_detector.js'\'')}}\"></script>' "$app_html"
+    fi
+
+    success "app.html manually patched"
 }
 
 set_ml_detector_permissions() {
