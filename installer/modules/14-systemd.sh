@@ -161,8 +161,9 @@ EOF
 create_slips_webui_service() {
     log "Creating SLIPS Web UI service..."
 
-    # Detect management IP
+    # Detect management IP and interface
     local mgmt_ip="127.0.0.1"
+    local mgmt_iface="${MGMT_IFACE:-lo}"
     if [[ -n "${MGMT_IFACE:-}" ]]; then
         mgmt_ip=$(ip addr show "$MGMT_IFACE" 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 || echo "127.0.0.1")
     fi
@@ -180,9 +181,9 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=${SLIPS_DIR}
-# Web UI doesn't monitor interfaces - it just serves the dashboard from Redis data
-# Remove -i flag so it can reach the internet for updates
-ExecStart=${SLIPS_DIR}/venv/bin/python ${SLIPS_DIR}/slips.py -c ${SLIPS_DIR}/config/slips.yaml -w
+# Web UI monitors management interface (has internet) instead of bridge (no IP)
+# This allows SLIPS to download threat intel updates while serving the dashboard
+ExecStart=${SLIPS_DIR}/venv/bin/python ${SLIPS_DIR}/slips.py -c ${SLIPS_DIR}/config/slips.yaml -i ${mgmt_iface} -w
 Restart=on-failure
 RestartSec=30
 StandardOutput=journal
