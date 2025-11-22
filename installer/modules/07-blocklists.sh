@@ -295,11 +295,12 @@ clone_hagezi_repo() {
 
 import_perflyst_lists() {
     local ips_filter_db="/opt/ips-filter-db.py"
+    local db_path="/var/lib/suricata/ips_filter.db"
 
     # SmartTV
     if [[ "${BLOCKLIST_PERFLYST_SMARTTV}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/SmartTV.txt" ]]; then
         log "Importing Perflyst SmartTV blocklist..."
-        $ips_filter_db import-list \
+        $ips_filter_db --db-path "$db_path" import-list \
             --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/SmartTV.txt" \
             --category "ads" \
             --source-name "perflyst_smarttv" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
@@ -310,7 +311,7 @@ import_perflyst_lists() {
     # Android Tracking
     if [[ "${BLOCKLIST_PERFLYST_ANDROID}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/android-tracking.txt" ]]; then
         log "Importing Perflyst Android tracking blocklist..."
-        $ips_filter_db import-list \
+        $ips_filter_db --db-path "$db_path" import-list \
             --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/android-tracking.txt" \
             --category "tracking" \
             --source-name "perflyst_android" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
@@ -321,7 +322,7 @@ import_perflyst_lists() {
     # Amazon FireTV
     if [[ "${BLOCKLIST_PERFLYST_FIRETV}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/AmazonFireTV.txt" ]]; then
         log "Importing Perflyst Amazon FireTV blocklist..."
-        $ips_filter_db import-list \
+        $ips_filter_db --db-path "$db_path" import-list \
             --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/AmazonFireTV.txt" \
             --category "ads" \
             --source-name "perflyst_firetv" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
@@ -332,7 +333,7 @@ import_perflyst_lists() {
     # SessionReplay
     if [[ "${BLOCKLIST_PERFLYST_SESSIONREPLAY}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/SessionReplay.txt" ]]; then
         log "Importing Perflyst SessionReplay blocklist..."
-        $ips_filter_db import-list \
+        $ips_filter_db --db-path "$db_path" import-list \
             --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/SessionReplay.txt" \
             --category "tracking" \
             --source-name "perflyst_sessionreplay" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
@@ -343,11 +344,12 @@ import_perflyst_lists() {
 
 import_hagezi_lists() {
     local ips_filter_db="/opt/ips-filter-db.py"
+    local db_path="/var/lib/suricata/ips_filter.db"
 
     # Light (low blocking)
     if [[ "${BLOCKLIST_HAGEZI_LIGHT}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/light.txt" ]]; then
         log "Importing hagezi Light blocklist (📗 low blocking, minimal false positives)..."
-        $ips_filter_db import-list \
+        $ips_filter_db --db-path "$db_path" import-list \
             --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/light.txt" \
             --category "ads" \
             --source-name "hagezi_light" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
@@ -358,7 +360,7 @@ import_hagezi_lists() {
     # Normal (medium blocking) - uses multi.txt
     if [[ "${BLOCKLIST_HAGEZI_NORMAL}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/multi.txt" ]]; then
         log "Importing hagezi Normal blocklist (📘 medium blocking, relaxed/balanced)..."
-        $ips_filter_db import-list \
+        $ips_filter_db --db-path "$db_path" import-list \
             --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/multi.txt" \
             --category "ads" \
             --source-name "hagezi_normal" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
@@ -369,7 +371,7 @@ import_hagezi_lists() {
     # Pro (balanced - recommended)
     if [[ "${BLOCKLIST_HAGEZI_PRO}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.txt" ]]; then
         log "Importing hagezi Pro blocklist (📒 balanced - recommended)..."
-        $ips_filter_db import-list \
+        $ips_filter_db --db-path "$db_path" import-list \
             --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.txt" \
             --category "ads" \
             --source-name "hagezi_pro" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
@@ -380,7 +382,7 @@ import_hagezi_lists() {
     # Pro++ (aggressive)
     if [[ "${BLOCKLIST_HAGEZI_PROPLUS}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.plus.txt" ]]; then
         log "Importing hagezi Pro++ blocklist (📙 balanced/aggressive)..."
-        $ips_filter_db import-list \
+        $ips_filter_db --db-path "$db_path" import-list \
             --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.plus.txt" \
             --category "ads" \
             --source-name "hagezi_proplus" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
@@ -391,7 +393,7 @@ import_hagezi_lists() {
     # Ultimate (most aggressive)
     if [[ "${BLOCKLIST_HAGEZI_ULTIMATE}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/ultimate.txt" ]]; then
         log "Importing hagezi Ultimate blocklist (📕 most aggressive, may break sites)..."
-        $ips_filter_db import-list \
+        $ips_filter_db --db-path "$db_path" import-list \
             --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/ultimate.txt" \
             --category "ads" \
             --source-name "hagezi_ultimate" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
@@ -409,7 +411,7 @@ import_hagezi_lists() {
             if [[ -f "$native_file" ]]; then
                 local platform=$(basename "$native_file" .txt | sed 's/native\.//')
                 log "  - Importing native.$platform tracker..."
-                $ips_filter_db import-list \
+                $ips_filter_db --db-path "$db_path" import-list \
                     --list-file "$native_file" \
                     --category "tracking" \
                     --source-name "hagezi_native_$platform" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
@@ -422,8 +424,9 @@ import_hagezi_lists() {
 
 sync_to_suricata() {
     local ips_filter_db="/opt/ips-filter-db.py"
+    local db_path="/var/lib/suricata/ips_filter.db"
     if [[ -x "$ips_filter_db" ]]; then
-        $ips_filter_db sync 2>&1 | grep -E "(Syncing|Successfully|Progress:|Warning:)" || true
+        $ips_filter_db --db-path "$db_path" sync 2>&1 | grep -E "(Syncing|Successfully|Progress:|Warning:)" || true
     else
         warn "Blocklist manager not found, skipping Suricata sync"
     fi
@@ -431,8 +434,9 @@ sync_to_suricata() {
 
 show_blocklist_stats() {
     local ips_filter_db="/opt/ips-filter-db.py"
+    local db_path="/var/lib/suricata/ips_filter.db"
     if [[ -x "$ips_filter_db" ]]; then
-        $ips_filter_db --stats
+        $ips_filter_db --db-path "$db_path" --stats
     else
         warn "Blocklist manager not found, skipping stats display"
     fi
