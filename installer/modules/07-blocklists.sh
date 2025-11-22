@@ -14,6 +14,84 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 
 # ============================================================================
+# BLOCKLIST SELECTION
+# ============================================================================
+
+configure_blocklists() {
+    if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
+        # Non-interactive: enable all by default
+        BLOCKLIST_PERFLYST_SMARTTV="${BLOCKLIST_PERFLYST_SMARTTV:-true}"
+        BLOCKLIST_PERFLYST_ANDROID="${BLOCKLIST_PERFLYST_ANDROID:-true}"
+        BLOCKLIST_PERFLYST_FIRETV="${BLOCKLIST_PERFLYST_FIRETV:-true}"
+        BLOCKLIST_PERFLYST_SESSIONREPLAY="${BLOCKLIST_PERFLYST_SESSIONREPLAY:-true}"
+        BLOCKLIST_HAGEZI_PRO="${BLOCKLIST_HAGEZI_PRO:-true}"
+        BLOCKLIST_HAGEZI_NATIVE="${BLOCKLIST_HAGEZI_NATIVE:-true}"
+        return
+    fi
+
+    log_subsection "Blocklist Selection"
+    info "Select which blocklists to enable:"
+    echo ""
+
+    # Perflyst SmartTV
+    if [[ -z "${BLOCKLIST_PERFLYST_SMARTTV}" ]]; then
+        if ask_yes_no "Enable SmartTV tracking blocklist? (Samsung, LG, etc)" "y"; then
+            BLOCKLIST_PERFLYST_SMARTTV="true"
+        else
+            BLOCKLIST_PERFLYST_SMARTTV="false"
+        fi
+    fi
+
+    # Perflyst Android
+    if [[ -z "${BLOCKLIST_PERFLYST_ANDROID}" ]]; then
+        if ask_yes_no "Enable Android tracking blocklist?" "y"; then
+            BLOCKLIST_PERFLYST_ANDROID="true"
+        else
+            BLOCKLIST_PERFLYST_ANDROID="false"
+        fi
+    fi
+
+    # Perflyst FireTV
+    if [[ -z "${BLOCKLIST_PERFLYST_FIRETV}" ]]; then
+        if ask_yes_no "Enable Amazon FireTV tracking blocklist?" "y"; then
+            BLOCKLIST_PERFLYST_FIRETV="true"
+        else
+            BLOCKLIST_PERFLYST_FIRETV="false"
+        fi
+    fi
+
+    # Perflyst SessionReplay
+    if [[ -z "${BLOCKLIST_PERFLYST_SESSIONREPLAY}" ]]; then
+        if ask_yes_no "Enable SessionReplay tracking blocklist?" "y"; then
+            BLOCKLIST_PERFLYST_SESSIONREPLAY="true"
+        else
+            BLOCKLIST_PERFLYST_SESSIONREPLAY="false"
+        fi
+    fi
+
+    # hagezi Pro
+    if [[ -z "${BLOCKLIST_HAGEZI_PRO}" ]]; then
+        if ask_yes_no "Enable hagezi Pro blocklist? (balanced, recommended)" "y"; then
+            BLOCKLIST_HAGEZI_PRO="true"
+        else
+            BLOCKLIST_HAGEZI_PRO="false"
+        fi
+    fi
+
+    # hagezi Native
+    if [[ -z "${BLOCKLIST_HAGEZI_NATIVE}" ]]; then
+        if ask_yes_no "Enable hagezi Native Tracker blocklist?" "y"; then
+            BLOCKLIST_HAGEZI_NATIVE="true"
+        else
+            BLOCKLIST_HAGEZI_NATIVE="false"
+        fi
+    fi
+
+    echo ""
+    success "Blocklist selection complete"
+}
+
+# ============================================================================
 # COMMUNITY BLOCKLISTS INSTALLATION
 # ============================================================================
 
@@ -25,6 +103,9 @@ import_community_blocklists() {
         log "Blocklists installation disabled, skipping"
         return 0
     fi
+
+    # Configure which blocklists to use
+    configure_blocklists
 
     # Install blocklist manager script
     log "Installing blocklist management tools..."
@@ -44,21 +125,33 @@ import_community_blocklists() {
     log "This may take several minutes due to repository size..."
     log ""
 
-    # Clone Perflyst/PiHoleBlocklist
-    clone_perflyst_repo
+    # Clone Perflyst/PiHoleBlocklist (if any Perflyst lists enabled)
+    if [[ "${BLOCKLIST_PERFLYST_SMARTTV}" == "true" ]] || \
+       [[ "${BLOCKLIST_PERFLYST_ANDROID}" == "true" ]] || \
+       [[ "${BLOCKLIST_PERFLYST_FIRETV}" == "true" ]] || \
+       [[ "${BLOCKLIST_PERFLYST_SESSIONREPLAY}" == "true" ]]; then
+        clone_perflyst_repo
+    else
+        log "No Perflyst blocklists selected, skipping repository clone"
+    fi
 
-    # Clone hagezi/dns-blocklists
-    clone_hagezi_repo
+    # Clone hagezi/dns-blocklists (if any hagezi lists enabled)
+    if [[ "${BLOCKLIST_HAGEZI_PRO}" == "true" ]] || \
+       [[ "${BLOCKLIST_HAGEZI_NATIVE}" == "true" ]]; then
+        clone_hagezi_repo
+    else
+        log "No hagezi blocklists selected, skipping repository clone"
+    fi
 
     log ""
-    log "Importing blocklists into IPS database..."
+    log "Importing selected blocklists into IPS database..."
     log "This will take several minutes for large lists..."
     log ""
 
-    # Import Perflyst blocklists
+    # Import Perflyst blocklists (only selected ones)
     import_perflyst_lists
 
-    # Import hagezi blocklists
+    # Import hagezi blocklists (only selected ones)
     import_hagezi_lists
 
     log ""
@@ -123,39 +216,47 @@ import_perflyst_lists() {
     local ips_filter_db="/opt/ips-filter-db.py"
 
     # SmartTV
-    if [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/SmartTV.txt" ]]; then
+    if [[ "${BLOCKLIST_PERFLYST_SMARTTV}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/SmartTV.txt" ]]; then
         log "Importing Perflyst SmartTV blocklist..."
         $ips_filter_db import-list \
             --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/SmartTV.txt" \
             --category "ads" \
             --source-name "perflyst_smarttv" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+    elif [[ "${BLOCKLIST_PERFLYST_SMARTTV}" == "false" ]]; then
+        log "SmartTV blocklist disabled, skipping..."
     fi
 
     # Android Tracking
-    if [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/android-tracking.txt" ]]; then
+    if [[ "${BLOCKLIST_PERFLYST_ANDROID}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/android-tracking.txt" ]]; then
         log "Importing Perflyst Android tracking blocklist..."
         $ips_filter_db import-list \
             --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/android-tracking.txt" \
             --category "tracking" \
             --source-name "perflyst_android" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+    elif [[ "${BLOCKLIST_PERFLYST_ANDROID}" == "false" ]]; then
+        log "Android blocklist disabled, skipping..."
     fi
 
     # Amazon FireTV
-    if [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/AmazonFireTV.txt" ]]; then
+    if [[ "${BLOCKLIST_PERFLYST_FIRETV}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/AmazonFireTV.txt" ]]; then
         log "Importing Perflyst Amazon FireTV blocklist..."
         $ips_filter_db import-list \
             --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/AmazonFireTV.txt" \
             --category "ads" \
             --source-name "perflyst_firetv" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+    elif [[ "${BLOCKLIST_PERFLYST_FIRETV}" == "false" ]]; then
+        log "FireTV blocklist disabled, skipping..."
     fi
 
     # SessionReplay
-    if [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/SessionReplay.txt" ]]; then
+    if [[ "${BLOCKLIST_PERFLYST_SESSIONREPLAY}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/PiHoleBlocklist/SessionReplay.txt" ]]; then
         log "Importing Perflyst SessionReplay blocklist..."
         $ips_filter_db import-list \
             --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/SessionReplay.txt" \
             --category "tracking" \
             --source-name "perflyst_sessionreplay" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+    elif [[ "${BLOCKLIST_PERFLYST_SESSIONREPLAY}" == "false" ]]; then
+        log "SessionReplay blocklist disabled, skipping..."
     fi
 }
 
@@ -163,25 +264,25 @@ import_hagezi_lists() {
     local ips_filter_db="/opt/ips-filter-db.py"
 
     # Pro (recommended)
-    if [[ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.txt" ]]; then
+    if [[ "${BLOCKLIST_HAGEZI_PRO}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.txt" ]]; then
         log "Importing hagezi Pro blocklist (balanced - recommended)..."
         $ips_filter_db import-list \
             --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.txt" \
             --category "ads" \
             --source-name "hagezi_pro" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
-    else
-        warn "hagezi Pro blocklist not found, skipping..."
+    elif [[ "${BLOCKLIST_HAGEZI_PRO}" == "false" ]]; then
+        log "hagezi Pro blocklist disabled, skipping..."
     fi
 
     # Native Tracker
-    if [[ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/native.txt" ]]; then
+    if [[ "${BLOCKLIST_HAGEZI_NATIVE}" == "true" ]] && [[ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/native.txt" ]]; then
         log "Importing hagezi Native Tracker blocklist..."
         $ips_filter_db import-list \
             --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/native.txt" \
             --category "tracking" \
             --source-name "hagezi_native" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
-    else
-        warn "hagezi Native Tracker blocklist not found, skipping..."
+    elif [[ "${BLOCKLIST_HAGEZI_NATIVE}" == "false" ]]; then
+        log "hagezi Native Tracker blocklist disabled, skipping..."
     fi
 }
 
@@ -235,6 +336,7 @@ verify_blocklists() {
 export -f import_community_blocklists
 export -f clone_perflyst_repo
 export -f clone_hagezi_repo
+export -f configure_blocklists
 export -f import_perflyst_lists
 export -f import_hagezi_lists
 export -f sync_to_suricata
