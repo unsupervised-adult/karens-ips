@@ -111,8 +111,8 @@ Internet
     ↓
 ┌─────────────────────────────────────────┐
 │  Network Bridge (br0)                   │
-│  ├─ enp6s19 (Traffic IN)                │
-│  └─ enp6s20 (Traffic OUT)               │
+│  ├─ <IFACE_IN> (Traffic IN)             │
+│  └─ <IFACE_OUT> (Traffic OUT)           │
 └─────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────┐
@@ -440,7 +440,10 @@ suricatasc -c "datasets.list"
 ### Interface issues
 ```bash
 # Check interface status
-ip link show enp6s19 enp6s20
+ip link show  # Shows all interfaces
+
+# Check specific bridge interfaces (replace with your interface names)
+ip link show <IFACE_IN> <IFACE_OUT>
 
 # Restart interface setup
 systemctl restart ips-interfaces.service

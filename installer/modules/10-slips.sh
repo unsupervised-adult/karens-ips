@@ -169,13 +169,18 @@ configure_zeek_integration() {
     if [[ -d /opt/zeek/etc ]]; then
         log "Creating Zeek node configuration..."
 
+        # Validate IFACE_IN is set
+        if [[ -z "${IFACE_IN}" ]]; then
+            error_exit "IFACE_IN not set. Network interfaces must be configured before installing Zeek."
+        fi
+
         cat > /opt/zeek/etc/node.cfg << ZEEK_NODE_EOF
 # Zeek Node Configuration - Standalone Mode for SLIPS Integration
 # Monitors primary copy interface for traffic analysis
 [zeek]
 type=standalone
 host=localhost
-interface=${IFACE_IN:-enp6s19}
+interface=${IFACE_IN}
 ZEEK_NODE_EOF
 
         # Create Zeek control configuration
