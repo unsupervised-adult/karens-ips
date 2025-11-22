@@ -313,6 +313,9 @@ main() {
     # Pre-flight checks
     preflight_checks
 
+    # Configure network interfaces (auto-detect or interactive)
+    configure_network_interfaces
+
     # Show configuration
     show_configuration
 
