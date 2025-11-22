@@ -570,9 +570,33 @@ def main():
         help='Import blocklists into database'
     )
     parser.add_argument(
+        '--import-file',
+        metavar='FILE',
+        help='Import a single blocklist file'
+    )
+    parser.add_argument(
+        '--source-name',
+        help='Source name for single file import (required with --import-file)'
+    )
+    parser.add_argument(
+        '--source-description',
+        default='',
+        help='Source description for single file import'
+    )
+    parser.add_argument(
+        '--source-url',
+        default='',
+        help='Source URL for single file import'
+    )
+    parser.add_argument(
         '--generate-rules',
         metavar='OUTPUT',
         help='Generate Suricata rules to file'
+    )
+    parser.add_argument(
+        '--sync',
+        action='store_true',
+        help='Sync blocklists to Suricata rules (same as --generate-rules)'
     )
     parser.add_argument(
         '--stats',
@@ -588,21 +612,69 @@ def main():
 
     args = parser.parse_args()
 
+    # Validate arguments
+    if args.import_file and not args.source_name:
+        parser.error("--import-file requires --source-name")
+
     # Initialize database
     db = BlocklistDB(args.db_path)
 
     try:
-        # Import blocklists
+        # Import blocklists from repositories
         if args.do_import:
             importer = BlocklistImporter(db, args.repo_path)
             importer.import_perflyst_blocklists()
             importer.import_hagezi_blocklists()
+
+        # Import single file
+        if args.import_file:
+            logger.info(f"Importing single file: {args.import_file}")
+
+            # Add source
+            source_id = db.add_source(
+                name=args.source_name,
+                description=args.source_description,
+                url=args.source_url,
+                category=args.category if args.category != 'all' else 'ads'
+            )
+
+            # Parse and import domains
+            if os.path.exists(args.import_file):
+                domains = BlocklistParser.parse_domain_list(args.import_file)
+                added = db.add_domains(source_id, domains, args.category if args.category != 'all' else 'ads')
+                logger.info(f"Imported {added} domains from {args.import_file}")
+                print(f"Importing: {args.source_name}")
+                print(f"Import Complete")
+                print(f"Imported: {added} domains")
+                print(f"Skipped: {len(domains) - added} duplicates")
+            else:
+                logger.error(f"File not found: {args.import_file}")
+                print(f"Error: File not found: {args.import_file}")
 
         # Generate Suricata rules
         if args.generate_rules:
             generator = SuricataRuleGenerator(db)
             category = None if args.category == 'all' else args.category
             generator.generate_rules(args.generate_rules, category)
+
+        # Sync to Suricata (generate rules to default location)
+        if args.sync:
+            logger.info("Syncing blocklists to Suricata rules...")
+            generator = SuricataRuleGenerator(db)
+
+            # Default output location for Suricata rules
+            output_file = '/etc/suricata/rules/karens-ips-blocklist.rules'
+
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+            generator.generate_rules(output_file, category=None)
+            print(f"Syncing: blocklists to Suricata")
+            print(f"Successfully: generated rules to {output_file}")
+
+            # Get stats for progress
+            stats = db.get_stats()
+            print(f"Progress: {stats.get('total_domains', 0)} domains synced")
 
         # Show statistics
         if args.stats:
