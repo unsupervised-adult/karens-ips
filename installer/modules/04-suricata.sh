@@ -82,9 +82,15 @@ install_suricata_ubuntu() {
     log "Setting up Suricata PPA for Ubuntu..."
     wait_for_apt_lock
     apt-get update
+
+    wait_for_apt_lock
     apt-get install -y software-properties-common
     add-apt-repository -y ppa:oisf/suricata-stable
+
+    wait_for_apt_lock
     apt-get update
+
+    wait_for_apt_lock
     apt-get install -y suricata || error_exit "Failed to install Suricata"
 }
 
@@ -96,16 +102,20 @@ install_suricata_debian() {
     # Try backports first
     if ! grep -q "backports" /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null; then
         echo "deb http://deb.debian.org/debian $VERSION_CODENAME-backports main" > /etc/apt/sources.list.d/backports.list
+        wait_for_apt_lock
         apt-get update
     fi
 
+    wait_for_apt_lock
     if apt-get install -y -t "$VERSION_CODENAME-backports" suricata 2>/dev/null; then
         log "Suricata installed from backports"
     else
         log "Backports failed, trying OISF repository..."
         wget -qO - https://www.openinfosecfoundation.org/debian.gpg | apt-key add - 2>/dev/null || true
         echo "deb https://www.openinfosecfoundation.org/debian/ $VERSION_CODENAME main" > /etc/apt/sources.list.d/oisf.list
+        wait_for_apt_lock
         apt-get update
+        wait_for_apt_lock
         apt-get install -y suricata || error_exit "Failed to install Suricata from OISF repository"
     fi
 }
