@@ -1,0 +1,78 @@
+/* SPDX-FileCopyrightText: 2025 Karen's IPS ML Ad Detector */
+/* SPDX-License-Identifier: GPL-2.0-only */
+
+/* ML Detector Specific Styles */
+
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
+
+.card-header {
+    font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Statistics Cards */
+.card.bg-primary,
+.card.bg-danger,
+.card.bg-success,
+.card.bg-info {
+    transition: transform 0.2s;
+}
+
+.card.bg-primary:hover,
+.card.bg-danger:hover,
+.card.bg-success:hover,
+.card.bg-info:hover {
+    transform: translateY(-5px);
+}
+
+.card-title {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.9;
+}
+
+.card-text {
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+/* Charts */
+canvas {
+    max-height: 250px;
+}
+
+/* Tables */
+#table_detections,
+#table_alerts {
+    font-size: 0.9rem;
+}
+
+#table_detections thead th,
+#table_alerts thead th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+/* Badges */
+.badge {
+    font-size: 0.85rem;
+    padding: 0.35em 0.65em;
+}
+
+/* Tab styling */
+.nav-tabs .nav-link {
+    color: #495057;
+}
+
+.nav-tabs .nav-link.active {
+    font-weight: 600;
+}
+
+/* Model info table */
+.table-sm th {
+    font-weight: 600;
+    color: #495057;
+}

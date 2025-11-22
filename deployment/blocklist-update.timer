@@ -1,0 +1,16 @@
+[Unit]
+Description=Karen's IPS Blocklist Update Timer
+Documentation=https://github.com/unsupervised-adult/karens-ips
+
+[Timer]
+# Run weekly on Sunday at 3 AM
+OnCalendar=Sun *-*-* 03:00:00
+# Run 1 hour after boot if missed
+OnBootSec=1h
+# Randomize start time by up to 30 minutes to avoid server load spikes
+RandomizedDelaySec=30min
+# Keep timer persistent across reboots
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,173 @@
+<div class="container-fluid mt-4">
+
+  <!-- ML Detector Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <h2 class="text-primary">ML Ad Detector Dashboard</h2>
+      <p class="text-muted">Real-time monitoring of machine learning-based ad detection</p>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card bg-primary text-white">
+        <div class="card-body">
+          <h5 class="card-title">Total Analyzed</h5>
+          <h2 class="card-text" id="stat_total_analyzed">0</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-danger text-white">
+        <div class="card-body">
+          <h5 class="card-title">Ads Detected</h5>
+          <h2 class="card-text" id="stat_ads_detected">0</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-success text-white">
+        <div class="card-body">
+          <h5 class="card-title">Legitimate Traffic</h5>
+          <h2 class="card-text" id="stat_legitimate">0</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-info text-white">
+        <div class="card-body">
+          <h5 class="card-title">Model Accuracy</h5>
+          <h2 class="card-text" id="stat_accuracy">0%</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h5>Detection Timeline</h5>
+        </div>
+        <div class="card-body">
+          <canvas id="timeline_chart" height="250"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h5>Feature Importance</h5>
+        </div>
+        <div class="card-body">
+          <canvas id="feature_importance_chart" height="250"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model Information -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h5>Model Information</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-sm">
+            <tbody>
+              <tr>
+                <th width="200">Model Type:</th>
+                <td id="model_type">-</td>
+                <th width="200">Version:</th>
+                <td id="model_version">-</td>
+              </tr>
+              <tr>
+                <th>Training Accuracy:</th>
+                <td id="model_accuracy">-</td>
+                <th>Last Trained:</th>
+                <td id="model_last_trained">-</td>
+              </tr>
+              <tr>
+                <th>Features Used:</th>
+                <td colspan="3" id="model_features">-</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs for Different Views -->
+  <div class="row">
+    <div class="col-12">
+      <ul class="nav nav-tabs" id="mlDetectorTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="detections-tab" data-bs-toggle="tab"
+                  data-bs-target="#detections" type="button" role="tab">
+            Recent Detections
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="alerts-tab" data-bs-toggle="tab"
+                  data-bs-target="#alerts" type="button" role="tab">
+            Alerts
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content" id="mlDetectorTabContent">
+        <!-- Recent Detections Tab -->
+        <div class="tab-pane fade show active" id="detections" role="tabpanel">
+          <div class="card mt-3">
+            <div class="card-body">
+              <table id="table_detections" class="table table-striped table-hover display nowrap" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Source IP</th>
+                    <th>Destination IP</th>
+                    <th>Destination Port</th>
+                    <th>Protocol</th>
+                    <th>Classification</th>
+                    <th>Confidence</th>
+                    <th>Bytes</th>
+                    <th>Packets</th>
+                  </tr>
+                </thead>
+                <tbody>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alerts Tab -->
+        <div class="tab-pane fade" id="alerts" role="tabpanel">
+          <div class="card mt-3">
+            <div class="card-body">
+              <table id="table_alerts" class="table table-striped table-hover display nowrap" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Alert Type</th>
+                    <th>Severity</th>
+                    <th>Source IP</th>
+                    <th>Description</th>
+                    <th>Confidence</th>
+                  </tr>
+                </thead>
+                <tbody>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

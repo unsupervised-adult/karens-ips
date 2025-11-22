@@ -146,6 +146,7 @@ show_configuration() {
     info "    Redis (SLIPS backend)"
     info "    Kalipso (Terminal UI for SLIPS)"
     info "    SLIPS Web UI (Browser interface)"
+    info "    └─ ML Detector Dashboard (ad detection)"
     info "    SystemD (service management)"
     info "=========================================="
     info ""
@@ -2117,7 +2118,102 @@ class IPSFilterDB:
             return False
         finally:
             conn.close()
-    
+
+    def import_domain_list(self, list_file_path: str, category: str = 'ads', source_name: str = None):
+        """Import simple domain list file (one domain per line, # for comments)"""
+        print(f"  Importing domain list: {list_file_path}")
+
+        if not os.path.exists(list_file_path):
+            print(f"Domain list file not found: {list_file_path}")
+            return False
+
+        if source_name is None:
+            source_name = os.path.basename(list_file_path)
+
+        conn = sqlite3.connect(self.db_path, timeout=10, isolation_level=None)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=OFF")
+        conn.execute("PRAGMA temp_store=MEMORY")
+        conn.execute("PRAGMA cache_size=-200000")
+        cursor = conn.cursor()
+
+        imported_count = 0
+        skipped_count = 0
+        batch_rows = []
+        batch_size = 1000
+
+        try:
+            with open(list_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                for line_num, line in enumerate(f, 1):
+                    if line_num % 10000 == 0:
+                        print(f"   Processing line {line_num:,}...")
+
+                    line = line.strip()
+
+                    # Skip empty lines and comments
+                    if not line or line.startswith('#'):
+                        continue
+
+                    # Remove inline comments
+                    if '#' in line:
+                        line = line.split('#')[0].strip()
+
+                    # Handle hosts file format (IP domain)
+                    parts = line.split()
+                    if len(parts) >= 2 and (parts[0].startswith('0.0.0.0') or parts[0].startswith('127.0.0.1')):
+                        domain = parts[1].lower()
+                    else:
+                        domain = line.lower()
+
+                    # Validate domain
+                    if not domain or '.' not in domain or len(domain) > 255:
+                        skipped_count += 1
+                        continue
+
+                    # Skip localhost and invalid domains
+                    if domain in ['localhost', 'localhost.localdomain', 'local', 'broadcasthost']:
+                        skipped_count += 1
+                        continue
+
+                    batch_rows.append((domain, category, f'Imported from {source_name}', source_name))
+
+                    # Process batch when full
+                    if len(batch_rows) >= batch_size:
+                        cursor.execute('BEGIN IMMEDIATE')
+                        cursor.executemany('''
+                            INSERT OR IGNORE INTO blocked_domains (domain, category, reason, added_by)
+                            VALUES (?, ?, ?, ?)
+                        ''', batch_rows)
+                        imported_count += len(batch_rows)
+                        cursor.execute('COMMIT')
+                        batch_rows = []
+
+            # Process final batch
+            if batch_rows:
+                cursor.execute('BEGIN IMMEDIATE')
+                cursor.executemany('''
+                    INSERT OR IGNORE INTO blocked_domains (domain, category, reason, added_by)
+                    VALUES (?, ?, ?, ?)
+                ''', batch_rows)
+                imported_count += len(batch_rows)
+                cursor.execute('COMMIT')
+
+            # Restore normal sync mode
+            cursor.execute('PRAGMA synchronous=NORMAL')
+            conn.commit()
+
+            print(f"\nDomain List Import Complete:")
+            print(f"     Imported: {imported_count:,} domains")
+            print(f"     Skipped: {skipped_count:,} entries")
+
+            return True
+
+        except Exception as e:
+            print(f"Error importing domain list: {e}")
+            return False
+        finally:
+            conn.close()
+
     def sync_domains_batch(self, domains: list):
         """Sync batch of domains to Suricata for performance"""
         for domain in domains:
@@ -2898,15 +2994,17 @@ class IPSFilterDB:
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='IPS Filter Database Management')
-    parser.add_argument('action', choices=['init', 'add', 'stats', 'import-rpz', 'sync', 'ml-scan', 'ml-auto', 'debug-datasets'])
+    parser.add_argument('action', choices=['init', 'add', 'stats', 'import-rpz', 'import-list', 'sync', 'ml-scan', 'ml-auto', 'debug-datasets'])
     parser.add_argument('--domain', help='Domain to add')
     parser.add_argument('--category', help='Category for domain')
     parser.add_argument('--reason', help='Reason for blocking')
     parser.add_argument('--rpz-file', help='Path to RPZ file for import')
-    
+    parser.add_argument('--list-file', help='Path to domain list file for import')
+    parser.add_argument('--source-name', help='Source name for domain list import')
+
     args = parser.parse_args()
     db = IPSFilterDB()
-    
+
     if args.action == 'add' and args.domain and args.category:
         db.add_blocked_domain(args.domain, args.category, args.reason or '')
     elif args.action == 'stats':
@@ -2919,6 +3017,13 @@ if __name__ == '__main__':
             sys.exit(1)
         category = args.category or 'rpz_import'
         db.import_rpz_file(args.rpz_file, category)
+    elif args.action == 'import-list':
+        if not args.list_file:
+            print("--list-file required for import-list")
+            sys.exit(1)
+        category = args.category or 'ads'
+        source_name = args.source_name or os.path.basename(args.list_file)
+        db.import_domain_list(args.list_file, category, source_name)
     elif args.action == 'sync':
         print("Syncing all domains to Suricata...")
         db.sync_all_domains_to_suricata()
@@ -3079,6 +3184,16 @@ case "$1" in
         echo "Warning: This may take several minutes for 100k+ entries..."
         /opt/ips-filter-db.py import-rpz --rpz-file "$2" --category "${3:-rpz_import}"
         ;;
+    "import-list")
+        if [ -z "$2" ]; then
+            echo "Usage: ips-filter import-list <domain-list-file> [category] [source-name]"
+            echo "Example: ips-filter import-list /path/to/domains.txt ads perflyst"
+            exit 1
+        fi
+        echo "  Importing domain list: $2"
+        echo "Warning: This may take several minutes for large lists..."
+        /opt/ips-filter-db.py import-list --list-file "$2" --category "${3:-ads}" --source-name "${4:-$(basename "$2")}"
+        ;;
     "ml-scan")
         echo "Running SLIPS ML threat analysis..."
         echo "Scanning for bypass attempts, domain fronting, C&C channels..."
@@ -3106,20 +3221,76 @@ case "$1" in
         echo "Live IPS filter activity:"
         tail -f /var/log/suricata/fast.log | grep --color=always "FAMILY FILTER"
         ;;
+    "update-blocklists")
+        echo "Updating blocklist repositories..."
+        /usr/local/bin/update-blocklists
+        ;;
+    "exception")
+        case "$2" in
+            "add")
+                if [ "$3" = "domain" ]; then
+                    [ -z "$4" ] && { echo "Usage: ips-filter exception add domain <domain> [reason]"; exit 1; }
+                    python3 /opt/karens-ips/src/blocklist_config.py exception add domain "$4" --reason "${5:-Manual exception}"
+                elif [ "$3" = "ip" ]; then
+                    [ -z "$4" ] && { echo "Usage: ips-filter exception add ip <ip> [reason]"; exit 1; }
+                    python3 /opt/karens-ips/src/blocklist_config.py exception add ip "$4" --reason "${5:-Manual exception}"
+                else
+                    echo "Usage: ips-filter exception add {domain|ip} <value> [reason]"
+                    exit 1
+                fi
+                ;;
+            "remove")
+                if [ "$3" = "domain" ]; then
+                    [ -z "$4" ] && { echo "Usage: ips-filter exception remove domain <domain>"; exit 1; }
+                    python3 /opt/karens-ips/src/blocklist_config.py exception remove domain "$4"
+                elif [ "$3" = "ip" ]; then
+                    [ -z "$4" ] && { echo "Usage: ips-filter exception remove ip <ip>"; exit 1; }
+                    python3 /opt/karens-ips/src/blocklist_config.py exception remove ip "$4"
+                else
+                    echo "Usage: ips-filter exception remove {domain|ip} <value>"
+                    exit 1
+                fi
+                ;;
+            "list")
+                python3 /opt/karens-ips/src/blocklist_config.py exception list "${3:-all}"
+                ;;
+            *)
+                echo "Exception Management"
+                echo "Usage: ips-filter exception {add|remove|list} ..."
+                echo ""
+                echo "Commands:"
+                echo "  exception add domain <domain> [reason]  - Add domain exception"
+                echo "  exception add ip <ip> [reason]         - Add IP exception"
+                echo "  exception remove domain <domain>        - Remove domain exception"
+                echo "  exception remove ip <ip>                - Remove IP exception"
+                echo "  exception list [domain|ip|all]          - List exceptions"
+                echo ""
+                echo "Examples:"
+                echo "  ips-filter exception add domain example.com 'false positive'"
+                echo "  ips-filter exception add ip 8.8.8.8 'trusted DNS server'"
+                echo "  ips-filter exception list"
+                ;;
+        esac
+        ;;
     *)
         echo "IPS Filter Management "
         echo "Commands:"
-        echo "  add <domain> [category]       - Block a domain"
-        echo "  import-rpz <file> [category]  - Import DNS RPZ file (100k+ entries)"
-        echo "  sync                          - Sync all domains to Suricata"
-        echo "  stats                         - Show statistics"  
-        echo "  web                           - Start web interface"
-        echo "  log                           - Monitor live blocking"
+        echo "  add <domain> [category]           - Block a domain"
+        echo "  import-rpz <file> [category]      - Import DNS RPZ file (100k+ entries)"
+        echo "  import-list <file> [category]     - Import domain list file"
+        echo "  update-blocklists                 - Update blocklist repositories"
+        echo "  exception <command>               - Manage exceptions (whitelist)"
+        echo "  sync                              - Sync all domains to Suricata"
+        echo "  stats                             - Show statistics"
+        echo "  web                               - Start web interface"
+        echo "  log                               - Monitor live blocking"
         echo ""
         echo "Examples:"
         echo "  ips-filter add facebook.com social_media"
         echo "  ips-filter import-rpz /path/to/blocklist.rpz malware"
-        echo "  ips-filter import-rpz /home/user/ads.rpz advertising"
+        echo "  ips-filter import-list /path/to/domains.txt ads"
+        echo "  ips-filter update-blocklists"
+        echo "  ips-filter exception add domain trusted.com"
         echo "  ips-filter sync"
         echo "  ips-filter web"
         echo ""
@@ -3127,6 +3298,14 @@ case "$1" in
         echo "  • Blocked domains: domain.com CNAME ."
         echo "  • Allowed domains: domain.com CNAME rpz-passthru."
         echo "  • Supports 100k+ entries with real-time Suricata sync"
+        echo ""
+        echo "  Exception Management:"
+        echo "  • Add exceptions to prevent blocking trusted domains/IPs"
+        echo "  • Useful for false positives in aggressive blocklists"
+        echo ""
+        echo "  Automatic Updates:"
+        echo "  • Blocklists auto-update weekly (systemd timer)"
+        echo "  • Manual update: ips-filter update-blocklists"
         echo ""
         echo "Web Interface: http://10.10.254.39:55001"
         ;;
@@ -3401,6 +3580,114 @@ ZEEK_CFG_EOF
     fi
     
     log "SLIPS installed successfully"
+}
+
+# Install ML Detector Dashboard Integration for SLIPS Web UI
+install_ml_detector_dashboard() {
+    log "Installing Karen's IPS ML Detector Dashboard..."
+
+    # Get the directory where Karen's IPS is installed (where this script lives)
+    KARENS_IPS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Check if SLIPS is installed
+    if [ ! -d "/opt/StratosphereLinuxIPS" ]; then
+        error_exit "SLIPS not found at /opt/StratosphereLinuxIPS. Install SLIPS first."
+    fi
+
+    # Check if slips_integration directory exists
+    if [ ! -d "$KARENS_IPS_DIR/slips_integration" ]; then
+        warn "ML Detector dashboard files not found at $KARENS_IPS_DIR/slips_integration"
+        warn "Skipping ML Detector dashboard installation"
+        return 0
+    fi
+
+    log "Found ML Detector integration files at $KARENS_IPS_DIR/slips_integration"
+
+    cd /opt/StratosphereLinuxIPS
+
+    # Backup existing web interface (if not already backed up)
+    if [ ! -d "webinterface.backup.$(date +%Y%m%d)" ]; then
+        log "Creating backup of SLIPS webinterface..."
+        cp -r webinterface "webinterface.backup.$(date +%Y%m%d)"
+    fi
+
+    # Copy ML Detector blueprint
+    log "Installing ML Detector blueprint..."
+    ML_DETECTOR_DEST="/opt/StratosphereLinuxIPS/webinterface/ml_detector"
+
+    if [ -d "$ML_DETECTOR_DEST" ]; then
+        log "ML Detector already exists, updating..."
+        rm -rf "$ML_DETECTOR_DEST"
+    fi
+
+    cp -r "$KARENS_IPS_DIR/slips_integration/webinterface/ml_detector" "$ML_DETECTOR_DEST"
+    log "ML Detector blueprint installed"
+
+    # Apply patches to SLIPS core files
+    log "Applying patches to SLIPS web interface..."
+
+    # Patch app.py
+    if grep -q "from .ml_detector.ml_detector import ml_detector" webinterface/app.py; then
+        log "app.py already patched"
+    else
+        log "Patching webinterface/app.py..."
+        if patch -p1 --dry-run < "$KARENS_IPS_DIR/slips_integration/patches/app.py.patch" > /dev/null 2>&1; then
+            patch -p1 < "$KARENS_IPS_DIR/slips_integration/patches/app.py.patch"
+            log "app.py patched successfully"
+        else
+            warn "app.py patch failed, attempting manual integration..."
+            # Manual patch fallback
+            sed -i '/from \.documentation\.documentation import documentation/a from .ml_detector.ml_detector import ml_detector' webinterface/app.py
+            sed -i '/app.register_blueprint(documentation, url_prefix="\/documentation")/a \    app.register_blueprint(ml_detector, url_prefix="/ml_detector")' webinterface/app.py
+            log "app.py manually patched"
+        fi
+    fi
+
+    # Patch app.html
+    if grep -q "ml_detector.html" webinterface/templates/app.html; then
+        log "app.html already patched"
+    else
+        log "Patching webinterface/templates/app.html..."
+        if patch -p1 --dry-run < "$KARENS_IPS_DIR/slips_integration/patches/app.html.patch" > /dev/null 2>&1; then
+            patch -p1 < "$KARENS_IPS_DIR/slips_integration/patches/app.html.patch"
+            log "app.html patched successfully"
+        else
+            warn "app.html patch failed - manual integration required"
+            warn "Please follow instructions in $KARENS_IPS_DIR/slips_integration/README.md"
+        fi
+    fi
+
+    # Set proper permissions
+    chown -R root:root "$ML_DETECTOR_DEST"
+    chmod 755 "$ML_DETECTOR_DEST"
+    find "$ML_DETECTOR_DEST" -type f -name "*.py" -exec chmod 644 {} \;
+    find "$ML_DETECTOR_DEST" -type f -name "*.js" -exec chmod 644 {} \;
+    find "$ML_DETECTOR_DEST" -type f -name "*.css" -exec chmod 644 {} \;
+    find "$ML_DETECTOR_DEST" -type f -name "*.html" -exec chmod 644 {} \;
+
+    # Install additional Python dependencies if needed (using SLIPS venv)
+    if [ -f "$KARENS_IPS_DIR/requirements.txt" ]; then
+        log "Installing additional Python dependencies..."
+        source /opt/StratosphereLinuxIPS/venv/bin/activate
+        pip install --upgrade pip
+        # Install only if not already present
+        pip install -q flask markupsafe || true
+        deactivate
+    fi
+
+    log "ML Detector Dashboard installed successfully!"
+    log ""
+    log "The ML Detector Dashboard will be available at:"
+    log "  http://[SLIPS-IP]:55000 -> Click 'ML Detector' tab"
+    log ""
+    log "Redis keys used by ML Detector:"
+    log "  - ml_detector:stats"
+    log "  - ml_detector:recent_detections"
+    log "  - ml_detector:timeline"
+    log "  - ml_detector:model_info"
+    log "  - ml_detector:feature_importance"
+    log "  - ml_detector:alerts"
+    log ""
 }
 
 # Configure interface setup
@@ -4278,8 +4565,211 @@ echo "tail -f /var/log/suricata/eve.json | grep '\"quic\"'"
 HEALTH_EOF
     
     chmod +x /opt/ips-health-check.sh
-    
+
     log "Verification completed"
+}
+
+import_community_blocklists() {
+    log "=========================================="
+    log "Importing Community Blocklists"
+    log "=========================================="
+    log ""
+
+    # Create blocklists directory
+    BLOCKLISTS_DIR="/opt/karens-ips-blocklists"
+    mkdir -p "$BLOCKLISTS_DIR"
+    cd "$BLOCKLISTS_DIR"
+
+    log "Cloning blocklist repositories..."
+    log "This may take several minutes due to repository size..."
+    log ""
+
+    # Clone Perflyst PiHoleBlocklist
+    if [ ! -d "PiHoleBlocklist" ]; then
+        log "Cloning Perflyst/PiHoleBlocklist..."
+        git clone --depth 1 https://github.com/Perflyst/PiHoleBlocklist.git 2>&1 | grep -v "^remote:" || true
+    else
+        log "Perflyst/PiHoleBlocklist already exists, updating..."
+        cd PiHoleBlocklist && git pull --quiet 2>&1 | grep -v "^remote:" || true
+        cd ..
+    fi
+
+    # Clone hagezi dns-blocklists
+    if [ ! -d "dns-blocklists" ]; then
+        log "Cloning hagezi/dns-blocklists (this is a large repository)..."
+        git clone --depth 1 https://github.com/hagezi/dns-blocklists.git 2>&1 | grep -v "^remote:" || true
+    else
+        log "hagezi/dns-blocklists already exists, updating..."
+        cd dns-blocklists && git pull --quiet 2>&1 | grep -v "^remote:" || true
+        cd ..
+    fi
+
+    log ""
+    log "Importing blocklists into IPS database..."
+    log "This will take several minutes for large lists..."
+    log ""
+
+    # Import Perflyst blocklists
+    log "Importing Perflyst SmartTV blocklist..."
+    /opt/ips-filter-db.py import-list \
+        --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/SmartTV.txt" \
+        --category "ads" \
+        --source-name "perflyst_smarttv" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+
+    log "Importing Perflyst Android tracking blocklist..."
+    /opt/ips-filter-db.py import-list \
+        --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/android-tracking.txt" \
+        --category "tracking" \
+        --source-name "perflyst_android" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+
+    log "Importing Perflyst Amazon FireTV blocklist..."
+    /opt/ips-filter-db.py import-list \
+        --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/AmazonFireTV.txt" \
+        --category "ads" \
+        --source-name "perflyst_firetv" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+
+    log "Importing Perflyst SessionReplay blocklist..."
+    /opt/ips-filter-db.py import-list \
+        --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/SessionReplay.txt" \
+        --category "tracking" \
+        --source-name "perflyst_sessionreplay" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+
+    # Import hagezi blocklists (Pro version - balanced blocking)
+    if [ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.txt" ]; then
+        log "Importing hagezi Pro blocklist (balanced - recommended)..."
+        /opt/ips-filter-db.py import-list \
+            --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.txt" \
+            --category "ads" \
+            --source-name "hagezi_pro" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
+    else
+        warn "hagezi Pro blocklist not found, skipping..."
+    fi
+
+    if [ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/native.txt" ]; then
+        log "Importing hagezi Native Tracker blocklist..."
+        /opt/ips-filter-db.py import-list \
+            --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/native.txt" \
+            --category "tracking" \
+            --source-name "hagezi_native" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
+    else
+        warn "hagezi Native Tracker blocklist not found, skipping..."
+    fi
+
+    log ""
+    log "Syncing all imported domains to Suricata..."
+    /opt/ips-filter-db.py sync 2>&1 | grep -E "(Syncing|Successfully|Progress:|Warning:)" || true
+
+    log ""
+    log "Showing final statistics..."
+    /opt/ips-filter-db.py stats
+
+    log ""
+    log "Blocklist import complete!"
+    log "Database: /var/lib/suricata/ips_filter.db"
+    log "Blocklists: $BLOCKLISTS_DIR"
+    log ""
+    log "To update blocklists in the future, run:"
+    log "  cd $BLOCKLISTS_DIR"
+    log "  cd PiHoleBlocklist && git pull && cd .."
+    log "  cd dns-blocklists && git pull && cd .."
+    log "  ips-filter import-list /opt/karens-ips-blocklists/PiHoleBlocklist/SmartTV.txt ads"
+    log "  ips-filter sync"
+    log ""
+}
+
+setup_blocklist_management() {
+    log "=========================================="
+    log "Setting Up Blocklist Management"
+    log "=========================================="
+    log ""
+
+    # Get the project directory (where the installer is located)
+    INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Create configuration directory
+    mkdir -p /etc/karens-ips
+    log "✓ Created configuration directory"
+
+    # Copy blocklist configuration file
+    if [ -f "$INSTALLER_DIR/config/blocklists.yaml" ]; then
+        cp "$INSTALLER_DIR/config/blocklists.yaml" /etc/karens-ips/
+        chmod 644 /etc/karens-ips/blocklists.yaml
+        log "✓ Installed blocklist configuration: /etc/karens-ips/blocklists.yaml"
+    else
+        warn "Blocklist configuration file not found, creating default..."
+        cat > /etc/karens-ips/blocklists.yaml << 'EOF'
+repositories_dir: /opt/karens-ips-blocklists
+auto_update:
+  enabled: true
+  schedule: weekly
+perflyst:
+  enabled: true
+hagezi:
+  enabled: true
+exceptions:
+  enabled: true
+  domains: []
+  ips: []
+EOF
+        log "✓ Created default blocklist configuration"
+    fi
+
+    # Install update script
+    if [ -f "$INSTALLER_DIR/scripts/update-blocklists.sh" ]; then
+        cp "$INSTALLER_DIR/scripts/update-blocklists.sh" /usr/local/bin/update-blocklists
+        chmod +x /usr/local/bin/update-blocklists
+        log "✓ Installed update script: /usr/local/bin/update-blocklists"
+    else
+        warn "Update script not found at $INSTALLER_DIR/scripts/update-blocklists.sh"
+    fi
+
+    # Install configuration-based importer
+    if [ -f "$INSTALLER_DIR/scripts/import-from-config.py" ]; then
+        cp "$INSTALLER_DIR/scripts/import-from-config.py" /usr/local/bin/import-from-config
+        chmod +x /usr/local/bin/import-from-config
+        log "✓ Installed configuration-based importer: /usr/local/bin/import-from-config"
+    else
+        warn "Import script not found at $INSTALLER_DIR/scripts/import-from-config.py"
+    fi
+
+    # Install systemd service and timer for automatic updates
+    if [ -f "$INSTALLER_DIR/deployment/blocklist-update.service" ]; then
+        cp "$INSTALLER_DIR/deployment/blocklist-update.service" /etc/systemd/system/
+        log "✓ Installed blocklist update service"
+    fi
+
+    if [ -f "$INSTALLER_DIR/deployment/blocklist-update.timer" ]; then
+        cp "$INSTALLER_DIR/deployment/blocklist-update.timer" /etc/systemd/system/
+        log "✓ Installed blocklist update timer"
+    fi
+
+    # Install Python configuration management module
+    if [ -f "$INSTALLER_DIR/src/blocklist_config.py" ]; then
+        mkdir -p /opt/karens-ips/src
+        cp "$INSTALLER_DIR/src/blocklist_config.py" /opt/karens-ips/src/
+        chmod +x /opt/karens-ips/src/blocklist_config.py
+        log "✓ Installed configuration manager"
+    fi
+
+    # Reload systemd and enable timer
+    systemctl daemon-reload
+    systemctl enable blocklist-update.timer
+    systemctl start blocklist-update.timer
+    log "✓ Enabled automatic weekly blocklist updates"
+
+    log ""
+    log "Blocklist management setup complete!"
+    log ""
+    log "Configuration:"
+    log "  • Config file: /etc/karens-ips/blocklists.yaml"
+    log "  • Update script: /usr/local/bin/update-blocklists"
+    log "  • Auto-update: Weekly on Sunday at 3 AM"
+    log ""
+    log "Commands:"
+    log "  • Update now: ips-filter update-blocklists"
+    log "  • Add exception: ips-filter exception add domain example.com"
+    log "  • List exceptions: ips-filter exception list"
+    log ""
 }
 
 # Main execution
@@ -4309,12 +4799,21 @@ main() {
     
     log "Phase 6: Updating Suricata rules..."
     update_suricata_rules
-    
+
+    log "Phase 6.5: Importing community blocklists..."
+    import_community_blocklists
+
+    log "Phase 6.6: Setting up blocklist management..."
+    setup_blocklist_management
+
     log "Phase 7: Installing Node.js..."
     install_nodejs
-    
+
     log "Phase 8: Installing SLIPS..."
     install_slips
+    
+    log "Phase 8.5: Installing ML Detector Dashboard..."
+    install_ml_detector_dashboard
     
     log "Phase 9: Setting up network interfaces..."
     setup_interfaces
@@ -4373,6 +4872,7 @@ main() {
     info "  EVE JSON:       tail -f /var/log/suricata/eve.json"
     MGMT_IP_DETECTED=$(ip addr show $MGMT_IFACE | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 || echo "DHCP-pending")
     info "  SLIPS Web UI:   http://${MGMT_IP_DETECTED}:55000 (management interface)"
+    info "    └─ ML Detector:   Click 'ML Detector' tab for ad detection dashboard"
     info "  Kalipso CLI:    kalipso (interactive terminal - smart launcher)"
     info ""
     info "Configuration saved in: /etc/ips-config/ips-config.conf"
