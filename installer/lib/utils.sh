@@ -41,6 +41,40 @@ package_installed() {
     dpkg -l "$1" 2>/dev/null | grep -q "^ii"
 }
 
+# Wait for apt locks to clear
+wait_for_apt_lock() {
+    local max_wait=300  # 5 minutes maximum
+    local waited=0
+    local check_interval=2
+
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+          fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
+          fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
+
+        if [[ $waited -eq 0 ]]; then
+            log "Waiting for other package managers to finish..."
+            log "This may take a few minutes if system updates are running."
+        fi
+
+        if [[ $waited -ge $max_wait ]]; then
+            error_exit "Timeout waiting for package manager locks to clear after ${max_wait}s"
+        fi
+
+        sleep $check_interval
+        waited=$((waited + check_interval))
+
+        # Show progress every 10 seconds
+        if [[ $((waited % 10)) -eq 0 ]]; then
+            log "Still waiting... (${waited}s elapsed)"
+        fi
+    done
+
+    if [[ $waited -gt 0 ]]; then
+        success "Package manager locks cleared after ${waited}s"
+        sleep 1  # Brief pause to ensure locks are fully released
+    fi
+}
+
 # Check if service is running
 service_running() {
     systemctl is-active --quiet "$1"
@@ -461,7 +495,7 @@ configure_network_interfaces() {
 
 # Export functions for use in other scripts
 export -f log warn error_exit info success debug
-export -f ask_yes_no command_exists package_installed
+export -f ask_yes_no command_exists package_installed wait_for_apt_lock
 export -f service_running service_enabled wait_for_service
 export -f check_root check_os backup_file restore_file
 export -f create_dir download_file check_internet

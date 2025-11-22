@@ -51,6 +51,7 @@ install_nftables() {
     log "Installing nftables..."
 
     if ! command -v nft >/dev/null 2>&1; then
+        wait_for_apt_lock
         apt-get install -y nftables || error_exit "Failed to install nftables"
         success "nftables installed"
     else

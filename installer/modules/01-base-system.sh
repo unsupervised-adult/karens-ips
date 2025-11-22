@@ -33,6 +33,7 @@ install_base_system() {
 
     # Update system
     log "Running system update..."
+    wait_for_apt_lock
     apt-get update || error_exit "Failed to update package lists"
     apt-get upgrade -y || warn "System upgrade had issues, continuing..."
 
