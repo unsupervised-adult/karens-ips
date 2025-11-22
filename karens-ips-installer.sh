@@ -146,6 +146,7 @@ show_configuration() {
     info "    Redis (SLIPS backend)"
     info "    Kalipso (Terminal UI for SLIPS)"
     info "    SLIPS Web UI (Browser interface)"
+    info "    └─ ML Detector Dashboard (ad detection)"
     info "    SystemD (service management)"
     info "=========================================="
     info ""
@@ -3403,6 +3404,114 @@ ZEEK_CFG_EOF
     log "SLIPS installed successfully"
 }
 
+# Install ML Detector Dashboard Integration for SLIPS Web UI
+install_ml_detector_dashboard() {
+    log "Installing Karen's IPS ML Detector Dashboard..."
+
+    # Get the directory where Karen's IPS is installed (where this script lives)
+    KARENS_IPS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Check if SLIPS is installed
+    if [ ! -d "/opt/StratosphereLinuxIPS" ]; then
+        error_exit "SLIPS not found at /opt/StratosphereLinuxIPS. Install SLIPS first."
+    fi
+
+    # Check if slips_integration directory exists
+    if [ ! -d "$KARENS_IPS_DIR/slips_integration" ]; then
+        warn "ML Detector dashboard files not found at $KARENS_IPS_DIR/slips_integration"
+        warn "Skipping ML Detector dashboard installation"
+        return 0
+    fi
+
+    log "Found ML Detector integration files at $KARENS_IPS_DIR/slips_integration"
+
+    cd /opt/StratosphereLinuxIPS
+
+    # Backup existing web interface (if not already backed up)
+    if [ ! -d "webinterface.backup.$(date +%Y%m%d)" ]; then
+        log "Creating backup of SLIPS webinterface..."
+        cp -r webinterface "webinterface.backup.$(date +%Y%m%d)"
+    fi
+
+    # Copy ML Detector blueprint
+    log "Installing ML Detector blueprint..."
+    ML_DETECTOR_DEST="/opt/StratosphereLinuxIPS/webinterface/ml_detector"
+
+    if [ -d "$ML_DETECTOR_DEST" ]; then
+        log "ML Detector already exists, updating..."
+        rm -rf "$ML_DETECTOR_DEST"
+    fi
+
+    cp -r "$KARENS_IPS_DIR/slips_integration/webinterface/ml_detector" "$ML_DETECTOR_DEST"
+    log "ML Detector blueprint installed"
+
+    # Apply patches to SLIPS core files
+    log "Applying patches to SLIPS web interface..."
+
+    # Patch app.py
+    if grep -q "from .ml_detector.ml_detector import ml_detector" webinterface/app.py; then
+        log "app.py already patched"
+    else
+        log "Patching webinterface/app.py..."
+        if patch -p1 --dry-run < "$KARENS_IPS_DIR/slips_integration/patches/app.py.patch" > /dev/null 2>&1; then
+            patch -p1 < "$KARENS_IPS_DIR/slips_integration/patches/app.py.patch"
+            log "app.py patched successfully"
+        else
+            warn "app.py patch failed, attempting manual integration..."
+            # Manual patch fallback
+            sed -i '/from \.documentation\.documentation import documentation/a from .ml_detector.ml_detector import ml_detector' webinterface/app.py
+            sed -i '/app.register_blueprint(documentation, url_prefix="\/documentation")/a \    app.register_blueprint(ml_detector, url_prefix="/ml_detector")' webinterface/app.py
+            log "app.py manually patched"
+        fi
+    fi
+
+    # Patch app.html
+    if grep -q "ml_detector.html" webinterface/templates/app.html; then
+        log "app.html already patched"
+    else
+        log "Patching webinterface/templates/app.html..."
+        if patch -p1 --dry-run < "$KARENS_IPS_DIR/slips_integration/patches/app.html.patch" > /dev/null 2>&1; then
+            patch -p1 < "$KARENS_IPS_DIR/slips_integration/patches/app.html.patch"
+            log "app.html patched successfully"
+        else
+            warn "app.html patch failed - manual integration required"
+            warn "Please follow instructions in $KARENS_IPS_DIR/slips_integration/README.md"
+        fi
+    fi
+
+    # Set proper permissions
+    chown -R root:root "$ML_DETECTOR_DEST"
+    chmod 755 "$ML_DETECTOR_DEST"
+    find "$ML_DETECTOR_DEST" -type f -name "*.py" -exec chmod 644 {} \;
+    find "$ML_DETECTOR_DEST" -type f -name "*.js" -exec chmod 644 {} \;
+    find "$ML_DETECTOR_DEST" -type f -name "*.css" -exec chmod 644 {} \;
+    find "$ML_DETECTOR_DEST" -type f -name "*.html" -exec chmod 644 {} \;
+
+    # Install additional Python dependencies if needed (using SLIPS venv)
+    if [ -f "$KARENS_IPS_DIR/requirements.txt" ]; then
+        log "Installing additional Python dependencies..."
+        source /opt/StratosphereLinuxIPS/venv/bin/activate
+        pip install --upgrade pip
+        # Install only if not already present
+        pip install -q flask markupsafe || true
+        deactivate
+    fi
+
+    log "ML Detector Dashboard installed successfully!"
+    log ""
+    log "The ML Detector Dashboard will be available at:"
+    log "  http://[SLIPS-IP]:55000 -> Click 'ML Detector' tab"
+    log ""
+    log "Redis keys used by ML Detector:"
+    log "  - ml_detector:stats"
+    log "  - ml_detector:recent_detections"
+    log "  - ml_detector:timeline"
+    log "  - ml_detector:model_info"
+    log "  - ml_detector:feature_importance"
+    log "  - ml_detector:alerts"
+    log ""
+}
+
 # Configure interface setup
 setup_interfaces() {
     log "Setting up network bridge for NFQUEUE IPS mode..."
@@ -4316,6 +4425,9 @@ main() {
     log "Phase 8: Installing SLIPS..."
     install_slips
     
+    log "Phase 8.5: Installing ML Detector Dashboard..."
+    install_ml_detector_dashboard
+    
     log "Phase 9: Setting up network interfaces..."
     setup_interfaces
     
@@ -4373,6 +4485,7 @@ main() {
     info "  EVE JSON:       tail -f /var/log/suricata/eve.json"
     MGMT_IP_DETECTED=$(ip addr show $MGMT_IFACE | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 || echo "DHCP-pending")
     info "  SLIPS Web UI:   http://${MGMT_IP_DETECTED}:55000 (management interface)"
+    info "    └─ ML Detector:   Click 'ML Detector' tab for ad detection dashboard"
     info "  Kalipso CLI:    kalipso (interactive terminal - smart launcher)"
     info ""
     info "Configuration saved in: /etc/ips-config/ips-config.conf"
