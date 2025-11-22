@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Models
+*.tflite
+*.pb
+*.h5
+*.pkl
+*.joblib
+
+# Data files
+*.csv
+*.json
+*.log
+*.parquet
+training/data/
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config (sensitive)
+config/local_*.yaml
+config/secrets.yaml
+*.key
+*.pem
+
+# Temporary files
+*.tmp
+*.temp
+*~

@@ -1,0 +1,7 @@
+- No emojis in code or comments
+- File/function-level comments only, never inline
+- Minimal explanations, clean code
+- No verbose docstrings unless necessary
+- Do not create new files unless explicitly requested
+- No README/markdown/changelog files for code changes
+- No documentation files unless asked

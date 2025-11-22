@@ -1,0 +1,155 @@
+# ML Ad/Telemetry Detector Configuration
+# Karen's IPS - Machine Learning Module for SLIPS
+
+# Redis Configuration
+redis:
+  # SLIPS Redis connections
+  host: "localhost"
+  ports:
+    # SLIPS main database
+    main: 6379
+    # SLIPS cache database  
+    cache: 6380
+  databases:
+    # Flow profiles and evidence
+    flows: 1
+    # Cache and temporary data
+    cache: 0
+  timeout: 5
+  password: null
+
+# Model Configuration
+model:
+  # Path to TensorFlow Lite model file
+  path: "models/ad_detector_v1.tflite"
+  # Path to StandardScaler pickle file
+  scaler_path: "models/scaler.pkl"
+  # Model version tracking
+  version_file: "models/version.txt"
+  # Fallback to full TensorFlow if TFLite fails
+  fallback_tensorflow: true
+
+# Detection Parameters
+detection:
+  # Confidence threshold for ad/telemetry classification (0.0-1.0)
+  confidence_threshold: 0.75
+  # High confidence threshold for immediate blocking
+  high_confidence_threshold: 0.90
+  # Minimum flows in time window for analysis
+  min_flows_for_prediction: 5
+  # Time window for flow aggregation (seconds)
+  time_window: 60
+  # Maximum concurrent predictions to batch
+  batch_size: 32
+
+# Feature Extraction
+features:
+  # Number of features extracted per flow
+  feature_count: 30
+  # Time series window (number of flows)
+  time_series_window: 10
+  # Cache feature vectors for performance
+  enable_caching: true
+  # Cache TTL in seconds
+  cache_ttl: 300
+
+# Blocking Configuration
+blocking:
+  # Timeout for IP blocks (seconds)
+  timeout: 30
+  # Evidence accumulation before blocking
+  evidence_threshold: 3
+  # Allow manual override of blocks
+  allow_override: true
+
+# Training Parameters
+training:
+  # Minimum labeled samples needed for retraining
+  min_samples: 100
+  # Data collection window for training (hours)
+  data_window_hours: 168  # 1 week
+  # Train/validation/test split ratios
+  train_ratio: 0.70
+  validation_ratio: 0.15
+  test_ratio: 0.15
+  # Model architecture
+  lstm_units: [64, 32]
+  dropout_rates: [0.3, 0.3, 0.4]
+  batch_size: 32
+  epochs: 50
+  learning_rate: 0.001
+
+# Logging Configuration
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+  # Log file path (null for console only)
+  file: "/var/log/ml-ad-detector.log"
+  # Maximum log file size (MB)
+  max_size: 10
+  # Number of backup log files
+  backup_count: 5
+  # Log predictions to database
+  log_predictions: true
+  # Log performance metrics
+  log_performance: true
+
+# Database Configuration
+database:
+  # SQLite database for storing predictions and statistics
+  path: "/opt/ml-ad-detector/data/predictions.db"
+  # Statistics table retention (days)
+  stats_retention: 90
+  # Prediction logs retention (days)
+  predictions_retention: 30
+
+# Performance Tuning
+performance:
+  # Maximum inference time warning threshold (ms)
+  max_inference_time: 15
+  # Feature extraction timeout (ms)
+  extraction_timeout: 5
+  # Enable performance profiling
+  enable_profiling: false
+  # Thread pool size for batch processing
+  thread_pool_size: 4
+
+# Security
+security:
+  # Only analyze outbound traffic (skip internal IPs)
+  outbound_only: true
+  # Private IP ranges to ignore
+  private_networks:
+    - "10.0.0.0/8"
+    - "172.16.0.0/12" 
+    - "192.168.0.0/16"
+    - "127.0.0.0/8"
+    - "169.254.0.0/16"
+  # Rate limiting (predictions per second)
+  rate_limit: 100
+
+# Monitoring
+monitoring:
+  # Enable real-time monitoring
+  enable_monitor: true
+  # Statistics update interval (seconds)
+  stats_interval: 60
+  # Alert thresholds
+  alerts:
+    # False positive rate threshold (percentage)
+    false_positive_rate: 5.0
+    # Accuracy drop threshold (percentage)
+    accuracy_drop: 5.0
+    # High prediction volume (predictions per minute)
+    high_volume: 1000
+
+# Development/Debug
+debug:
+  # Save raw features for debugging
+  save_features: false
+  # Save prediction details
+  save_predictions: true
+  # Enable detailed timing logs
+  timing_logs: false
+  # Test mode (don't send evidence to SLIPS)
+  test_mode: false
