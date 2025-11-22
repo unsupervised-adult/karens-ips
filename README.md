@@ -30,6 +30,16 @@ Built with Python and machine learning models, it offers real-time protection wh
 - ✅ Auto-refresh every 5 seconds
 - ✅ Fully integrated with SLIPS Web UI
 
+### Community Blocklists
+- ✅ Integrated blocklist management with SQLite database
+- ✅ **Perflyst/PiHoleBlocklist** - SmartTV, Android, FireTV tracking blocklists
+- ✅ **hagezi/dns-blocklists** - Comprehensive ad/tracker blocking (Pro & Native lists)
+- ✅ Automatic import during installation (300K+ domains)
+- ✅ Suricata IPS-level blocking (fallback when DNS blocking fails)
+- ✅ Real-time sync with Suricata datasets
+- ✅ CLI management: `ips-filter import-list`, `ips-filter sync`
+- ✅ Support for multiple formats (domain lists, hosts files, RPZ)
+
 ### Monitoring & Management
 - ✅ SLIPS Web UI (browser-based dashboard)
 - ✅ Kalipso CLI (terminal interface)
@@ -63,12 +73,13 @@ sudo ./karens-ips-installer.sh
 This installs:
 1. Base system and dependencies
 2. Suricata IPS (NFQUEUE bridge mode)
-3. SLIPS (Stratosphere Linux IPS)
-4. **ML Detector Dashboard** (automatically integrated)
-5. Redis database
-6. Kalipso CLI
-7. SLIPS Web UI with ML Detector tab
-8. SystemD services for all components
+3. **Community Blocklists** (Perflyst + hagezi, 300K+ domains)
+4. SLIPS (Stratosphere Linux IPS)
+5. **ML Detector Dashboard** (automatically integrated)
+6. Redis database
+7. Kalipso CLI
+8. SLIPS Web UI with ML Detector tab
+9. SystemD services for all components
 
 ### Post-Installation
 
@@ -119,6 +130,70 @@ The ML Detector uses these Redis keys:
 - `ml_detector:alerts` - Alerts (list, max 50)
 
 See [ML_DETECTOR_INTEGRATION.md](ML_DETECTOR_INTEGRATION.md) for complete integration documentation.
+
+## Community Blocklist Integration
+
+Karen's IPS integrates community-maintained blocklists for IPS-level ad and tracker blocking, providing a fallback when DNS-based blocking (like Pi-hole) fails or is bypassed.
+
+### Integrated Blocklists
+
+**Perflyst/PiHoleBlocklist**
+- SmartTV blocklist - Smart TV telemetry and ads
+- Android tracking - Mobile app tracking domains
+- Amazon FireTV - FireTV tracking and ads
+- SessionReplay - Session replay tracking scripts
+
+**hagezi/dns-blocklists**
+- Pro blocklist (recommended) - ~345K domains, balanced blocking
+- Native Tracker - Native app tracking domains
+- Multiple formats supported: domains, hosts, RPZ
+
+### How It Works
+
+1. **Installation**: Blocklists are automatically cloned and imported during installation
+2. **SQLite Database**: All domains stored in `/var/lib/suricata/ips_filter.db`
+3. **Suricata Integration**: Domains synced to Suricata datasets for IPS-level blocking
+4. **Real-time Blocking**: Traffic to blocked domains is dropped by Suricata before reaching its destination
+
+### Blocklist Management
+
+```bash
+# View statistics
+ips-filter stats
+
+# Import additional domain list
+ips-filter import-list /path/to/domains.txt ads
+
+# Import RPZ file
+ips-filter import-rpz /path/to/blocklist.rpz malware
+
+# Manually add domain
+ips-filter add example-ad-domain.com advertising
+
+# Sync all domains to Suricata
+ips-filter sync
+
+# Update blocklists
+cd /opt/karens-ips-blocklists
+cd PiHoleBlocklist && git pull && cd ..
+cd dns-blocklists && git pull && cd ..
+ips-filter import-list /opt/karens-ips-blocklists/PiHoleBlocklist/SmartTV.txt ads
+ips-filter sync
+```
+
+### Database Schema
+
+**blocked_domains table:**
+- `domain` - Domain name (unique per source)
+- `category` - ads, tracking, malware, social_media
+- `source` - perflyst_smarttv, hagezi_pro, etc.
+- `added_by` - Import source identifier
+- `active` - Enable/disable without deletion
+
+**Locations:**
+- Database: `/var/lib/suricata/ips_filter.db`
+- Blocklists: `/opt/karens-ips-blocklists/`
+- Suricata datasets: `/etc/suricata/datasets/`
 
 ## Architecture
 

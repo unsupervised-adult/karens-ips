@@ -2118,7 +2118,102 @@ class IPSFilterDB:
             return False
         finally:
             conn.close()
-    
+
+    def import_domain_list(self, list_file_path: str, category: str = 'ads', source_name: str = None):
+        """Import simple domain list file (one domain per line, # for comments)"""
+        print(f"  Importing domain list: {list_file_path}")
+
+        if not os.path.exists(list_file_path):
+            print(f"Domain list file not found: {list_file_path}")
+            return False
+
+        if source_name is None:
+            source_name = os.path.basename(list_file_path)
+
+        conn = sqlite3.connect(self.db_path, timeout=10, isolation_level=None)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=OFF")
+        conn.execute("PRAGMA temp_store=MEMORY")
+        conn.execute("PRAGMA cache_size=-200000")
+        cursor = conn.cursor()
+
+        imported_count = 0
+        skipped_count = 0
+        batch_rows = []
+        batch_size = 1000
+
+        try:
+            with open(list_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                for line_num, line in enumerate(f, 1):
+                    if line_num % 10000 == 0:
+                        print(f"   Processing line {line_num:,}...")
+
+                    line = line.strip()
+
+                    # Skip empty lines and comments
+                    if not line or line.startswith('#'):
+                        continue
+
+                    # Remove inline comments
+                    if '#' in line:
+                        line = line.split('#')[0].strip()
+
+                    # Handle hosts file format (IP domain)
+                    parts = line.split()
+                    if len(parts) >= 2 and (parts[0].startswith('0.0.0.0') or parts[0].startswith('127.0.0.1')):
+                        domain = parts[1].lower()
+                    else:
+                        domain = line.lower()
+
+                    # Validate domain
+                    if not domain or '.' not in domain or len(domain) > 255:
+                        skipped_count += 1
+                        continue
+
+                    # Skip localhost and invalid domains
+                    if domain in ['localhost', 'localhost.localdomain', 'local', 'broadcasthost']:
+                        skipped_count += 1
+                        continue
+
+                    batch_rows.append((domain, category, f'Imported from {source_name}', source_name))
+
+                    # Process batch when full
+                    if len(batch_rows) >= batch_size:
+                        cursor.execute('BEGIN IMMEDIATE')
+                        cursor.executemany('''
+                            INSERT OR IGNORE INTO blocked_domains (domain, category, reason, added_by)
+                            VALUES (?, ?, ?, ?)
+                        ''', batch_rows)
+                        imported_count += len(batch_rows)
+                        cursor.execute('COMMIT')
+                        batch_rows = []
+
+            # Process final batch
+            if batch_rows:
+                cursor.execute('BEGIN IMMEDIATE')
+                cursor.executemany('''
+                    INSERT OR IGNORE INTO blocked_domains (domain, category, reason, added_by)
+                    VALUES (?, ?, ?, ?)
+                ''', batch_rows)
+                imported_count += len(batch_rows)
+                cursor.execute('COMMIT')
+
+            # Restore normal sync mode
+            cursor.execute('PRAGMA synchronous=NORMAL')
+            conn.commit()
+
+            print(f"\nDomain List Import Complete:")
+            print(f"     Imported: {imported_count:,} domains")
+            print(f"     Skipped: {skipped_count:,} entries")
+
+            return True
+
+        except Exception as e:
+            print(f"Error importing domain list: {e}")
+            return False
+        finally:
+            conn.close()
+
     def sync_domains_batch(self, domains: list):
         """Sync batch of domains to Suricata for performance"""
         for domain in domains:
@@ -2899,15 +2994,17 @@ class IPSFilterDB:
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='IPS Filter Database Management')
-    parser.add_argument('action', choices=['init', 'add', 'stats', 'import-rpz', 'sync', 'ml-scan', 'ml-auto', 'debug-datasets'])
+    parser.add_argument('action', choices=['init', 'add', 'stats', 'import-rpz', 'import-list', 'sync', 'ml-scan', 'ml-auto', 'debug-datasets'])
     parser.add_argument('--domain', help='Domain to add')
     parser.add_argument('--category', help='Category for domain')
     parser.add_argument('--reason', help='Reason for blocking')
     parser.add_argument('--rpz-file', help='Path to RPZ file for import')
-    
+    parser.add_argument('--list-file', help='Path to domain list file for import')
+    parser.add_argument('--source-name', help='Source name for domain list import')
+
     args = parser.parse_args()
     db = IPSFilterDB()
-    
+
     if args.action == 'add' and args.domain and args.category:
         db.add_blocked_domain(args.domain, args.category, args.reason or '')
     elif args.action == 'stats':
@@ -2920,6 +3017,13 @@ if __name__ == '__main__':
             sys.exit(1)
         category = args.category or 'rpz_import'
         db.import_rpz_file(args.rpz_file, category)
+    elif args.action == 'import-list':
+        if not args.list_file:
+            print("--list-file required for import-list")
+            sys.exit(1)
+        category = args.category or 'ads'
+        source_name = args.source_name or os.path.basename(args.list_file)
+        db.import_domain_list(args.list_file, category, source_name)
     elif args.action == 'sync':
         print("Syncing all domains to Suricata...")
         db.sync_all_domains_to_suricata()
@@ -3080,6 +3184,16 @@ case "$1" in
         echo "Warning: This may take several minutes for 100k+ entries..."
         /opt/ips-filter-db.py import-rpz --rpz-file "$2" --category "${3:-rpz_import}"
         ;;
+    "import-list")
+        if [ -z "$2" ]; then
+            echo "Usage: ips-filter import-list <domain-list-file> [category] [source-name]"
+            echo "Example: ips-filter import-list /path/to/domains.txt ads perflyst"
+            exit 1
+        fi
+        echo "  Importing domain list: $2"
+        echo "Warning: This may take several minutes for large lists..."
+        /opt/ips-filter-db.py import-list --list-file "$2" --category "${3:-ads}" --source-name "${4:-$(basename "$2")}"
+        ;;
     "ml-scan")
         echo "Running SLIPS ML threat analysis..."
         echo "Scanning for bypass attempts, domain fronting, C&C channels..."
@@ -3110,17 +3224,18 @@ case "$1" in
     *)
         echo "IPS Filter Management "
         echo "Commands:"
-        echo "  add <domain> [category]       - Block a domain"
-        echo "  import-rpz <file> [category]  - Import DNS RPZ file (100k+ entries)"
-        echo "  sync                          - Sync all domains to Suricata"
-        echo "  stats                         - Show statistics"  
-        echo "  web                           - Start web interface"
-        echo "  log                           - Monitor live blocking"
+        echo "  add <domain> [category]           - Block a domain"
+        echo "  import-rpz <file> [category]      - Import DNS RPZ file (100k+ entries)"
+        echo "  import-list <file> [category]     - Import domain list file"
+        echo "  sync                              - Sync all domains to Suricata"
+        echo "  stats                             - Show statistics"
+        echo "  web                               - Start web interface"
+        echo "  log                               - Monitor live blocking"
         echo ""
         echo "Examples:"
         echo "  ips-filter add facebook.com social_media"
         echo "  ips-filter import-rpz /path/to/blocklist.rpz malware"
-        echo "  ips-filter import-rpz /home/user/ads.rpz advertising"
+        echo "  ips-filter import-list /path/to/domains.txt ads"
         echo "  ips-filter sync"
         echo "  ips-filter web"
         echo ""
@@ -4387,8 +4502,116 @@ echo "tail -f /var/log/suricata/eve.json | grep '\"quic\"'"
 HEALTH_EOF
     
     chmod +x /opt/ips-health-check.sh
-    
+
     log "Verification completed"
+}
+
+import_community_blocklists() {
+    log "=========================================="
+    log "Importing Community Blocklists"
+    log "=========================================="
+    log ""
+
+    # Create blocklists directory
+    BLOCKLISTS_DIR="/opt/karens-ips-blocklists"
+    mkdir -p "$BLOCKLISTS_DIR"
+    cd "$BLOCKLISTS_DIR"
+
+    log "Cloning blocklist repositories..."
+    log "This may take several minutes due to repository size..."
+    log ""
+
+    # Clone Perflyst PiHoleBlocklist
+    if [ ! -d "PiHoleBlocklist" ]; then
+        log "Cloning Perflyst/PiHoleBlocklist..."
+        git clone --depth 1 https://github.com/Perflyst/PiHoleBlocklist.git 2>&1 | grep -v "^remote:" || true
+    else
+        log "Perflyst/PiHoleBlocklist already exists, updating..."
+        cd PiHoleBlocklist && git pull --quiet 2>&1 | grep -v "^remote:" || true
+        cd ..
+    fi
+
+    # Clone hagezi dns-blocklists
+    if [ ! -d "dns-blocklists" ]; then
+        log "Cloning hagezi/dns-blocklists (this is a large repository)..."
+        git clone --depth 1 https://github.com/hagezi/dns-blocklists.git 2>&1 | grep -v "^remote:" || true
+    else
+        log "hagezi/dns-blocklists already exists, updating..."
+        cd dns-blocklists && git pull --quiet 2>&1 | grep -v "^remote:" || true
+        cd ..
+    fi
+
+    log ""
+    log "Importing blocklists into IPS database..."
+    log "This will take several minutes for large lists..."
+    log ""
+
+    # Import Perflyst blocklists
+    log "Importing Perflyst SmartTV blocklist..."
+    /opt/ips-filter-db.py import-list \
+        --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/SmartTV.txt" \
+        --category "ads" \
+        --source-name "perflyst_smarttv" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+
+    log "Importing Perflyst Android tracking blocklist..."
+    /opt/ips-filter-db.py import-list \
+        --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/android-tracking.txt" \
+        --category "tracking" \
+        --source-name "perflyst_android" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+
+    log "Importing Perflyst Amazon FireTV blocklist..."
+    /opt/ips-filter-db.py import-list \
+        --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/AmazonFireTV.txt" \
+        --category "ads" \
+        --source-name "perflyst_firetv" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+
+    log "Importing Perflyst SessionReplay blocklist..."
+    /opt/ips-filter-db.py import-list \
+        --list-file "$BLOCKLISTS_DIR/PiHoleBlocklist/SessionReplay.txt" \
+        --category "tracking" \
+        --source-name "perflyst_sessionreplay" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:)" || true
+
+    # Import hagezi blocklists (Pro version - balanced blocking)
+    if [ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.txt" ]; then
+        log "Importing hagezi Pro blocklist (balanced - recommended)..."
+        /opt/ips-filter-db.py import-list \
+            --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.txt" \
+            --category "ads" \
+            --source-name "hagezi_pro" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
+    else
+        warn "hagezi Pro blocklist not found, skipping..."
+    fi
+
+    if [ -f "$BLOCKLISTS_DIR/dns-blocklists/domains/native.txt" ]; then
+        log "Importing hagezi Native Tracker blocklist..."
+        /opt/ips-filter-db.py import-list \
+            --list-file "$BLOCKLISTS_DIR/dns-blocklists/domains/native.txt" \
+            --category "tracking" \
+            --source-name "hagezi_native" 2>&1 | grep -E "(Importing|Import Complete|Imported:|Skipped:|Processing line)" || true
+    else
+        warn "hagezi Native Tracker blocklist not found, skipping..."
+    fi
+
+    log ""
+    log "Syncing all imported domains to Suricata..."
+    /opt/ips-filter-db.py sync 2>&1 | grep -E "(Syncing|Successfully|Progress:|Warning:)" || true
+
+    log ""
+    log "Showing final statistics..."
+    /opt/ips-filter-db.py stats
+
+    log ""
+    log "Blocklist import complete!"
+    log "Database: /var/lib/suricata/ips_filter.db"
+    log "Blocklists: $BLOCKLISTS_DIR"
+    log ""
+    log "To update blocklists in the future, run:"
+    log "  cd $BLOCKLISTS_DIR"
+    log "  cd PiHoleBlocklist && git pull && cd .."
+    log "  cd dns-blocklists && git pull && cd .."
+    log "  ips-filter import-list /opt/karens-ips-blocklists/PiHoleBlocklist/SmartTV.txt ads"
+    log "  ips-filter sync"
+    log ""
 }
 
 # Main execution
@@ -4418,10 +4641,13 @@ main() {
     
     log "Phase 6: Updating Suricata rules..."
     update_suricata_rules
-    
+
+    log "Phase 6.5: Importing community blocklists..."
+    import_community_blocklists
+
     log "Phase 7: Installing Node.js..."
     install_nodejs
-    
+
     log "Phase 8: Installing SLIPS..."
     install_slips
     

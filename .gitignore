@@ -53,3 +53,4 @@ config/secrets.yaml
 
 # External repositories (cloned for integration reference)
 StratosphereLinuxIPS/
+blocklists/
