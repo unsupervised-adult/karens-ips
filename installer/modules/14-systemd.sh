@@ -170,15 +170,19 @@ create_slips_webui_service() {
     cat > /etc/systemd/system/slips-webui.service << EOF
 [Unit]
 Description=SLIPS Web Interface
-After=network.target redis.service ips-interfaces.service
+After=network.target redis.service ips-interfaces.service slips.service
 Wants=redis.service ips-interfaces.service
+# Web UI reads from Redis, so it should start after main SLIPS
+Requires=slips.service
 
 [Service]
 Type=simple
 User=root
 Group=root
 WorkingDirectory=${SLIPS_DIR}
-ExecStart=${SLIPS_DIR}/venv/bin/python ${SLIPS_DIR}/slips.py -c ${SLIPS_DIR}/config/slips.yaml -i ${IFACE_OUT} -w
+# Web UI doesn't monitor interfaces - it just serves the dashboard from Redis data
+# Remove -i flag so it can reach the internet for updates
+ExecStart=${SLIPS_DIR}/venv/bin/python ${SLIPS_DIR}/slips.py -c ${SLIPS_DIR}/config/slips.yaml -w
 Restart=on-failure
 RestartSec=30
 StandardOutput=journal
