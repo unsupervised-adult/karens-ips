@@ -82,6 +82,10 @@ clone_slips_repository() {
         log "SLIPS repository already exists"
     fi
 
+    # Fix ownership and git permissions
+    chown -R root:root "$SLIPS_DIR"
+    git config --global --add safe.directory "$SLIPS_DIR"
+
     cd "$SLIPS_DIR" || error_exit "Failed to change to SLIPS directory"
 }
 
@@ -99,9 +103,23 @@ setup_slips_venv() {
 
     # Install SLIPS requirements
     if [ -f install/requirements.txt ]; then
-        log "Installing SLIPS dependencies..."
+        log "Installing SLIPS dependencies (this may take several minutes)..."
         pip install -r install/requirements.txt || warn "Some SLIPS dependencies failed to install"
-        success "SLIPS dependencies installed"
+
+        # Explicitly install idmefv2 from GitHub (critical dependency)
+        log "Installing idmefv2 from GitHub..."
+        if pip install git+https://github.com/SECEF/python-idmefv2.git; then
+            success "idmefv2 installed successfully"
+        else
+            error_exit "Failed to install idmefv2 - SLIPS cannot function without this dependency"
+        fi
+
+        # Verify idmefv2 is installed
+        if python -c "import idmefv2" 2>/dev/null; then
+            success "SLIPS dependencies installed and verified"
+        else
+            error_exit "idmefv2 import failed - installation incomplete"
+        fi
     else
         warn "SLIPS requirements.txt not found"
     fi
