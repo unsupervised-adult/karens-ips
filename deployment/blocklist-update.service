@@ -1,0 +1,19 @@
+[Unit]
+Description=Karen's IPS Blocklist Update
+Documentation=https://github.com/unsupervised-adult/karens-ips
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/update-blocklists
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=blocklist-update
+
+# Security hardening
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/karens-ips-blocklists /var/lib/suricata /etc/suricata/datasets

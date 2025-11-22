@@ -3221,12 +3221,65 @@ case "$1" in
         echo "Live IPS filter activity:"
         tail -f /var/log/suricata/fast.log | grep --color=always "FAMILY FILTER"
         ;;
+    "update-blocklists")
+        echo "Updating blocklist repositories..."
+        /usr/local/bin/update-blocklists
+        ;;
+    "exception")
+        case "$2" in
+            "add")
+                if [ "$3" = "domain" ]; then
+                    [ -z "$4" ] && { echo "Usage: ips-filter exception add domain <domain> [reason]"; exit 1; }
+                    python3 /opt/karens-ips/src/blocklist_config.py exception add domain "$4" --reason "${5:-Manual exception}"
+                elif [ "$3" = "ip" ]; then
+                    [ -z "$4" ] && { echo "Usage: ips-filter exception add ip <ip> [reason]"; exit 1; }
+                    python3 /opt/karens-ips/src/blocklist_config.py exception add ip "$4" --reason "${5:-Manual exception}"
+                else
+                    echo "Usage: ips-filter exception add {domain|ip} <value> [reason]"
+                    exit 1
+                fi
+                ;;
+            "remove")
+                if [ "$3" = "domain" ]; then
+                    [ -z "$4" ] && { echo "Usage: ips-filter exception remove domain <domain>"; exit 1; }
+                    python3 /opt/karens-ips/src/blocklist_config.py exception remove domain "$4"
+                elif [ "$3" = "ip" ]; then
+                    [ -z "$4" ] && { echo "Usage: ips-filter exception remove ip <ip>"; exit 1; }
+                    python3 /opt/karens-ips/src/blocklist_config.py exception remove ip "$4"
+                else
+                    echo "Usage: ips-filter exception remove {domain|ip} <value>"
+                    exit 1
+                fi
+                ;;
+            "list")
+                python3 /opt/karens-ips/src/blocklist_config.py exception list "${3:-all}"
+                ;;
+            *)
+                echo "Exception Management"
+                echo "Usage: ips-filter exception {add|remove|list} ..."
+                echo ""
+                echo "Commands:"
+                echo "  exception add domain <domain> [reason]  - Add domain exception"
+                echo "  exception add ip <ip> [reason]         - Add IP exception"
+                echo "  exception remove domain <domain>        - Remove domain exception"
+                echo "  exception remove ip <ip>                - Remove IP exception"
+                echo "  exception list [domain|ip|all]          - List exceptions"
+                echo ""
+                echo "Examples:"
+                echo "  ips-filter exception add domain example.com 'false positive'"
+                echo "  ips-filter exception add ip 8.8.8.8 'trusted DNS server'"
+                echo "  ips-filter exception list"
+                ;;
+        esac
+        ;;
     *)
         echo "IPS Filter Management "
         echo "Commands:"
         echo "  add <domain> [category]           - Block a domain"
         echo "  import-rpz <file> [category]      - Import DNS RPZ file (100k+ entries)"
         echo "  import-list <file> [category]     - Import domain list file"
+        echo "  update-blocklists                 - Update blocklist repositories"
+        echo "  exception <command>               - Manage exceptions (whitelist)"
         echo "  sync                              - Sync all domains to Suricata"
         echo "  stats                             - Show statistics"
         echo "  web                               - Start web interface"
@@ -3236,6 +3289,8 @@ case "$1" in
         echo "  ips-filter add facebook.com social_media"
         echo "  ips-filter import-rpz /path/to/blocklist.rpz malware"
         echo "  ips-filter import-list /path/to/domains.txt ads"
+        echo "  ips-filter update-blocklists"
+        echo "  ips-filter exception add domain trusted.com"
         echo "  ips-filter sync"
         echo "  ips-filter web"
         echo ""
@@ -3243,6 +3298,14 @@ case "$1" in
         echo "  • Blocked domains: domain.com CNAME ."
         echo "  • Allowed domains: domain.com CNAME rpz-passthru."
         echo "  • Supports 100k+ entries with real-time Suricata sync"
+        echo ""
+        echo "  Exception Management:"
+        echo "  • Add exceptions to prevent blocking trusted domains/IPs"
+        echo "  • Useful for false positives in aggressive blocklists"
+        echo ""
+        echo "  Automatic Updates:"
+        echo "  • Blocklists auto-update weekly (systemd timer)"
+        echo "  • Manual update: ips-filter update-blocklists"
         echo ""
         echo "Web Interface: http://10.10.254.39:55001"
         ;;
@@ -4614,6 +4677,101 @@ import_community_blocklists() {
     log ""
 }
 
+setup_blocklist_management() {
+    log "=========================================="
+    log "Setting Up Blocklist Management"
+    log "=========================================="
+    log ""
+
+    # Get the project directory (where the installer is located)
+    INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Create configuration directory
+    mkdir -p /etc/karens-ips
+    log "✓ Created configuration directory"
+
+    # Copy blocklist configuration file
+    if [ -f "$INSTALLER_DIR/config/blocklists.yaml" ]; then
+        cp "$INSTALLER_DIR/config/blocklists.yaml" /etc/karens-ips/
+        chmod 644 /etc/karens-ips/blocklists.yaml
+        log "✓ Installed blocklist configuration: /etc/karens-ips/blocklists.yaml"
+    else
+        warn "Blocklist configuration file not found, creating default..."
+        cat > /etc/karens-ips/blocklists.yaml << 'EOF'
+repositories_dir: /opt/karens-ips-blocklists
+auto_update:
+  enabled: true
+  schedule: weekly
+perflyst:
+  enabled: true
+hagezi:
+  enabled: true
+exceptions:
+  enabled: true
+  domains: []
+  ips: []
+EOF
+        log "✓ Created default blocklist configuration"
+    fi
+
+    # Install update script
+    if [ -f "$INSTALLER_DIR/scripts/update-blocklists.sh" ]; then
+        cp "$INSTALLER_DIR/scripts/update-blocklists.sh" /usr/local/bin/update-blocklists
+        chmod +x /usr/local/bin/update-blocklists
+        log "✓ Installed update script: /usr/local/bin/update-blocklists"
+    else
+        warn "Update script not found at $INSTALLER_DIR/scripts/update-blocklists.sh"
+    fi
+
+    # Install configuration-based importer
+    if [ -f "$INSTALLER_DIR/scripts/import-from-config.py" ]; then
+        cp "$INSTALLER_DIR/scripts/import-from-config.py" /usr/local/bin/import-from-config
+        chmod +x /usr/local/bin/import-from-config
+        log "✓ Installed configuration-based importer: /usr/local/bin/import-from-config"
+    else
+        warn "Import script not found at $INSTALLER_DIR/scripts/import-from-config.py"
+    fi
+
+    # Install systemd service and timer for automatic updates
+    if [ -f "$INSTALLER_DIR/deployment/blocklist-update.service" ]; then
+        cp "$INSTALLER_DIR/deployment/blocklist-update.service" /etc/systemd/system/
+        log "✓ Installed blocklist update service"
+    fi
+
+    if [ -f "$INSTALLER_DIR/deployment/blocklist-update.timer" ]; then
+        cp "$INSTALLER_DIR/deployment/blocklist-update.timer" /etc/systemd/system/
+        log "✓ Installed blocklist update timer"
+    fi
+
+    # Install Python configuration management module
+    if [ -f "$INSTALLER_DIR/src/blocklist_config.py" ]; then
+        mkdir -p /opt/karens-ips/src
+        cp "$INSTALLER_DIR/src/blocklist_config.py" /opt/karens-ips/src/
+        chmod +x /opt/karens-ips/src/blocklist_config.py
+        log "✓ Installed configuration manager"
+    fi
+
+    # Reload systemd and enable timer
+    systemctl daemon-reload
+    systemctl enable blocklist-update.timer
+    systemctl start blocklist-update.timer
+    log "✓ Enabled automatic weekly blocklist updates"
+
+    log ""
+    log "Blocklist management setup complete!"
+    log ""
+    log "Configuration:"
+    log "  • Config file: /etc/karens-ips/blocklists.yaml"
+    log "  • Update script: /usr/local/bin/update-blocklists"
+    log "  • Auto-update: Weekly on Sunday at 3 AM"
+    log ""
+    log "Commands:"
+    log "  • Update now: ips-filter update-blocklists"
+    log "  • Add exception: ips-filter exception add domain example.com"
+    log "  • List exceptions: ips-filter exception list"
+    log ""
+}
+
 # Main execution
 main() {
     log "=========================================="
@@ -4644,6 +4802,9 @@ main() {
 
     log "Phase 6.5: Importing community blocklists..."
     import_community_blocklists
+
+    log "Phase 6.6: Setting up blocklist management..."
+    setup_blocklist_management
 
     log "Phase 7: Installing Node.js..."
     install_nodejs

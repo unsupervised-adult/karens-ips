@@ -35,9 +35,12 @@ Built with Python and machine learning models, it offers real-time protection wh
 - ✅ **Perflyst/PiHoleBlocklist** - SmartTV, Android, FireTV tracking blocklists
 - ✅ **hagezi/dns-blocklists** - Comprehensive ad/tracker blocking (Pro & Native lists)
 - ✅ Automatic import during installation (300K+ domains)
+- ✅ **Automatic weekly updates** via systemd timer (configurable)
+- ✅ **Exception management** (whitelist) for domains and IPs
 - ✅ Suricata IPS-level blocking (fallback when DNS blocking fails)
 - ✅ Real-time sync with Suricata datasets
-- ✅ CLI management: `ips-filter import-list`, `ips-filter sync`
+- ✅ YAML configuration file for customization
+- ✅ CLI management: `ips-filter update-blocklists`, `ips-filter exception`
 - ✅ Support for multiple formats (domain lists, hosts files, RPZ)
 
 ### Monitoring & Management
@@ -157,6 +160,44 @@ Karen's IPS integrates community-maintained blocklists for IPS-level ad and trac
 
 ### Blocklist Management
 
+**Automatic Updates** ⏰
+
+Blocklists are automatically updated weekly (Sundays at 3 AM) via systemd timer:
+```bash
+# Check update status
+systemctl status blocklist-update.timer
+
+# Manual update now
+ips-filter update-blocklists
+
+# View last update time
+systemctl list-timers blocklist-update.timer
+```
+
+**Exception Management** (Whitelist)
+
+Handle false positives by adding exceptions for trusted domains and IPs:
+```bash
+# Add domain exception
+ips-filter exception add domain example.com "trusted site"
+
+# Add IP exception
+ips-filter exception add ip 8.8.8.8 "Google DNS"
+
+# List all exceptions
+ips-filter exception list
+
+# List by type
+ips-filter exception list domain
+ips-filter exception list ip
+
+# Remove exception
+ips-filter exception remove domain example.com
+ips-filter exception remove ip 8.8.8.8
+```
+
+**Manual Operations**
+
 ```bash
 # View statistics
 ips-filter stats
@@ -172,14 +213,16 @@ ips-filter add example-ad-domain.com advertising
 
 # Sync all domains to Suricata
 ips-filter sync
-
-# Update blocklists
-cd /opt/karens-ips-blocklists
-cd PiHoleBlocklist && git pull && cd ..
-cd dns-blocklists && git pull && cd ..
-ips-filter import-list /opt/karens-ips-blocklists/PiHoleBlocklist/SmartTV.txt ads
-ips-filter sync
 ```
+
+**Configuration File**
+
+Edit `/etc/karens-ips/blocklists.yaml` to customize:
+- Which blocklists to import
+- Update schedule
+- Exception lists (domains and IPs)
+- Import behavior
+- Database settings
 
 ### Database Schema
 

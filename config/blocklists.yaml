@@ -1,0 +1,163 @@
+# Karen's IPS Blocklist Configuration
+# SPDX-FileCopyrightText: 2025 Karen's IPS
+# SPDX-License-Identifier: GPL-2.0-only
+
+# Blocklist repositories location
+repositories_dir: /opt/karens-ips-blocklists
+
+# Automatic updates
+auto_update:
+  enabled: true
+  schedule: weekly  # daily, weekly, monthly
+  day_of_week: sunday  # for weekly updates
+  hour: 3  # 3 AM
+
+# Perflyst/PiHoleBlocklist configuration
+perflyst:
+  enabled: true
+  repository: https://github.com/Perflyst/PiHoleBlocklist.git
+  lists:
+    - name: SmartTV
+      file: SmartTV.txt
+      category: ads
+      enabled: true
+      description: Smart TV telemetry and advertising
+
+    - name: SmartTV-AGH
+      file: SmartTV-AGH.txt
+      category: ads
+      enabled: false
+      description: Smart TV (AdGuard Home format)
+
+    - name: AmazonFireTV
+      file: AmazonFireTV.txt
+      category: ads
+      enabled: true
+      description: Amazon Fire TV tracking
+
+    - name: AndroidTracking
+      file: android-tracking.txt
+      category: tracking
+      enabled: true
+      description: Android app tracking domains
+
+    - name: SessionReplay
+      file: SessionReplay.txt
+      category: tracking
+      enabled: true
+      description: Session replay tracking scripts
+
+# hagezi/dns-blocklists configuration
+hagezi:
+  enabled: true
+  repository: https://github.com/hagezi/dns-blocklists.git
+  lists:
+    - name: Pro
+      file: domains/pro.txt
+      category: ads
+      enabled: true
+      description: Pro blocklist - balanced blocking (~345K domains)
+
+    - name: Light
+      file: domains/light.txt
+      category: ads
+      enabled: false
+      description: Light blocklist - minimal blocking (~88K domains)
+
+    - name: Normal
+      file: domains/normal.txt
+      category: ads
+      enabled: false
+      description: Normal blocklist - standard blocking (~258K domains)
+
+    - name: ProPlus
+      file: domains/pro.plus.txt
+      category: ads
+      enabled: false
+      description: Pro++ blocklist - aggressive blocking (~376K domains)
+
+    - name: Ultimate
+      file: domains/ultimate.txt
+      category: ads
+      enabled: false
+      description: Ultimate blocklist - maximum blocking (~459K domains)
+
+    - name: NativeTracker
+      file: domains/native.txt
+      category: tracking
+      enabled: true
+      description: Native app tracking domains
+
+    - name: ThreatIntelligence
+      file: domains/tif.txt
+      category: malware
+      enabled: false
+      description: Threat Intelligence Feeds
+
+# Custom blocklists (user-defined)
+custom:
+  enabled: true
+  lists:
+    # Example custom list
+    # - name: MyCustomList
+    #   file: /path/to/custom/domains.txt
+    #   category: ads
+    #   enabled: true
+    #   description: My custom blocklist
+
+# Exception lists (domains and IPs that should never be blocked)
+exceptions:
+  enabled: true
+
+  # Domain exceptions (will not be blocked even if in blocklists)
+  domains:
+    - localhost
+    - localhost.localdomain
+    # Add your exceptions below:
+    # - example.com
+    # - trusted-domain.com
+
+  # IP exceptions (will not be blocked even if in blocklists)
+  ips:
+    - 127.0.0.1
+    - ::1
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    # Add your exceptions below:
+    # - 8.8.8.8
+    # - 1.1.1.1
+
+  # CIDR ranges that should never be blocked
+  ranges:
+    - 127.0.0.0/8  # Loopback
+    - ::1/128      # IPv6 loopback
+    - fe80::/10    # IPv6 link-local
+
+# Database configuration
+database:
+  path: /var/lib/suricata/ips_filter.db
+  batch_size: 1000  # Entries per transaction
+  max_cache_mb: 200  # SQLite cache size
+
+# Import behavior
+import:
+  skip_duplicates: true
+  update_existing: false  # Update metadata on re-import
+  validate_domains: true
+  min_domain_length: 3
+  max_domain_length: 255
+
+# Suricata integration
+suricata:
+  sync_after_import: true
+  sync_batch_size: 50
+  dataset_file: /etc/suricata/datasets/malicious-domains.txt
+  reload_after_sync: true
+
+# Logging
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  file: /var/log/karens-ips/blocklists.log
+  max_size_mb: 10
+  backup_count: 5
