@@ -80,6 +80,7 @@ install_suricata_package() {
 
 install_suricata_ubuntu() {
     log "Setting up Suricata PPA for Ubuntu..."
+    wait_for_apt_lock
     apt-get update
     apt-get install -y software-properties-common
     add-apt-repository -y ppa:oisf/suricata-stable
@@ -89,6 +90,7 @@ install_suricata_ubuntu() {
 
 install_suricata_debian() {
     log "Setting up Suricata from Debian backports or OISF repository..."
+    wait_for_apt_lock
     apt-get update
 
     # Try backports first
@@ -110,6 +112,7 @@ install_suricata_debian() {
 
 install_suricata_generic() {
     log "Unsupported distribution: $DISTRO. Trying generic installation..."
+    wait_for_apt_lock
     apt-get update
 
     if ! apt-get install -y suricata; then

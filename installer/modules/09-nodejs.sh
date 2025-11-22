@@ -37,6 +37,7 @@ install_nodejs() {
 
     # Install Node.js 22.x
     log "Adding Node.js 22.x repository..."
+    wait_for_apt_lock
     if curl -fsSL https://deb.nodesource.com/setup_22.x | bash -; then
         success "Node.js repository added"
     else
@@ -44,6 +45,7 @@ install_nodejs() {
     fi
 
     log "Installing Node.js..."
+    wait_for_apt_lock
     if apt-get install -y nodejs; then
         local node_version=$(node --version)
         success "Node.js installed: $node_version"
