@@ -1,11 +1,14 @@
 # SPDX-FileCopyrightText: 2025 Karen's IPS ML Ad Detector
 # SPDX-License-Identifier: GPL-2.0-only
 from flask import Blueprint, render_template, jsonify
-from markupsafe import escape
 import json
+import logging
 from typing import Dict, List
 from ..database.database import db
 from slips_files.common.slips_utils import utils
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 ml_detector = Blueprint(
     "ml_detector",
@@ -21,9 +24,12 @@ ml_detector = Blueprint(
 # ----------------------------------------
 def ts_to_date(ts, seconds=False):
     """Convert timestamp to human-readable date"""
-    if seconds:
-        return utils.convert_ts_format(ts, "%Y/%m/%d %H:%M:%S.%f")
-    return utils.convert_ts_format(ts, "%Y/%m/%d %H:%M:%S")
+    try:
+        if seconds:
+            return utils.convert_ts_format(ts, "%Y/%m/%d %H:%M:%S.%f")
+        return utils.convert_ts_format(ts, "%Y/%m/%d %H:%M:%S")
+    except Exception:
+        return "N/A"
 
 
 # ----------------------------------------
@@ -61,7 +67,8 @@ def get_stats():
 
         return jsonify({"data": stats})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error fetching ML detector stats: {str(e)}")
+        return jsonify({"error": "Failed to fetch statistics"}), 500
 
 
 @ml_detector.route("/detections/recent")
@@ -76,21 +83,26 @@ def get_recent_detections():
 
         data = []
         for detection in detections:
-            if isinstance(detection, bytes):
-                detection = detection.decode()
-            detection_data = json.loads(detection)
+            try:
+                if isinstance(detection, bytes):
+                    detection = detection.decode()
+                detection_data = json.loads(detection)
 
-            # Format timestamp if present
-            if "timestamp" in detection_data:
-                detection_data["timestamp_formatted"] = ts_to_date(
-                    detection_data["timestamp"], seconds=True
-                )
+                # Format timestamp if present
+                if "timestamp" in detection_data:
+                    detection_data["timestamp_formatted"] = ts_to_date(
+                        detection_data["timestamp"], seconds=True
+                    )
 
-            data.append(detection_data)
+                data.append(detection_data)
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                logger.warning(f"Skipping malformed detection data: {str(e)}")
+                continue
 
         return jsonify({"data": data})
     except Exception as e:
-        return jsonify({"error": str(e), "data": []}), 200
+        logger.error(f"Error fetching recent detections: {str(e)}")
+        return jsonify({"error": "Failed to fetch detections", "data": []}), 200
 
 
 @ml_detector.route("/detections/timeline")
@@ -105,14 +117,19 @@ def get_detection_timeline():
 
         data = []
         for entry in timeline:
-            if isinstance(entry, bytes):
-                entry = entry.decode()
-            timeline_data = json.loads(entry)
-            data.append(timeline_data)
+            try:
+                if isinstance(entry, bytes):
+                    entry = entry.decode()
+                timeline_data = json.loads(entry)
+                data.append(timeline_data)
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                logger.warning(f"Skipping malformed timeline entry: {str(e)}")
+                continue
 
         return jsonify({"data": data})
     except Exception as e:
-        return jsonify({"error": str(e), "data": []}), 200
+        logger.error(f"Error fetching timeline data: {str(e)}")
+        return jsonify({"error": "Failed to fetch timeline", "data": []}), 200
 
 
 @ml_detector.route("/model/info")
@@ -141,7 +158,8 @@ def get_model_info():
 
         return jsonify({"data": model_info})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error fetching model info: {str(e)}")
+        return jsonify({"error": "Failed to fetch model information"}), 500
 
 
 @ml_detector.route("/features/importance")
@@ -170,12 +188,24 @@ def get_feature_importance():
                        v.decode() if isinstance(v, bytes) else v
                        for k, v in features.items()}
 
-        data = [{"feature": k, "importance": float(v)} for k, v in features.items()]
+        # Convert to list with error handling for invalid values
+        data = []
+        for k, v in features.items():
+            try:
+                importance = float(v)
+                # Clamp to valid range [0, 1]
+                importance = max(0.0, min(1.0, importance))
+                data.append({"feature": k, "importance": importance})
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Skipping invalid feature importance '{k}': {v} - {str(e)}")
+                continue
+
         data.sort(key=lambda x: x["importance"], reverse=True)
 
         return jsonify({"data": data})
     except Exception as e:
-        return jsonify({"error": str(e), "data": []}), 200
+        logger.error(f"Error fetching feature importance: {str(e)}")
+        return jsonify({"error": "Failed to fetch feature importance", "data": []}), 200
 
 
 @ml_detector.route("/alerts")
@@ -190,18 +220,23 @@ def get_alerts():
 
         data = []
         for alert in alerts:
-            if isinstance(alert, bytes):
-                alert = alert.decode()
-            alert_data = json.loads(alert)
+            try:
+                if isinstance(alert, bytes):
+                    alert = alert.decode()
+                alert_data = json.loads(alert)
 
-            # Format timestamp if present
-            if "timestamp" in alert_data:
-                alert_data["timestamp_formatted"] = ts_to_date(
-                    alert_data["timestamp"], seconds=True
-                )
+                # Format timestamp if present
+                if "timestamp" in alert_data:
+                    alert_data["timestamp_formatted"] = ts_to_date(
+                        alert_data["timestamp"], seconds=True
+                    )
 
-            data.append(alert_data)
+                data.append(alert_data)
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                logger.warning(f"Skipping malformed alert data: {str(e)}")
+                continue
 
         return jsonify({"data": data})
     except Exception as e:
-        return jsonify({"error": str(e), "data": []}), 200
+        logger.error(f"Error fetching alerts: {str(e)}")
+        return jsonify({"error": "Failed to fetch alerts", "data": []}), 200

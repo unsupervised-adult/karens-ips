@@ -6,6 +6,9 @@
 
 set -e
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -23,7 +26,7 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-SLIPS_PATH="$1"
+SLIPS_PATH="$(cd "$1" && pwd)"
 
 # Validate SLIPS installation
 if [ ! -d "$SLIPS_PATH" ]; then
@@ -61,7 +64,7 @@ if [ -d "$ML_DETECTOR_DEST" ]; then
     rm -rf "$ML_DETECTOR_DEST"
 fi
 
-cp -r "$(dirname "$0")/webinterface/ml_detector" "$ML_DETECTOR_DEST"
+cp -r "$SCRIPT_DIR/webinterface/ml_detector" "$ML_DETECTOR_DEST"
 echo -e "${GREEN}✓${NC} ML Detector blueprint installed"
 echo ""
 
@@ -71,8 +74,8 @@ echo "Applying patches to SLIPS core files..."
 # Patch app.py
 echo "  - Patching webinterface/app.py"
 cd "$SLIPS_PATH"
-if patch -p1 --dry-run < "$(dirname "$0")/patches/app.py.patch" > /dev/null 2>&1; then
-    patch -p1 < "$(dirname "$0")/patches/app.py.patch"
+if patch -p1 --dry-run < "$SCRIPT_DIR/patches/app.py.patch" > /dev/null 2>&1; then
+    patch -p1 < "$SCRIPT_DIR/patches/app.py.patch"
     echo -e "    ${GREEN}✓${NC} app.py patched successfully"
 else
     echo -e "    ${YELLOW}⚠${NC} app.py patch may already be applied or conflicts exist"
@@ -81,8 +84,8 @@ fi
 
 # Patch app.html
 echo "  - Patching webinterface/templates/app.html"
-if patch -p1 --dry-run < "$(dirname "$0")/patches/app.html.patch" > /dev/null 2>&1; then
-    patch -p1 < "$(dirname "$0")/patches/app.html.patch"
+if patch -p1 --dry-run < "$SCRIPT_DIR/patches/app.html.patch" > /dev/null 2>&1; then
+    patch -p1 < "$SCRIPT_DIR/patches/app.html.patch"
     echo -e "    ${GREEN}✓${NC} app.html patched successfully"
 else
     echo -e "    ${YELLOW}⚠${NC} app.html patch may already be applied or conflicts exist"

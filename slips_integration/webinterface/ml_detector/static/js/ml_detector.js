@@ -7,6 +7,7 @@ let featureChart = null;
 
 // Refresh interval (5 seconds)
 const REFRESH_INTERVAL = 5000;
+let refreshInterval = null;
 
 // ----------------------------------------
 // Initialize on page load
@@ -24,15 +25,28 @@ $(document).ready(function() {
     loadAllData();
 
     // Set up auto-refresh
-    setInterval(loadAllData, REFRESH_INTERVAL);
+    refreshInterval = setInterval(loadAllData, REFRESH_INTERVAL);
 
     console.log("ML Detector: Initialized successfully");
+});
+
+// Cleanup on page unload
+$(window).on('beforeunload', function() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
 });
 
 // ----------------------------------------
 // Chart Initialization
 // ----------------------------------------
 function initializeCharts() {
+    // Check if Chart.js is loaded
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js is not loaded. Charts will not be available.');
+        return;
+    }
+
     // Timeline Chart
     const timelineCtx = document.getElementById('timeline_chart');
     if (timelineCtx) {
@@ -117,13 +131,14 @@ function initializeTables() {
     // Detections Table
     window.detectionsTable = $('#table_detections').DataTable({
         columns: [
-            { data: 'timestamp_formatted' },
-            { data: 'src_ip' },
-            { data: 'dst_ip' },
-            { data: 'dst_port' },
-            { data: 'protocol' },
+            { data: 'timestamp_formatted', defaultContent: 'N/A' },
+            { data: 'src_ip', defaultContent: 'N/A' },
+            { data: 'dst_ip', defaultContent: 'N/A' },
+            { data: 'dst_port', defaultContent: 'N/A' },
+            { data: 'protocol', defaultContent: 'N/A' },
             {
                 data: 'classification',
+                defaultContent: 'Unknown',
                 render: function(data) {
                     const badge = data === 'ad' ? 'danger' : 'success';
                     const text = data === 'ad' ? 'Advertisement' : 'Legitimate';
@@ -132,12 +147,14 @@ function initializeTables() {
             },
             {
                 data: 'confidence',
+                defaultContent: '0',
                 render: function(data) {
-                    return (parseFloat(data) * 100).toFixed(2) + '%';
+                    const value = parseFloat(data);
+                    return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
                 }
             },
-            { data: 'total_bytes' },
-            { data: 'total_packets' }
+            { data: 'total_bytes', defaultContent: '0' },
+            { data: 'total_packets', defaultContent: '0' }
         ],
         order: [[0, 'desc']],
         pageLength: 25,
@@ -148,10 +165,11 @@ function initializeTables() {
     // Alerts Table
     window.alertsTable = $('#table_alerts').DataTable({
         columns: [
-            { data: 'timestamp_formatted' },
-            { data: 'alert_type' },
+            { data: 'timestamp_formatted', defaultContent: 'N/A' },
+            { data: 'alert_type', defaultContent: 'Unknown' },
             {
                 data: 'severity',
+                defaultContent: 'low',
                 render: function(data) {
                     let badge = 'info';
                     if (data === 'high') badge = 'danger';
@@ -159,12 +177,14 @@ function initializeTables() {
                     return `<span class="badge bg-${badge}">${data}</span>`;
                 }
             },
-            { data: 'src_ip' },
-            { data: 'description' },
+            { data: 'src_ip', defaultContent: 'N/A' },
+            { data: 'description', defaultContent: 'No description' },
             {
                 data: 'confidence',
+                defaultContent: '0',
                 render: function(data) {
-                    return (parseFloat(data) * 100).toFixed(2) + '%';
+                    const value = parseFloat(data);
+                    return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
                 }
             }
         ],
@@ -196,7 +216,8 @@ function loadStats() {
                 $('#stat_total_analyzed').text(response.data.total_analyzed || 0);
                 $('#stat_ads_detected').text(response.data.ads_detected || 0);
                 $('#stat_legitimate').text(response.data.legitimate_traffic || 0);
-                $('#stat_accuracy').text((parseFloat(response.data.accuracy || 0) * 100).toFixed(2) + '%');
+                const accuracy = parseFloat(response.data.accuracy || 0);
+                $('#stat_accuracy').text((isNaN(accuracy) ? 0 : accuracy * 100).toFixed(2) + '%');
             }
         },
         error: function(xhr, status, error) {
