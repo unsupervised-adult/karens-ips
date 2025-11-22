@@ -26,6 +26,16 @@ import_community_blocklists() {
         return 0
     fi
 
+    # Install blocklist manager script
+    log "Installing blocklist management tools..."
+    if [[ -f "$PROJECT_ROOT/src/blocklist_manager.py" ]]; then
+        cp "$PROJECT_ROOT/src/blocklist_manager.py" /opt/ips-filter-db.py
+        chmod 755 /opt/ips-filter-db.py
+        success "Blocklist manager installed"
+    else
+        warn "Blocklist manager script not found in src/, stats will be unavailable"
+    fi
+
     # Create blocklists directory
     create_dir "$BLOCKLISTS_DIR" "root:root" "755"
     cd "$BLOCKLISTS_DIR"
@@ -177,12 +187,20 @@ import_hagezi_lists() {
 
 sync_to_suricata() {
     local ips_filter_db="/opt/ips-filter-db.py"
-    $ips_filter_db sync 2>&1 | grep -E "(Syncing|Successfully|Progress:|Warning:)" || true
+    if [[ -x "$ips_filter_db" ]]; then
+        $ips_filter_db sync 2>&1 | grep -E "(Syncing|Successfully|Progress:|Warning:)" || true
+    else
+        warn "Blocklist manager not found, skipping Suricata sync"
+    fi
 }
 
 show_blocklist_stats() {
     local ips_filter_db="/opt/ips-filter-db.py"
-    $ips_filter_db stats
+    if [[ -x "$ips_filter_db" ]]; then
+        $ips_filter_db stats
+    else
+        warn "Blocklist manager not found, skipping stats display"
+    fi
 }
 
 # ============================================================================
