@@ -560,7 +560,7 @@ def main():
     )
     parser.add_argument(
         '--repo-path',
-        default='/home/user/karens-ips/blocklists',
+        default='/opt/karens-ips-blocklists',
         help='Path to blocklists repositories'
     )
     parser.add_argument(

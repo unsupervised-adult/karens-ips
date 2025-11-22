@@ -111,8 +111,8 @@ Internet
     ↓
 ┌─────────────────────────────────────────┐
 │  Network Bridge (br0)                   │
-│  ├─ enp6s19 (Traffic IN)                │
-│  └─ enp6s20 (Traffic OUT)               │
+│  ├─ <IFACE_IN> (Traffic IN)             │
+│  └─ <IFACE_OUT> (Traffic OUT)           │
 └─────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────┐
@@ -179,6 +179,37 @@ installer/
 
 ### Custom Installation
 
+**Network Interface Configuration:**
+
+The installer automatically detects network interfaces. For custom configuration:
+
+```bash
+# Option 1: Edit configuration file before installation
+nano installer/config/installer.conf
+
+# Set your interfaces (leave empty for auto-detection):
+# MGMT_IFACE=""      # Management interface (auto-detects first interface with IP)
+# IFACE_IN=""        # Bridge input interface
+# IFACE_OUT=""       # Bridge output interface
+# HOME_NET=""        # Protected network CIDR (auto-detects from management interface)
+
+# Option 2: Interactive mode (default)
+# The installer will detect interfaces and prompt for confirmation
+sudo ./karens-ips-installer.sh
+
+# Option 3: Non-interactive with auto-detection
+sudo NON_INTERACTIVE=1 ./karens-ips-installer.sh
+```
+
+**Find your interfaces:**
+```bash
+# List all interfaces
+ip link show
+
+# Show interface details with IPs
+ip addr show
+```
+
 **Skip specific components:**
 ```bash
 # Skip blocklists
@@ -191,7 +222,7 @@ sudo INSTALL_WEBUI=false ./karens-ips-installer.sh
 sudo INSTALL_ZEEK=false ./karens-ips-installer.sh
 ```
 
-**Custom configuration:**
+**Custom configuration file:**
 ```bash
 # Copy and edit configuration
 cp installer/config/installer.conf installer/config/custom.conf
@@ -409,7 +440,10 @@ suricatasc -c "datasets.list"
 ### Interface issues
 ```bash
 # Check interface status
-ip link show enp6s19 enp6s20
+ip link show  # Shows all interfaces
+
+# Check specific bridge interfaces (replace with your interface names)
+ip link show <IFACE_IN> <IFACE_OUT>
 
 # Restart interface setup
 systemctl restart ips-interfaces.service

@@ -29,14 +29,15 @@ Adds ML-based ad/telemetry detection to your existing **Suricata + SLIPS + Kalip
 ## 3-Minute Setup
 
 ### 1. Download Files
-Place `BUILD_GUIDE.md` in:
+Place `BUILD_GUIDE.md` in your karens-ips directory:
 ```bash
-/home/ficus/Documents/Project-Code/IPS/karens-ips/
+~/karens-ips/
+# Or wherever you cloned the repository
 ```
 
 ### 2. Open Claude Code
 ```bash
-cd /home/ficus/Documents/Project-Code/IPS/karens-ips/
+cd ~/karens-ips/
 # Open Claude Code here
 ```
 
@@ -63,7 +64,7 @@ Open `BUILD_GUIDE.md` and copy/paste each prompt (1→19) into Claude Code.
 
 ### Week 1: Collect Data
 ```bash
-cd /home/ficus/Documents/Project-Code/IPS/karens-ips/
+cd ~/karens-ips/
 python3 training/collect_data.py --hours 24 --output training/data/raw/
 ```
 **Goal**: 2,500+ flows collected
@@ -132,7 +133,7 @@ Internet Traffic
 ## Key Files After Build
 
 ```
-/home/ficus/Documents/Project-Code/IPS/karens-ips/
+~/karens-ips/
 ├── src/
 │   ├── feature_extractor.py    # 30 features from SLIPS Redis
 │   ├── predictor.py             # TFLite inference (<10ms)
