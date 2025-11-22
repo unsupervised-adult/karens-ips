@@ -129,27 +129,23 @@ Wants=ips-interfaces.service
 Before=slips.service
 
 [Service]
-Type=forking
+Type=oneshot
+RemainAfterExit=yes
 User=root
 Group=root
 WorkingDirectory=/opt/zeek
-PIDFile=/opt/zeek/spool/zeek/zeek.pid
 Environment=PATH=/opt/zeek/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-# Use the exact same approach as working Docker container
+# Use zeekctl for process management - it handles PID files internally
 ExecStartPre=/opt/zeek/bin/zeekctl install
 ExecStart=/opt/zeek/bin/zeekctl deploy
 ExecReload=/opt/zeek/bin/zeekctl restart
 ExecStop=/opt/zeek/bin/zeekctl stop
-Restart=on-failure
-RestartSec=30
 StandardOutput=journal
 StandardError=journal
 # Allow extra time for initial deployment and rule compilation
-TimeoutStartSec=180
+TimeoutStartSec=300
 # Allow more time for stopping (zeek can be slow to shutdown cleanly)
 TimeoutStopSec=90
-# Don't fail if zeek has startup issues - this is optional for the IPS system
-SuccessExitStatus=0 1
 
 # Resource limits
 MemoryMax=1G
@@ -220,7 +216,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/opt/ips-filter-db.py sync
+ExecStart=/opt/ips-filter-db.py --db-path /var/lib/suricata/ips_filter.db --sync
 StandardOutput=journal
 StandardError=journal
 User=root
