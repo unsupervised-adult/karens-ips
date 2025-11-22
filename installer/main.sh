@@ -152,123 +152,107 @@ main_install() {
         warn "Module install_suricata not found, skipping..."
     fi
 
-    # Phase 5: Suricata Configuration
-    if command -v configure_suricata_afpacket &>/dev/null; then
-        log "Phase 5: Configuring Suricata for NFQUEUE bridge mode..."
-        configure_suricata_afpacket
-    else
-        warn "Module configure_suricata_afpacket not found, skipping..."
-    fi
-
-    # Phase 6: Suricata Rules
+    # Phase 5: Suricata Rules
     if command -v update_suricata_rules &>/dev/null; then
-        log "Phase 6: Updating Suricata rules..."
+        log "Phase 5: Updating Suricata rules..."
         update_suricata_rules
     else
         warn "Module update_suricata_rules not found, skipping..."
     fi
 
-    # Phase 6.5: Community Blocklists
+    # Phase 6: Community Blocklists
     if [[ "${INSTALL_BLOCKLISTS:-true}" == "true" ]]; then
         if command -v import_community_blocklists &>/dev/null; then
-            log "Phase 6.5: Importing community blocklists..."
+            log "Phase 6: Importing community blocklists..."
             import_community_blocklists
         else
             warn "Module import_community_blocklists not found, skipping..."
         fi
     fi
 
-    # Phase 6.6: Blocklist Management
+    # Phase 7: Blocklist Management
     if [[ "${INSTALL_BLOCKLISTS:-true}" == "true" ]]; then
         if command -v setup_blocklist_management &>/dev/null; then
-            log "Phase 6.6: Setting up blocklist management..."
+            log "Phase 7: Setting up blocklist management..."
             setup_blocklist_management
         else
             warn "Module setup_blocklist_management not found, skipping..."
         fi
     fi
 
-    # Phase 7: Node.js
+    # Phase 8: Node.js
     if [[ "${INSTALL_NODEJS:-true}" == "true" ]]; then
         if command -v install_nodejs &>/dev/null; then
-            log "Phase 7: Installing Node.js..."
+            log "Phase 8: Installing Node.js..."
             install_nodejs
         else
             warn "Module install_nodejs not found, skipping..."
         fi
     fi
 
-    # Phase 8: SLIPS
+    # Phase 9: SLIPS
     if [[ "${INSTALL_SLIPS:-true}" == "true" ]]; then
         if command -v install_slips &>/dev/null; then
-            log "Phase 8: Installing SLIPS..."
+            log "Phase 9: Installing SLIPS..."
             install_slips
         else
             warn "Module install_slips not found, skipping..."
         fi
     fi
 
-    # Phase 8.5: ML Detector Dashboard
+    # Phase 10: ML Detector Dashboard
     if [[ "${INSTALL_ML_DETECTOR:-true}" == "true" ]]; then
         if command -v install_ml_detector_dashboard &>/dev/null; then
-            log "Phase 8.5: Installing ML Detector Dashboard..."
+            log "Phase 10: Installing ML Detector Dashboard..."
             install_ml_detector_dashboard
         else
             warn "Module install_ml_detector_dashboard not found, skipping..."
         fi
     fi
 
-    # Phase 9: Network Interfaces
+    # Phase 11: Network Interfaces
     if command -v setup_interfaces &>/dev/null; then
-        log "Phase 9: Setting up network interfaces..."
+        log "Phase 11: Setting up network interfaces..."
         setup_interfaces
     else
         warn "Module setup_interfaces not found, skipping..."
     fi
 
-    # Phase 10: Redis
+    # Phase 12: Redis
     if command -v configure_redis &>/dev/null; then
-        log "Phase 10: Configuring Redis..."
+        log "Phase 12: Configuring Redis..."
         configure_redis
     else
         warn "Module configure_redis not found, skipping..."
     fi
 
-    # Phase 11: SystemD Services
+    # Phase 13: SystemD Services
     if command -v create_systemd_services &>/dev/null; then
-        log "Phase 11: Creating SystemD services..."
+        log "Phase 13: Creating SystemD services..."
         create_systemd_services
     else
         warn "Module create_systemd_services not found, skipping..."
     fi
 
-    # Phase 12: Start Services
+    # Phase 14: Start Services
     if command -v start_services &>/dev/null; then
-        log "Phase 12: Starting services..."
+        log "Phase 14: Starting services..."
         start_services
     else
         warn "Module start_services not found, skipping..."
     fi
 
-    # Phase 13: MOTD
+    # Phase 15: MOTD
     if command -v create_motd &>/dev/null; then
-        log "Phase 13: Creating MOTD..."
+        log "Phase 15: Creating MOTD..."
         create_motd
     else
         warn "Module create_motd not found, skipping..."
     fi
 
-    # Phase 14: Save Configuration
-    if command -v save_configuration &>/dev/null; then
-        log "Phase 14: Saving configuration..."
-        save_configuration
-    else
-        warn "Module save_configuration not found, skipping..."
-    fi
-
-    # Phase 15: Verification
+    # Phase 16: Verification
     if command -v verify_installation &>/dev/null; then
-        log "Phase 15: Verifying installation..."
+        log "Phase 16: Verifying installation..."
         verify_installation
     else
         warn "Module verify_installation not found, skipping..."

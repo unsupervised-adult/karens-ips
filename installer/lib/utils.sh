@@ -245,7 +245,7 @@ is_valid_cidr() {
 # Get interface IP address
 get_interface_ip() {
     local iface="$1"
-    ip addr show "$iface" | grep 'inet ' | awk '{print $2}' | cut -d/ -f1
+    ip addr show "$iface" 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1 || true
 }
 
 # Check if interface exists
