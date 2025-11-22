@@ -197,7 +197,7 @@ sync_to_suricata() {
 show_blocklist_stats() {
     local ips_filter_db="/opt/ips-filter-db.py"
     if [[ -x "$ips_filter_db" ]]; then
-        $ips_filter_db stats
+        $ips_filter_db --stats
     else
         warn "Blocklist manager not found, skipping stats display"
     fi
