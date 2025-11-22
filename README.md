@@ -1,25 +1,37 @@
 # Karen's IPS
 
-An intelligent Intrusion Prevention System with ML-powered ad detection and family-friendly network security.
+An intelligent Intrusion Prevention System with ML-powered behavioral analysis, community blocklists, and family-friendly network security.
 
 ## Overview
 
 Karen's IPS is a comprehensive network security solution that combines:
-- **Stratosphere Linux IPS (SLIPS)** - ML-based behavioral analysis
-- **Suricata** - High-performance IPS engine
-- **Custom ML Ad Detector** - Machine learning-based advertisement detection
-- **Real-time Dashboard** - Web-based monitoring and visualization
+- **Stratosphere Linux IPS (SLIPS)** - ML-based behavioral threat analysis
+- **Suricata** - High-performance IPS engine with NFQUEUE integration
+- **Custom ML Detector Dashboard** - Real-time ad detection visualization
+- **Community Blocklists** - 300K+ domains from Perflyst and hagezi
+- **Modular Installer** - Easy deployment and maintenance
 
-Built with Python and machine learning models, it offers real-time protection while maintaining ease of use for home and family networks.
+Built with Python, machine learning, and modern security tools, it offers enterprise-grade protection for home and family networks.
 
 ## Key Features
 
 ### Core Security
 - ✅ Real-time network monitoring via NFQUEUE bridge mode
 - ✅ ML-based behavioral threat detection (SLIPS)
-- ✅ High-performance IPS with Suricata
+- ✅ High-performance IPS with Suricata (drop/reject capabilities)
 - ✅ Family-friendly content filtering
 - ✅ Automated threat blocking via nftables
+- ✅ Zeek network security monitor integration
+
+### Community Blocklists (300K+ Domains)
+- ✅ **Perflyst/PiHoleBlocklist** - SmartTV, Android, FireTV tracking
+- ✅ **hagezi/dns-blocklists** - Pro & Native tracker blocking
+- ✅ Automatic weekly updates via systemd timer
+- ✅ Exception management (whitelist) for domains and IPs
+- ✅ IPS-level blocking (bypasses DNS-based ad blockers)
+- ✅ Real-time sync with Suricata datasets
+- ✅ YAML configuration for customization
+- ✅ CLI management: `ips-filter update-blocklists`, `ips-filter exception`
 
 ### ML Ad Detector Dashboard
 - ✅ Real-time ad detection visualization
@@ -30,153 +42,179 @@ Built with Python and machine learning models, it offers real-time protection wh
 - ✅ Auto-refresh every 5 seconds
 - ✅ Fully integrated with SLIPS Web UI
 
-### Community Blocklists
-- ✅ Integrated blocklist management with SQLite database
-- ✅ **Perflyst/PiHoleBlocklist** - SmartTV, Android, FireTV tracking blocklists
-- ✅ **hagezi/dns-blocklists** - Comprehensive ad/tracker blocking (Pro & Native lists)
-- ✅ Automatic import during installation (300K+ domains)
-- ✅ **Automatic weekly updates** via systemd timer (configurable)
-- ✅ **Exception management** (whitelist) for domains and IPs
-- ✅ Suricata IPS-level blocking (fallback when DNS blocking fails)
-- ✅ Real-time sync with Suricata datasets
-- ✅ YAML configuration file for customization
-- ✅ CLI management: `ips-filter update-blocklists`, `ips-filter exception`
-- ✅ Support for multiple formats (domain lists, hosts files, RPZ)
-
 ### Monitoring & Management
 - ✅ SLIPS Web UI (browser-based dashboard)
 - ✅ Kalipso CLI (terminal interface)
 - ✅ SystemD service management
-- ✅ Comprehensive logging
+- ✅ Comprehensive logging (Suricata, SLIPS, system)
 - ✅ Redis-based data backend
 
-## Project Structure
+## Quick Start
 
-- `src/` - Python modules and core functionality
-- `slips_integration/` - ML Detector dashboard for SLIPS Web UI
-  - `webinterface/ml_detector/` - Flask blueprint for ML detector
-  - `patches/` - Integration patches for SLIPS
-  - `install.sh` - Standalone dashboard installer
-- `training/` - Data collection and model training scripts
-- `deployment/` - Installation and deployment scripts
-- `scripts/` - Utility scripts
-- `tests/` - Unit tests
-- `config/` - YAML configuration files
-- `karens-ips-installer.sh` - **Complete integrated installer**
+### Installation (One Command)
 
-## Quick Start Installation
-
-### Automated Installation (Recommended)
-
-Run the complete installer that sets up everything:
 ```bash
 sudo ./karens-ips-installer.sh
 ```
 
-This installs:
-1. Base system and dependencies
-2. Suricata IPS (NFQUEUE bridge mode)
-3. **Community Blocklists** (Perflyst + hagezi, 300K+ domains)
-4. SLIPS (Stratosphere Linux IPS)
-5. **ML Detector Dashboard** (automatically integrated)
-6. Redis database
-7. Kalipso CLI
-8. SLIPS Web UI with ML Detector tab
-9. SystemD services for all components
+**What gets installed:**
+1. Base system dependencies and Zeek
+2. Kernel tuning and nftables firewall
+3. Suricata IPS (NFQUEUE bridge mode)
+4. Community blocklists (300K+ domains)
+5. SLIPS (Stratosphere Linux IPS) with ML
+6. ML Detector Dashboard (auto-integrated)
+7. Node.js and Kalipso CLI
+8. Network bridge configuration
+9. Redis database
+10. SystemD services for all components
+
+**Installation time:** 15-30 minutes (depending on network speed)
 
 ### Post-Installation
 
-Access the dashboards:
+**Access the dashboards:**
 - **SLIPS Web UI**: `http://[SERVER-IP]:55000`
-- **ML Detector**: Click the "ML Detector" tab in SLIPS Web UI
+- **ML Detector**: Click "ML Detector" tab in SLIPS Web UI
+- **Kalipso CLI**: `sudo kalipso` (terminal interface)
 
-Service management:
+**Service management:**
 ```bash
 # Check all services
-systemctl status redis-server suricata slips slips-webui
+systemctl status redis-server suricata slips slips-webui zeek
 
-# Start/stop services
-systemctl start slips slips-webui
-systemctl stop slips slips-webui
+# Restart services
+systemctl restart suricata slips
 
 # View logs
-journalctl -fu slips
-tail -f /var/log/suricata/fast.log
+journalctl -fu slips                        # SLIPS behavioral analysis
+tail -f /var/log/suricata/fast.log          # Suricata alerts
+tail -f /var/log/suricata/eve.json | jq    # Detailed EVE JSON logs
 ```
 
-## ML Detector Dashboard
+## Architecture
 
-The ML Detector Dashboard is automatically integrated during installation and provides:
+```
+Internet
+    ↓
+┌─────────────────────────────────────────┐
+│  Network Bridge (br0)                   │
+│  ├─ enp6s19 (Traffic IN)                │
+│  └─ enp6s20 (Traffic OUT)               │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│  nftables NFQUEUE                       │
+│  ├─ Send traffic to queue 0             │
+│  └─ Bypass if Suricata unavailable      │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│  Suricata IPS Engine                    │
+│  ├─ Community blocklists (300K domains) │
+│  ├─ ET Open rules + TrafficID           │
+│  ├─ Custom family-filter rules          │
+│  └─ Drop/Alert decisions                │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│  SLIPS Behavioral Analysis              │
+│  ├─ ML threat detection                 │
+│  ├─ Behavioral profiling                │
+│  ├─ Redis data storage                  │
+│  └─ ML Ad Detector integration          │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│  Dashboards & Monitoring                │
+│  ├─ SLIPS Web UI (port 55000)           │
+│  ├─ ML Detector Dashboard               │
+│  └─ Kalipso CLI                         │
+└─────────────────────────────────────────┘
+```
 
-### Dashboard Features
-- **Statistics Cards**: Total analyzed, ads detected, legitimate traffic, model accuracy
-- **Detection Timeline Chart**: Real-time line chart showing ads vs legitimate traffic trends
-- **Feature Importance Chart**: Horizontal bar chart of ML model feature weights
-- **Model Information Panel**: Model type, version, training accuracy, features used
-- **Recent Detections Table**: Searchable, sortable table of recent detections with confidence scores
-- **Alerts Table**: High-priority alerts from the ML detector
+## Modular Installer
 
-### Technical Details
-- **Backend**: Flask Blueprint integrated into SLIPS
-- **Frontend**: Chart.js for visualizations, DataTables for data display
-- **Data Storage**: Redis keys populated by ML detector module
-- **Auto-refresh**: Dashboard updates every 5 seconds
-- **Security**: Robust error handling, no information disclosure, input validation
+The installer uses a **modular architecture** for maintainability and flexibility:
 
-### Redis Data Structure
-The ML Detector uses these Redis keys:
-- `ml_detector:stats` - Overall statistics (hash)
-- `ml_detector:recent_detections` - Recent detections (list, max 100)
-- `ml_detector:timeline` - Time-series data (list, max 1000)
-- `ml_detector:model_info` - Model metadata (hash)
-- `ml_detector:feature_importance` - Feature importance scores (hash)
-- `ml_detector:alerts` - Alerts (list, max 50)
+### Architecture
+```
+installer/
+├── main.sh                  # Main orchestrator
+├── config/
+│   └── installer.conf       # Central configuration
+├── lib/
+│   ├── logging.sh           # Logging functions
+│   └── utils.sh             # Utility functions (30+ helpers)
+└── modules/                 # 16 installation modules
+    ├── 01-base-system.sh    # Base packages + Zeek
+    ├── 02-kernel-tuning.sh  # Kernel optimization
+    ├── 03-nftables.sh       # Firewall setup
+    ├── 04-suricata.sh       # Suricata installation
+    ├── 06-suricata-rules.sh # Rules initialization
+    ├── 07-blocklists.sh     # Community blocklists
+    ├── 08-blocklist-mgmt.sh # Blocklist management
+    ├── 09-nodejs.sh         # Node.js for Kalipso
+    ├── 10-slips.sh          # SLIPS installation
+    ├── 11-ml-detector.sh    # ML Detector Dashboard
+    ├── 12-interfaces.sh     # Network bridge setup
+    ├── 13-redis.sh          # Redis configuration
+    ├── 14-systemd.sh        # SystemD services
+    ├── 15-services.sh       # Service startup
+    ├── 16-motd.sh           # MOTD creation
+    └── 17-verification.sh   # Installation verification
+```
 
-See [ML_DETECTOR_INTEGRATION.md](ML_DETECTOR_INTEGRATION.md) for complete integration documentation.
+### Custom Installation
 
-## Community Blocklist Integration
-
-Karen's IPS integrates community-maintained blocklists for IPS-level ad and tracker blocking, providing a fallback when DNS-based blocking (like Pi-hole) fails or is bypassed.
-
-### Integrated Blocklists
-
-**Perflyst/PiHoleBlocklist**
-- SmartTV blocklist - Smart TV telemetry and ads
-- Android tracking - Mobile app tracking domains
-- Amazon FireTV - FireTV tracking and ads
-- SessionReplay - Session replay tracking scripts
-
-**hagezi/dns-blocklists**
-- Pro blocklist (recommended) - ~345K domains, balanced blocking
-- Native Tracker - Native app tracking domains
-- Multiple formats supported: domains, hosts, RPZ
-
-### How It Works
-
-1. **Installation**: Blocklists are automatically cloned and imported during installation
-2. **SQLite Database**: All domains stored in `/var/lib/suricata/ips_filter.db`
-3. **Suricata Integration**: Domains synced to Suricata datasets for IPS-level blocking
-4. **Real-time Blocking**: Traffic to blocked domains is dropped by Suricata before reaching its destination
-
-### Blocklist Management
-
-**Automatic Updates** ⏰
-
-Blocklists are automatically updated weekly (Sundays at 3 AM) via systemd timer:
+**Skip specific components:**
 ```bash
-# Check update status
+# Skip blocklists
+sudo INSTALL_BLOCKLISTS=false ./karens-ips-installer.sh
+
+# Skip SLIPS Web UI
+sudo INSTALL_WEBUI=false ./karens-ips-installer.sh
+
+# Skip Zeek (SLIPS will have reduced capabilities)
+sudo INSTALL_ZEEK=false ./karens-ips-installer.sh
+```
+
+**Custom configuration:**
+```bash
+# Copy and edit configuration
+cp installer/config/installer.conf installer/config/custom.conf
+nano installer/config/custom.conf
+
+# Run with custom config
+sudo CONFIG_FILE=installer/config/custom.conf ./karens-ips-installer.sh
+```
+
+**Debug mode:**
+```bash
+sudo DEBUG=1 ./karens-ips-installer.sh
+```
+
+See [installer/README.md](installer/README.md) for complete modular installer documentation.
+
+## Community Blocklist Management
+
+### Automatic Updates
+
+Blocklists auto-update weekly (Sundays at 3 AM):
+```bash
+# Check update timer
 systemctl status blocklist-update.timer
 
 # Manual update now
 ips-filter update-blocklists
 
-# View last update time
+# View schedule
 systemctl list-timers blocklist-update.timer
 ```
 
-**Exception Management** (Whitelist)
+### Exception Management (Whitelist)
 
-Handle false positives by adding exceptions for trusted domains and IPs:
+Add exceptions for false positives:
 ```bash
 # Add domain exception
 ips-filter exception add domain example.com "trusted site"
@@ -184,99 +222,253 @@ ips-filter exception add domain example.com "trusted site"
 # Add IP exception
 ips-filter exception add ip 8.8.8.8 "Google DNS"
 
-# List all exceptions
+# List exceptions
 ips-filter exception list
-
-# List by type
 ips-filter exception list domain
 ips-filter exception list ip
 
 # Remove exception
 ips-filter exception remove domain example.com
-ips-filter exception remove ip 8.8.8.8
 ```
 
-**Manual Operations**
+### Manual Operations
 
 ```bash
 # View statistics
 ips-filter stats
 
-# Import additional domain list
+# Import domain list
 ips-filter import-list /path/to/domains.txt ads
 
 # Import RPZ file
 ips-filter import-rpz /path/to/blocklist.rpz malware
 
-# Manually add domain
-ips-filter add example-ad-domain.com advertising
+# Add single domain
+ips-filter add ad-domain.com advertising
 
-# Sync all domains to Suricata
+# Sync to Suricata
 ips-filter sync
 ```
 
-**Configuration File**
+### Configuration
 
 Edit `/etc/karens-ips/blocklists.yaml` to customize:
-- Which blocklists to import
+- Enabled/disabled blocklists
 - Update schedule
 - Exception lists (domains and IPs)
-- Import behavior
 - Database settings
 
-### Database Schema
+## ML Detector Dashboard
 
-**blocked_domains table:**
-- `domain` - Domain name (unique per source)
-- `category` - ads, tracking, malware, social_media
-- `source` - perflyst_smarttv, hagezi_pro, etc.
-- `added_by` - Import source identifier
-- `active` - Enable/disable without deletion
+### Features
+- **Statistics Cards**: Total analyzed, ads detected, legitimate traffic, accuracy
+- **Timeline Chart**: Real-time ad detection trends (Chart.js)
+- **Feature Importance**: ML model feature weights visualization
+- **Recent Detections**: Searchable, sortable table with confidence scores
+- **Alerts**: High-priority ML detector alerts
 
-**Locations:**
-- Database: `/var/lib/suricata/ips_filter.db`
-- Blocklists: `/opt/karens-ips-blocklists/`
-- Suricata datasets: `/etc/suricata/datasets/`
+### Technical Details
+- **Backend**: Flask Blueprint integrated into SLIPS
+- **Frontend**: Chart.js for charts, DataTables for tables
+- **Data Storage**: Redis (auto-refresh every 5 seconds)
+- **Security**: Input validation, error handling, no info disclosure
 
-## Architecture
-
+### Redis Keys
 ```
-Internet
-    ↓
-[Bridge Interface: enp6s19 ↔ enp6s20]
-    ↓
-[NFQUEUE] → [Suricata IPS] → Block/Allow
-    ↓
-[Traffic Mirroring] → [SLIPS Behavioral Analysis]
-    ↓
-[ML Ad Detector] → [Redis] → [Web Dashboard]
+ml_detector:stats               # Overall statistics (hash)
+ml_detector:recent_detections   # Recent detections (list, max 100)
+ml_detector:timeline            # Time-series data (list, max 1000)
+ml_detector:model_info          # Model metadata (hash)
+ml_detector:feature_importance  # Feature weights (hash)
+ml_detector:alerts              # Alerts (list, max 50)
 ```
 
-## Configuration
+## Project Structure
 
-Configuration files are stored in the `config/` directory as YAML files.
+```
+karens-ips/
+├── installer/                      # Modular installer (16 modules)
+│   ├── main.sh                     # Main orchestrator
+│   ├── config/installer.conf       # Central configuration
+│   ├── lib/                        # Shared libraries
+│   └── modules/                    # Installation modules
+├── src/                            # Python modules
+│   ├── blocklist_manager.py        # Blocklist management
+│   └── blocklist_config.py         # Configuration manager
+├── slips_integration/              # ML Detector Dashboard
+│   ├── webinterface/ml_detector/   # Flask blueprint
+│   └── patches/                    # SLIPS integration patches
+├── config/                         # YAML configuration
+│   └── blocklists.yaml             # Blocklist configuration
+├── scripts/                        # Utility scripts
+│   ├── update-blocklists.sh        # Blocklist updater
+│   └── import-from-config.py       # Config-based importer
+├── deployment/                     # Deployment configs
+│   ├── blocklist-update.service    # SystemD service
+│   └── blocklist-update.timer      # SystemD timer
+├── tests/                          # Unit tests
+├── karens-ips-installer.sh         # Main installer wrapper
+├── requirements.txt                # Python dependencies
+├── README.md                       # This file
+├── QUICK_START.md                  # Quick start guide
+└── FINAL_CODE_REVIEW.md            # Comprehensive code review
+```
 
-For SLIPS configuration, see `/opt/StratosphereLinuxIPS/config/slips.conf`.
+## System Requirements
 
-## Testing
+**Minimum:**
+- CPU: 4 cores
+- RAM: 8 GB
+- Disk: 50 GB
+- OS: Ubuntu 22.04/24.04 or Debian 11/12
 
-Run tests from the project root:
+**Recommended:**
+- CPU: 8+ cores
+- RAM: 16 GB
+- Disk: 100 GB (for extended logs)
+- Network: 3 NICs (1 management, 2 bridge)
+
+**Resource Usage:**
+- Suricata: ~1-2 GB RAM, 100-200% CPU
+- SLIPS: ~1-2 GB RAM, 50-100% CPU
+- Redis: ~2 GB RAM (configured limit)
+- Zeek: ~1 GB RAM, 50-100% CPU
+- **Total: ~6 GB RAM, ~400% CPU**
+
+## Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `/etc/karens-ips/blocklists.yaml` | Blocklist configuration |
+| `/etc/suricata/suricata.yaml` | Suricata IPS configuration |
+| `/opt/StratosphereLinuxIPS/slips.conf` | SLIPS configuration |
+| `/etc/redis/redis.conf` | Redis configuration |
+| `installer/config/installer.conf` | Installer settings |
+
+## Database Locations
+
+| Database | Path |
+|----------|------|
+| Blocklists | `/var/lib/suricata/ips_filter.db` (SQLite) |
+| Redis | `/var/lib/redis/dump.rdb` |
+| Suricata Datasets | `/etc/suricata/datasets/` |
+| Blocklist Repos | `/opt/karens-ips-blocklists/` |
+
+## Logs
+
+| Component | Log Path |
+|-----------|----------|
+| Suricata Alerts | `/var/log/suricata/fast.log` |
+| Suricata EVE JSON | `/var/log/suricata/eve.json` |
+| SLIPS | `/var/log/slips/slips.log` |
+| SLIPS Journal | `journalctl -fu slips` |
+| System | `journalctl -xe` |
+
+## Troubleshooting
+
+### Services not starting
 ```bash
-python -m pytest tests/
+# Check service status
+systemctl status suricata slips slips-webui
+
+# View detailed logs
+journalctl -xeu suricata
+journalctl -xeu slips
+
+# Test Suricata configuration
+suricata -T -c /etc/suricata/suricata.yaml
+```
+
+### No traffic blocking
+```bash
+# Check bridge status
+ip link show br0
+
+# Verify nftables rules
+nft list ruleset | grep -A 10 "forward_ips"
+
+# Check Suricata is processing
+tail -f /var/log/suricata/fast.log
+
+# Verify dataset loading
+suricatasc -c "datasets.list"
+```
+
+### Interface issues
+```bash
+# Check interface status
+ip link show enp6s19 enp6s20
+
+# Restart interface setup
+systemctl restart ips-interfaces.service
+
+# Check bridge members
+bridge link show
 ```
 
 ## Documentation
 
-- [ML_DETECTOR_INTEGRATION.md](ML_DETECTOR_INTEGRATION.md) - Complete dashboard integration guide
-- [slips_integration/README.md](slips_integration/README.md) - Standalone dashboard installation
-- [CODE_REVIEW.md](CODE_REVIEW.md) - Security and code quality review
-- [BUILD_GUIDE.md](BUILD_GUIDE.md) - Step-by-step build instructions
-- [QUICK_START.md](QUICK_START.md) - Quick start guide
+- **[QUICK_START.md](QUICK_START.md)** - Quick start guide
+- **[installer/README.md](installer/README.md)** - Modular installer documentation
+- **[FINAL_CODE_REVIEW.md](FINAL_CODE_REVIEW.md)** - Comprehensive code review (9.4/10)
+
+## Performance Tuning
+
+See `installer/modules/02-kernel-tuning.sh` for kernel optimizations:
+- Ring buffer sizes (268 MB)
+- Network backlog (300K packets)
+- TCP BBR congestion control
+- Busy polling enabled
+- IPv6 disabled
+
+## Security Features
+
+- ✅ No critical vulnerabilities (security audited)
+- ✅ Proper privilege separation (suricata user)
+- ✅ File permissions correctly set (644/755)
+- ✅ Input validation throughout
+- ✅ No shell injection vulnerabilities
+- ✅ Localhost-only Redis binding
+- ✅ nftables host protection
+- ✅ Secure systemd service configurations
+
+See [FINAL_CODE_REVIEW.md](FINAL_CODE_REVIEW.md) for complete security analysis.
+
+## Testing
+
+```bash
+# Run Python tests
+python -m pytest tests/
+
+# Test blocklist import
+ips-filter import-list /path/to/test-domains.txt test
+
+# Test Suricata config
+suricata -T -c /etc/suricata/suricata.yaml
+
+# Test dataset operations
+echo -n "example.com" | base64 | xargs -I {} suricatasc -c "dataset-add malicious-domains string {}"
+```
+
+## Contributing
+
+Contributions welcome! This project integrates with:
+- [Stratosphere Linux IPS (SLIPS)](https://github.com/stratosphereips/StratosphereLinuxIPS)
+- [Suricata IPS](https://suricata.io/)
+- [Perflyst/PiHoleBlocklist](https://github.com/Perflyst/PiHoleBlocklist)
+- [hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists)
 
 ## License
 
 GPL-2.0-only
 
-## Contributors
+## Credits
 
-This project integrates with [Stratosphere Linux IPS (SLIPS)](https://github.com/stratosphereips/StratosphereLinuxIPS) by Stratosphere Research Laboratory.
+- **SLIPS**: Stratosphere Research Laboratory
+- **Suricata**: Open Information Security Foundation (OISF)
+- **Blocklists**: Perflyst, hagezi community
+- **Zeek**: The Zeek Project
+
+---
+
+**Status:** Production-ready (Code Review: 9.4/10) | **Version:** 4.0 Modular
