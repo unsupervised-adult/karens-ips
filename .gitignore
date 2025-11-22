@@ -50,3 +50,6 @@ config/secrets.yaml
 *.tmp
 *.temp
 *~
+
+# External repositories (cloned for integration reference)
+StratosphereLinuxIPS/
