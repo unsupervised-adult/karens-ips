@@ -93,9 +93,7 @@ load_modules() {
 
     # Check if modules directory exists
     if [[ ! -d "$module_dir" ]]; then
-        warn "Modules directory not found: $module_dir"
-        warn "Falling back to legacy monolithic installer"
-        return 1
+        error_exit "Modules directory not found: $module_dir - installation cannot proceed"
     fi
 
     # Source all module files in order
@@ -282,24 +280,6 @@ main_install() {
 }
 
 # ============================================================================
-# FALLBACK TO LEGACY INSTALLER
-# ============================================================================
-
-fallback_to_legacy() {
-    warn "Modular installer not fully configured"
-    warn "Falling back to legacy monolithic installer"
-
-    local legacy_installer="$PROJECT_ROOT/karens-ips-installer.sh"
-
-    if [[ -f "$legacy_installer" ]]; then
-        log "Executing legacy installer: $legacy_installer"
-        exec bash "$legacy_installer" "$@"
-    else
-        error_exit "Neither modular nor legacy installer found"
-    fi
-}
-
-# ============================================================================
 # MAIN ENTRY POINT
 # ============================================================================
 
@@ -319,14 +299,15 @@ main() {
     # Show configuration
     show_configuration
 
-    # Try to load modules
-    if load_modules; then
-        log "Loaded modular installer"
-        main_install
-    else
-        # If modules not found, fall back to legacy installer
-        fallback_to_legacy "$@"
+    # Load modules
+    if ! load_modules; then
+        error_exit "Failed to load installer modules. Check installer/modules/ directory."
     fi
+
+    log "Loaded modular installer - all modules ready"
+
+    # Execute installation
+    main_install
 }
 
 # Run main if executed (not sourced)
