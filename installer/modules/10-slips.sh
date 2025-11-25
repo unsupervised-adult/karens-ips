@@ -52,6 +52,9 @@ install_slips() {
     # Configure SLIPS web interface
     configure_slips_webui
 
+    # Patch SLIPS for bridge interface support
+    patch_slips_bridge_support
+
     success "SLIPS installed successfully"
 }
 
@@ -299,6 +302,91 @@ verify_slips() {
     fi
 }
 
+patch_slips_bridge_support() {
+    log "Patching SLIPS for bridge interface support..."
+
+    local host_ip_manager="$SLIPS_DIR/managers/host_ip_manager.py"
+
+    if [[ ! -f "$host_ip_manager" ]]; then
+        warn "host_ip_manager.py not found, skipping bridge patch"
+        return 1
+    fi
+
+    # Check if already patched
+    if grep -q "Interface has no IP (e.g., bridge interface)" "$host_ip_manager"; then
+        log "SLIPS bridge support already patched"
+        return 0
+    fi
+
+    # Backup original file
+    cp "$host_ip_manager" "${host_ip_manager}.backup"
+
+    # Create Python script to apply the patch
+    cat > /tmp/patch_slips_bridge.py << 'PATCH_SCRIPT_EOF'
+#!/usr/bin/env python3
+import sys
+
+file_path = sys.argv[1]
+
+# Read the file
+with open(file_path, 'r') as f:
+    lines = f.readlines()
+
+# Find the line where we need to insert the fallback code
+insert_after = -1
+for i, line in enumerate(lines):
+    if 'if netifaces.AF_INET not in addrs:' in line:
+        insert_after = i
+        break
+
+if insert_after == -1:
+    print("ERROR: Could not find insertion point")
+    sys.exit(1)
+
+# The indentation of the if statement (should be 12 spaces based on SLIPS code)
+base_indent = ' ' * 12
+
+# Prepare the fallback code to insert
+fallback_code = f'''{base_indent}    # Interface has no IP (e.g., bridge interface)
+{base_indent}    # Fall back to default/management interface for host IP
+{base_indent}    # This allows monitoring bridges while using another interface for internet
+{base_indent}    default_iface = utils.infer_used_interface()
+{base_indent}    if default_iface and default_iface != iface:
+{base_indent}        try:
+{base_indent}            default_addrs = netifaces.ifaddresses(default_iface)
+{base_indent}            if netifaces.AF_INET in default_addrs:
+{base_indent}                for addr in default_addrs[netifaces.AF_INET]:
+{base_indent}                    fallback_ip = addr.get("addr")
+{base_indent}                    if fallback_ip and not fallback_ip.startswith("127."):
+{base_indent}                        found_ips[iface] = fallback_ip
+{base_indent}                        self.main.print(
+{base_indent}                            f"Interface {{iface}} has no IP. Using {{fallback_ip}} from {{default_iface}} for internet connectivity."
+{base_indent}                        )
+{base_indent}                        break
+{base_indent}        except Exception:
+{base_indent}            pass
+'''
+
+# Insert after the "if netifaces.AF_INET not in addrs:" line
+lines.insert(insert_after + 1, fallback_code)
+
+# Write back
+with open(file_path, 'w') as f:
+    f.writelines(lines)
+
+print("SUCCESS: Patch applied")
+PATCH_SCRIPT_EOF
+
+    # Apply the patch
+    if python3 /tmp/patch_slips_bridge.py "$host_ip_manager"; then
+        success "SLIPS bridge support patched successfully"
+        rm -f /tmp/patch_slips_bridge.py
+        return 0
+    else
+        error_exit "Failed to patch SLIPS for bridge support"
+    fi
+}
+
 # Export functions
 export -f install_slips
 export -f check_zeek_availability
@@ -309,4 +397,5 @@ export -f install_kalipso
 export -f configure_zeek_integration
 export -f setup_slips_directories
 export -f configure_slips_webui
+export -f patch_slips_bridge_support
 export -f verify_slips
