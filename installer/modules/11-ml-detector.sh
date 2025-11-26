@@ -208,12 +208,12 @@ patch_app_html() {
 
     # Add Chart.js library before closing </body>
     if ! grep -q "chart.js" "$app_html"; then
-        sed -i '/<script src="https:\/\/cdn.jsdelivr.net\/npm\/bootstrap@4.5.3\/dist\/js\/bootstrap.bundle.min.js"/a\<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>' "$app_html"
+        sed -i 's|</body>|<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>\n</body>|' "$app_html"
     fi
 
-    # Add ML Detector JavaScript before closing </html>
+    # Add ML Detector JavaScript before closing </body> (after Chart.js)
     if ! grep -q "ml_detector.js" "$app_html"; then
-        sed -i '/<\/html>/i\<script src="{{url_for('\''ml_detector.static'\'', filename='\''js\/ml_detector.js'\'')}}\"></script>' "$app_html"
+        sed -i 's|</body>|<script src="{{url_for('\''ml_detector.static'\'', filename='\''js/ml_detector.js'\'')}}\"></script>\n</body>|' "$app_html"
     fi
 
     success "app.html manually patched"
