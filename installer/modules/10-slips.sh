@@ -303,23 +303,34 @@ verify_slips() {
 }
 
 patch_slips_bridge_support() {
+    log "═══════════════════════════════════════════════"
     log "Patching SLIPS for bridge interface support..."
+    log "═══════════════════════════════════════════════"
 
     local host_ip_manager="$SLIPS_DIR/managers/host_ip_manager.py"
 
+    log "Checking for file: $host_ip_manager"
+
     if [[ ! -f "$host_ip_manager" ]]; then
-        warn "host_ip_manager.py not found, skipping bridge patch"
+        warn "host_ip_manager.py not found at: $host_ip_manager"
+        warn "SLIPS_DIR is: $SLIPS_DIR"
+        ls -la "$SLIPS_DIR/managers/" 2>&1 | head -5 || true
         return 1
     fi
 
+    log "File found, checking if already patched..."
+
     # Check if already patched
     if grep -q "Interface has no IP (e.g., bridge interface)" "$host_ip_manager"; then
-        log "SLIPS bridge support already patched"
+        success "SLIPS bridge support already patched"
         return 0
     fi
 
+    log "Not yet patched, applying bridge support patch..."
+
     # Backup original file
     cp "$host_ip_manager" "${host_ip_manager}.backup"
+    log "Backup created: ${host_ip_manager}.backup"
 
     # Create Python script to apply the patch
     cat > /tmp/patch_slips_bridge.py << 'PATCH_SCRIPT_EOF'
@@ -378,12 +389,23 @@ print("SUCCESS: Patch applied")
 PATCH_SCRIPT_EOF
 
     # Apply the patch
-    if python3 /tmp/patch_slips_bridge.py "$host_ip_manager"; then
-        success "SLIPS bridge support patched successfully"
+    log "Executing Python patch script..."
+    if python3 /tmp/patch_slips_bridge.py "$host_ip_manager" 2>&1 | tee -a /var/log/slips_bridge_patch.log; then
+        success "SLIPS bridge support patched successfully!"
+        log "Verifying patch was applied..."
+        if grep -q "Interface has no IP" "$host_ip_manager"; then
+            success "✓ Patch verification successful - bridge support is active"
+        else
+            warn "Patch script ran but verification failed"
+        fi
         rm -f /tmp/patch_slips_bridge.py
+        log "═══════════════════════════════════════════════"
         return 0
     else
-        error_exit "Failed to patch SLIPS for bridge support"
+        warn "Python patch script failed"
+        log "Check /var/log/slips_bridge_patch.log for details"
+        log "═══════════════════════════════════════════════"
+        return 1
     fi
 }
 
