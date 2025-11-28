@@ -67,7 +67,33 @@ MOTD_EOF
     # Replace placeholder
     sed -i "s/MGMT_IP/${mgmt_ip}/g" /etc/motd
     chmod 644 /etc/motd
-    success "MOTD created"
+    log "MOTD created at /etc/motd"
+
+    # Copy MOTD to SSH banner
+    cp /etc/motd /etc/ssh/banner
+    chmod 644 /etc/ssh/banner
+    log "SSH banner created at /etc/ssh/banner"
+
+    # Configure SSH to use the banner
+    if ! grep -q "^Banner /etc/ssh/banner" /etc/ssh/sshd_config; then
+        # Backup sshd_config
+        cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+
+        # Add Banner directive
+        echo "" >> /etc/ssh/sshd_config
+        echo "# Karen's IPS Banner" >> /etc/ssh/sshd_config
+        echo "Banner /etc/ssh/banner" >> /etc/ssh/sshd_config
+
+        log "SSH banner configured in sshd_config"
+
+        # Restart SSH service to apply changes
+        systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null || true
+        log "SSH service restarted"
+    else
+        log "SSH banner already configured"
+    fi
+
+    success "MOTD and SSH banner created"
 }
 
 verify_motd() {
