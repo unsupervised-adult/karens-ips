@@ -180,79 +180,99 @@ main_install() {
         fi
     fi
 
-    # Phase 8: Node.js
+    # Phase 8: DNS Blackhole
+    if [[ "${INSTALL_BLOCKLISTS:-true}" == "true" ]]; then
+        if command -v install_dns_blackhole &>/dev/null; then
+            log "Phase 8: Setting up DNS blackhole..."
+            install_dns_blackhole
+        else
+            warn "Module install_dns_blackhole not found, skipping..."
+        fi
+    fi
+
+    # Phase 9: Active Blocking
+    if [[ "${INSTALL_BLOCKLISTS:-true}" == "true" ]]; then
+        if command -v install_active_blocking &>/dev/null; then
+            log "Phase 9: Setting up active packet blocking..."
+            install_active_blocking
+        else
+            warn "Module install_active_blocking not found, skipping..."
+        fi
+    fi
+
+    # Phase 10: Node.js
     if [[ "${INSTALL_NODEJS:-true}" == "true" ]]; then
         if command -v install_nodejs &>/dev/null; then
-            log "Phase 8: Installing Node.js..."
+            log "Phase 10: Installing Node.js..."
             install_nodejs
         else
             warn "Module install_nodejs not found, skipping..."
         fi
     fi
 
-    # Phase 9: SLIPS
+    # Phase 11: SLIPS
     if [[ "${INSTALL_SLIPS:-true}" == "true" ]]; then
         if command -v install_slips &>/dev/null; then
-            log "Phase 9: Installing SLIPS..."
+            log "Phase 11: Installing SLIPS..."
             install_slips
         else
             warn "Module install_slips not found, skipping..."
         fi
     fi
 
-    # Phase 10: ML Detector Dashboard
+    # Phase 12: ML Detector Dashboard
     if [[ "${INSTALL_ML_DETECTOR:-true}" == "true" ]]; then
         if command -v install_ml_detector_dashboard &>/dev/null; then
-            log "Phase 10: Installing ML Detector Dashboard..."
+            log "Phase 12: Installing ML Detector Dashboard..."
             install_ml_detector_dashboard
         else
             warn "Module install_ml_detector_dashboard not found, skipping..."
         fi
     fi
 
-    # Phase 11: Network Interfaces
+    # Phase 13: Network Interfaces
     if command -v setup_interfaces &>/dev/null; then
-        log "Phase 11: Setting up network interfaces..."
+        log "Phase 13: Setting up network interfaces..."
         setup_interfaces
     else
         warn "Module setup_interfaces not found, skipping..."
     fi
 
-    # Phase 12: Redis
+    # Phase 14: Redis
     if command -v configure_redis &>/dev/null; then
-        log "Phase 12: Configuring Redis..."
+        log "Phase 14: Configuring Redis..."
         configure_redis
     else
         warn "Module configure_redis not found, skipping..."
     fi
 
-    # Phase 13: SystemD Services
+    # Phase 15: SystemD Services
     if command -v create_systemd_services &>/dev/null; then
-        log "Phase 13: Creating SystemD services..."
+        log "Phase 15: Creating SystemD services..."
         create_systemd_services
     else
         warn "Module create_systemd_services not found, skipping..."
     fi
 
-    # Phase 14: Start Services
+    # Phase 16: Start Services
     if command -v start_services &>/dev/null; then
-        log "Phase 14: Starting services..."
+        log "Phase 16: Starting services..."
         start_services
     else
         warn "Module start_services not found, skipping..."
     fi
 
-    # Phase 15: MOTD
+    # Phase 17: MOTD
     if command -v create_motd &>/dev/null; then
-        log "Phase 15: Creating MOTD..."
+        log "Phase 17: Creating MOTD..."
         create_motd
     else
         warn "Module create_motd not found, skipping..."
     fi
 
-    # Phase 16: Verification
+    # Phase 18: Verification
     if command -v verify_installation &>/dev/null; then
-        log "Phase 16: Verifying installation..."
+        log "Phase 18: Verifying installation..."
         verify_installation
     else
         warn "Module verify_installation not found, skipping..."
