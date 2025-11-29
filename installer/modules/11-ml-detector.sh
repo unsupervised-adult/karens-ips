@@ -203,7 +203,12 @@ patch_app_html() {
 
     # Add ML Detector tab content (after documentation tab content)
     if ! grep -q "ml_detector.html" "$app_html"; then
-        sed -i '/{%.*include.*documentation.html.*%}/a\      <div class="tab-pane fade" id="nav-ml-detector" role="tabpanel" aria-labelledby="nav-ml-detector-tab">\n        {% include '\''ml_detector.html'\'' %}\n      </div>' "$app_html"
+        # First ensure documentation tab is properly closed
+        sed -i '/{%.*include.*documentation.html.*%}/a\      </div>' "$app_html"
+        # Then add ML detector tab
+        sed -i '/{%.*include.*documentation.html.*%}/,/^.*<\/div>/ {
+            /^.*<\/div>/a\      <div class="tab-pane fade" id="nav-ml-detector" role="tabpanel" aria-labelledby="nav-ml-detector-tab">\n        {% include '\''ml_detector.html'\'' %}\n      </div>
+        }' "$app_html"
     fi
 
     # Add Chart.js library before closing </body>
