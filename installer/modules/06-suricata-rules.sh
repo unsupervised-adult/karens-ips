@@ -351,14 +351,15 @@ verify_suricata_rules() {
         ((errors++))
     fi
     
-    # Check that dataset files have more than just placeholder IPs
+    # Check that dataset files exist (IP count validation is optional during install)
     for dataset in malicious-ips c2-ips; do
         local file="/etc/suricata/datasets/${dataset}.txt"
         if [[ -f "$file" ]]; then
             local ip_count=$(grep -c "^[0-9]" "$file" 2>/dev/null || echo "0")
-            if [[ $ip_count -lt 5 ]]; then
-                warn "Dataset $dataset has insufficient IPs ($ip_count)"
-                ((errors++))
+            if [[ $ip_count -eq 0 ]]; then
+                log "Dataset $dataset is empty ($ip_count IPs) - will be populated by timer or manual run"
+            else
+                log "Dataset $dataset contains $ip_count IPs"
             fi
         else
             warn "Dataset file $file not found"
@@ -375,4 +376,45 @@ verify_suricata_rules() {
     fi
 }
 
-export -f update_suricata_rules verify_suricata_rules create_malicious_ip_datasets create_dataset_extraction_script create_comprehensive_update_script
+extract_initial_threat_ips() {
+    log_subsection "Initial Threat IP Extraction"
+    
+    log "Extracting threat IPs from SQLite database to populate Suricata datasets..."
+    
+    # Check if SQLite database exists
+    if [[ ! -f "/var/lib/suricata/ips_filter.db" ]]; then
+        warn "SQLite database not found - datasets will remain empty until first timer run"
+        return 0
+    fi
+    
+    # Check if extraction script exists
+    if [[ ! -x "/usr/local/bin/extract-threat-ips.py" ]]; then
+        warn "IP extraction script not found - datasets will remain empty"
+        return 0
+    fi
+    
+    # Run the extraction script to populate datasets
+    log "Running initial threat IP extraction..."
+    if /usr/local/bin/extract-threat-ips.py; then
+        
+        # Show results
+        local malicious_count=0
+        local c2_count=0
+        
+        if [[ -f "/etc/suricata/datasets/malicious-ips.txt" ]]; then
+            malicious_count=$(grep -c "^[0-9]" "/etc/suricata/datasets/malicious-ips.txt" 2>/dev/null || echo "0")
+        fi
+        
+        if [[ -f "/etc/suricata/datasets/c2-ips.txt" ]]; then
+            c2_count=$(grep -c "^[0-9]" "/etc/suricata/datasets/c2-ips.txt" 2>/dev/null || echo "0")
+        fi
+        
+        success "Threat IP extraction completed: $malicious_count malicious IPs, $c2_count C2 IPs"
+        
+    else
+        warn "Failed to extract threat IPs - check logs"
+        return 1
+    fi
+}
+
+export -f update_suricata_rules verify_suricata_rules create_malicious_ip_datasets create_dataset_extraction_script create_comprehensive_update_script extract_initial_threat_ips

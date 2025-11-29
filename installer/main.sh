@@ -181,6 +181,16 @@ main_install() {
     fi
 
 
+    # Phase 7.5: Extract threat IPs from SQLite to datasets (after blocklist import)
+    if [[ "${INSTALL_BLOCKLISTS:-true}" == "true" ]]; then
+        if command -v extract_initial_threat_ips &>/dev/null; then
+            log "Phase 7.5: Extracting threat IPs from SQLite to Suricata datasets..."
+            extract_initial_threat_ips
+        else
+            warn "Module extract_initial_threat_ips not found, skipping..."
+        fi
+    fi
+
     # Phase 8: Active Blocking
     if [[ "${INSTALL_BLOCKLISTS:-true}" == "true" ]]; then
         if command -v install_active_blocking &>/dev/null; then
