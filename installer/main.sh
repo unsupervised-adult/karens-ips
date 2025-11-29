@@ -180,20 +180,11 @@ main_install() {
         fi
     fi
 
-    # Phase 8: DNS Blackhole
-    if [[ "${INSTALL_BLOCKLISTS:-true}" == "true" ]]; then
-        if command -v install_dns_blackhole &>/dev/null; then
-            log "Phase 8: Setting up DNS blackhole..."
-            install_dns_blackhole
-        else
-            warn "Module install_dns_blackhole not found, skipping..."
-        fi
-    fi
 
-    # Phase 9: Active Blocking
+    # Phase 8: Active Blocking
     if [[ "${INSTALL_BLOCKLISTS:-true}" == "true" ]]; then
         if command -v install_active_blocking &>/dev/null; then
-            log "Phase 9: Setting up active packet blocking..."
+            log "Phase 8: Setting up active packet blocking..."
             install_active_blocking
         else
             warn "Module install_active_blocking not found, skipping..."

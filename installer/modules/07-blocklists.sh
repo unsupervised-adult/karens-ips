@@ -76,7 +76,7 @@ configure_blocklists() {
 
     # hagezi blocklists - recommend choosing ONE version
     echo ""
-    info "hagezi DNS Blocklists (choose ONE version based on blocking level):"
+    info "hagezi IP Blocklists (choose ONE version based on blocking level):"
     echo "  📗 Light      - Low blocking, minimal false positives"
     echo "  📘 Normal     - Medium blocking, relaxed/balanced"
     echo "  📒 Pro        - Balanced blocking (RECOMMENDED)"

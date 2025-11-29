@@ -84,19 +84,21 @@ table inet home {
     chain input_filter {
         type filter hook input priority 0; policy accept;
         tcp dport 55000 accept comment "SLIPS Web UI";
-        ip saddr @blocked4 counter drop comment "Block malicious IPv4";
     }
 
     chain output_filter {
         type filter hook output priority 0; policy accept;
-        ip daddr @blocked4 counter drop comment "Block outbound to malicious IPv4";
     }
 
     # NFQUEUE chain for bridge traffic inspection (IPS mode)
     chain forward_ips {
         type filter hook forward priority 0; policy accept;
 
-        # Send all forwarded traffic through bridge to Suricata nfqueue
+        # Block malicious IPs on bridge traffic only (not management)
+        iifname "br0" ip saddr @blocked4 counter drop comment "Block malicious sources on bridge";
+        oifname "br0" ip daddr @blocked4 counter drop comment "Block malicious destinations on bridge";
+
+        # Send remaining bridge traffic to Suricata nfqueue
         iifname "br0" counter queue num 0 bypass comment "Send bridge traffic to Suricata IPS";
         oifname "br0" counter queue num 0 bypass comment "Send bridge traffic to Suricata IPS";
     }

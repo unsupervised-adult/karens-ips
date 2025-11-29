@@ -514,11 +514,13 @@ class SuricataRuleGenerator:
                 f.write("\n")
 
                 # Generate rules
+                rule_count = 0
                 for idx, domain in enumerate(domains, start=1000000):
-                    rule = self._generate_rule(idx, domain, category or "ads")
-                    f.write(rule + "\n")
+                    rules = self._generate_rule(idx, domain, category or "ads")
+                    f.write(rules + "\n")
+                    rule_count += 7  # DNS TCP/UDP + DoH + HTTP + HTTP2 + TLS + UDP rules
 
-            logger.info(f"Generated {len(domains)} Suricata rules")
+            logger.info(f"Generated {rule_count} Suricata rules for {len(domains)} domains")
 
         except Exception as e:
             logger.error(f"Failed to generate rules: {e}")
@@ -526,26 +528,98 @@ class SuricataRuleGenerator:
 
     def _generate_rule(self, sid: int, domain: str, category: str) -> str:
         """
-        Generate a single Suricata rule
+        Generate comprehensive Suricata DROP rules for domain blocking (second-line defense)
 
         Args:
             sid: Signature ID
-            domain: Domain name
+            domain: Domain name  
             category: Category
 
         Returns:
             Suricata rule string
         """
-        # HTTP rule
-        rule = (
-            f'alert http any any -> any any '
-            f'(msg:"KARENS-IPS Blocked {category}: {domain}"; '
-            f'flow:established,to_server; '
-            f'http.host; content:"{domain}"; nocase; '
+        rules = []
+        
+        # DNS query inspection (TCP/UDP port 53 - second-line defense after Pi-hole)
+        dns_tcp_rule = (
+            f'drop dns any any -> any 53 '
+            f'(msg:"KARENS-IPS Block {category} DNS query: {domain}"; '
+            f'dns.query; content:"{domain}"; nocase; '
             f'classtype:policy-violation; '
             f'sid:{sid}; rev:1;)'
         )
-        return rule
+        rules.append(dns_tcp_rule)
+        
+        # DNS over UDP
+        dns_udp_rule = (
+            f'drop udp any any -> any 53 '
+            f'(msg:"KARENS-IPS Block {category} DNS UDP query: {domain}"; '
+            f'content:"|01 00 00 01|"; offset:2; depth:4; '
+            f'content:"{domain}"; nocase; distance:8; '
+            f'classtype:policy-violation; '
+            f'sid:{sid + 100000}; rev:1;)'
+        )
+        rules.append(dns_udp_rule)
+        
+        # DNS over HTTPS (DoH) - port 443
+        doh_rule = (
+            f'drop http any any -> any 443 '
+            f'(msg:"KARENS-IPS Block {category} DoH query: {domain}"; '
+            f'http.uri; content:"/dns-query"; '
+            f'http.host; content:"{domain}"; nocase; '
+            f'classtype:policy-violation; '
+            f'sid:{sid + 200000}; rev:1;)'
+        )
+        rules.append(doh_rule)
+        
+        # HTTP/1.1 Host header inspection
+        http_rule = (
+            f'drop http any any -> any any '
+            f'(msg:"KARENS-IPS Block {category} HTTP: {domain}"; '
+            f'flow:established,to_server; '
+            f'http.host; content:"{domain}"; nocase; '
+            f'classtype:policy-violation; '
+            f'sid:{sid + 1000000}; rev:1;)'
+        )
+        rules.append(http_rule)
+        
+        # HTTP/2 inspection
+        http2_rule = (
+            f'drop http2 any any -> any any '
+            f'(msg:"KARENS-IPS Block {category} HTTP2: {domain}"; '
+            f'flow:established,to_server; '
+            f'http2.header; content:"authority"; '
+            f'http2.header_value; content:"{domain}"; nocase; '
+            f'classtype:policy-violation; '
+            f'sid:{sid + 1100000}; rev:1;)'
+        )
+        rules.append(http2_rule)
+        
+        # TLS SNI inspection (HTTPS)
+        tls_rule = (
+            f'drop tls any any -> any any '
+            f'(msg:"KARENS-IPS Block {category} TLS SNI: {domain}"; '
+            f'flow:established,to_server; '
+            f'tls.sni; content:"{domain}"; nocase; '
+            f'classtype:policy-violation; '
+            f'sid:{sid + 2000000}; rev:1;)'
+        )
+        rules.append(tls_rule)
+        
+        # NOTE: QUIC is encrypted - domain inspection not reliable
+        # QUIC blocking would require IP-based rules or upstream DNS blocking
+        
+        # Generic UDP traffic inspection (catch-all for other protocols)
+        udp_rule = (
+            f'drop udp any any -> any !53 '
+            f'(msg:"KARENS-IPS Block {category} UDP: {domain}"; '
+            f'content:"{domain}"; nocase; '
+            f'classtype:policy-violation; '
+            f'sid:{sid + 4000000}; rev:1;)'
+        )
+        rules.append(udp_rule)
+        
+        return '\n'.join(rules)
 
 
 def main():
@@ -605,7 +679,7 @@ def main():
     )
     parser.add_argument(
         '--category',
-        choices=['ads', 'tracking', 'malware', 'all'],
+        choices=['ads', 'tracking', 'malware', 'iot_ads', 'streaming_ads', 'all'],
         default='all',
         help='Filter by category'
     )
@@ -657,24 +731,62 @@ def main():
             category = None if args.category == 'all' else args.category
             generator.generate_rules(args.generate_rules, category)
 
-        # Sync to Suricata (generate rules to default location)
+        # Sync to Suricata (generate datasets AND rules)
         if args.sync:
-            logger.info("Syncing blocklists to Suricata rules...")
+            logger.info("Syncing blocklists to Suricata datasets and rules...")
             generator = SuricataRuleGenerator(db)
 
-            # Default output location for Suricata rules
-            output_file = '/etc/suricata/rules/karens-ips-blocklist.rules'
+            # Generate Suricata datasets (more efficient than complex rules)
+            dataset_file = '/etc/suricata/datasets/karens-ips-domains.txt'
+            os.makedirs(os.path.dirname(dataset_file), exist_ok=True)
+            
+            domains = db.get_all_domains()
+            with open(dataset_file, 'w') as f:
+                f.write("# Karen's IPS Domain Dataset\n")
+                f.write(f"# Generated: {datetime.now().isoformat()}\n")
+                f.write(f"# Total domains: {len(domains)}\n\n")
+                for domain in domains:
+                    f.write(f"{domain}\n")
+            
+            print(f"Generated dataset: {dataset_file}")
+            print(f"Domains in dataset: {len(domains)}")
 
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            # Generate simple rules that use the dataset
+            rules_file = '/etc/suricata/rules/karens-ips-dataset.rules'
+            os.makedirs(os.path.dirname(rules_file), exist_ok=True)
+            
+            with open(rules_file, 'w') as f:
+                f.write("# Karen's IPS Dataset Rules\n")
+                f.write(f"# Generated: {datetime.now().isoformat()}\n\n")
+                
+                # Simple rules that reference the dataset
+                f.write('# HTTP Host header blocking\n')
+                f.write('drop http any any -> any any (msg:"KARENS-IPS Block HTTP ad domain"; ')
+                f.write('http.host; dataset:set,karens-ips-domains,type string,load karens-ips-domains.txt; ')
+                f.write('classtype:policy-violation; sid:9000001; rev:1;)\n\n')
+                
+                f.write('# TLS SNI blocking\n') 
+                f.write('drop tls any any -> any any (msg:"KARENS-IPS Block TLS ad domain"; ')
+                f.write('tls.sni; dataset:set,karens-ips-domains,type string,load karens-ips-domains.txt; ')
+                f.write('classtype:policy-violation; sid:9000002; rev:1;)\n\n')
+                
+                f.write('# DNS query blocking\n')
+                f.write('drop dns any any -> any 53 (msg:"KARENS-IPS Block DNS ad query"; ')
+                f.write('dns.query; dataset:set,karens-ips-domains,type string,load karens-ips-domains.txt; ')
+                f.write('classtype:policy-violation; sid:9000003; rev:1;)\n\n')
+                
+                f.write('# HTTP/2 authority header blocking\n')
+                f.write('drop http2 any any -> any any (msg:"KARENS-IPS Block HTTP2 ad domain"; ')
+                f.write('http2.header_name; content:"authority"; ')
+                f.write('http2.header_value; dataset:set,karens-ips-domains,type string,load karens-ips-domains.txt; ')
+                f.write('classtype:policy-violation; sid:9000004; rev:1;)\n\n')
 
-            generator.generate_rules(output_file, category=None)
-            print(f"Syncing: blocklists to Suricata")
-            print(f"Successfully: generated rules to {output_file}")
+            print(f"Generated rules: {rules_file}")
+            print(f"Rules use dataset for efficient matching")
 
             # Get stats for progress
             stats = db.get_stats()
-            print(f"Progress: {stats.get('total_domains', 0)} domains synced")
+            print(f"Synced: {stats.get('total_domains', 0)} domains to Suricata dataset")
 
         # Show statistics
         if args.stats:

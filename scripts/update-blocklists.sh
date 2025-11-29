@@ -139,23 +139,6 @@ if command -v karens-ips-active-blocking >/dev/null 2>&1; then
     karens-ips-active-blocking generate
 fi
 
-# Update DNS blackhole if available
-if command -v karens-ips-dns-blackhole >/dev/null 2>&1; then
-    log ""
-    log "Updating DNS blackhole..."
-    
-    # Load domains into DNS blackhole
-    for blocklist_file in \
-        "$BLOCKLISTS_DIR/PiHoleBlocklist/SmartTV.txt" \
-        "$BLOCKLISTS_DIR/dns-blocklists/domains/pro.txt" \
-        "$BLOCKLISTS_DIR/dns-blocklists/domains/blocklist-referral.txt"; do
-        
-        if [ -f "$blocklist_file" ]; then
-            log "Loading $(basename "$blocklist_file") into DNS blackhole..."
-            karens-ips-dns-blackhole load-list "$blocklist_file"
-        fi
-    done
-fi
 
 log ""
 log "All blocking mechanisms updated!"

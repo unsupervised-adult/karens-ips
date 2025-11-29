@@ -27,6 +27,7 @@ class AdTrafficFeatureExtractor:
     - Connection patterns (8): concurrent_count, avg_size, std_size, min_size, max_size, small_request_ratio, short_duration_ratio, connection_variance
     - CDN detection (5): is_ad_cdn, cdn_consistency, subnet_changes, endpoint_diversity, known_tracker
     - Behavior (4): user_agent_changes, cookie_tracking, redirect_chains, data_exfiltration_score
+    - Ad patterns (3): short_burst_followed_by_long, video_ad_pattern, content_duration_ratio
     """
     
     def __init__(self, redis_host: str = "localhost", redis_ports: Dict[str, int] = None):
@@ -142,7 +143,7 @@ class AdTrafficFeatureExtractor:
             ValueError: If flow_data is invalid or missing required fields
         """
         try:
-            features = np.zeros(30, dtype=np.float32)
+            features = np.zeros(33, dtype=np.float32)
             
             # Basic flow information
             duration = float(flow_data.get('dur', 0))
@@ -209,6 +210,11 @@ class AdTrafficFeatureExtractor:
             features[28] = self._calculate_redirect_chains(recent_flows)
             features[29] = self._calculate_data_exfiltration_score(sbytes, dbytes, duration)
             
+            # Ad pattern detection (3 features) - NEW
+            features[30] = self._detect_short_burst_long_content(dst_ip, current_time, duration)
+            features[31] = self._detect_video_ad_pattern(dst_ip, dst_port, recent_flows)
+            features[32] = self._calculate_content_duration_ratio(recent_flows, duration)
+            
             # Update flow timing cache
             self._update_flow_timing_cache(dst_ip, current_time)
             
@@ -217,7 +223,7 @@ class AdTrafficFeatureExtractor:
         except Exception as e:
             self.logger.error(f"Error extracting features: {e}")
             # Return zero features on error to maintain array shape
-            return np.zeros(30, dtype=np.float32)
+            return np.zeros(33, dtype=np.float32)
     
     def extract_time_series(self, dst_ip: str, window_seconds: int = 60) -> np.ndarray:
         """
@@ -246,7 +252,7 @@ class AdTrafficFeatureExtractor:
             
         except Exception as e:
             self.logger.error(f"Error extracting time series for {dst_ip}: {e}")
-            return np.zeros((10, 30), dtype=np.float32)
+            return np.zeros((10, 33), dtype=np.float32)
     
     def _get_recent_flows(self, dst_ip: str, current_time: float, window_seconds: int) -> List[Dict]:
         """Get flows to destination IP within time window."""
@@ -494,4 +500,171 @@ class AdTrafficFeatureExtractor:
         """Clear feature cache."""
         self._feature_cache.clear()
         self._flow_times.clear()
+    
+    # ======================================
+    # AD PATTERN DETECTION METHODS
+    # ======================================
+    
+    def _detect_short_burst_long_content(self, dst_ip: str, current_time: float, current_duration: float) -> float:
+        """
+        Detect ad pattern: short burst (~30-60 seconds) followed by longer content.
+        This is the key behavioral pattern for video/streaming ads.
+        """
+        try:
+            # Get flows to this IP in the last 10 minutes
+            recent_flows = self._get_recent_flows(dst_ip, current_time, 600)
+            
+            if len(recent_flows) < 2:
+                return 0.0
+            
+            # Sort by start time
+            flows_by_time = sorted(recent_flows, key=lambda f: f.get('starttime', 0))
+            
+            # Look for pattern: short flow followed by longer flow
+            ad_pattern_score = 0.0
+            pattern_count = 0
+            
+            for i in range(len(flows_by_time) - 1):
+                current_flow = flows_by_time[i]
+                next_flow = flows_by_time[i + 1]
+                
+                current_dur = current_flow.get('dur', 0)
+                next_dur = next_flow.get('dur', 0)
+                
+                # Time gap between flows (should be small for sequential content)
+                time_gap = next_flow.get('starttime', 0) - (current_flow.get('starttime', 0) + current_dur)
+                
+                # Ad pattern: short duration (15-90 seconds) followed by longer content
+                if (15 <= current_dur <= 90 and  # Short burst (ad)
+                    next_dur > current_dur * 2 and  # Longer content
+                    next_dur > 120 and  # Content is substantial
+                    0 <= time_gap <= 10):  # Sequential with small gap
+                    
+                    pattern_count += 1
+                    
+                    # Calculate pattern strength
+                    duration_ratio = min(next_dur / current_dur, 10.0) / 10.0
+                    ad_duration_score = 1.0 - abs(current_dur - 30) / 75.0  # Optimal ~30s
+                    gap_score = 1.0 - (time_gap / 10.0)
+                    
+                    pattern_strength = (duration_ratio + ad_duration_score + gap_score) / 3.0
+                    ad_pattern_score += pattern_strength
+            
+            # Normalize score
+            if pattern_count > 0:
+                return min(ad_pattern_score / pattern_count, 1.0)
+            
+            return 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Error detecting short burst pattern: {e}")
+            return 0.0
+    
+    def _detect_video_ad_pattern(self, dst_ip: str, dst_port: int, recent_flows: List[Dict]) -> float:
+        """
+        Detect video advertising patterns based on streaming protocols and behavior.
+        """
+        try:
+            # Video streaming ports
+            video_ports = {80, 443, 1935, 8080, 8443, 554}  # HTTP/HTTPS/RTMP/RTSP
+            
+            if dst_port not in video_ports:
+                return 0.0
+            
+            if len(recent_flows) < 2:
+                return 0.0
+            
+            # Analyze flow patterns
+            total_bytes = []
+            durations = []
+            
+            for flow in recent_flows:
+                total_bytes.append(flow.get('sbytes', 0) + flow.get('dbytes', 0))
+                durations.append(flow.get('dur', 0))
+            
+            if not total_bytes or not durations:
+                return 0.0
+            
+            # Video ad indicators:
+            # 1. Multiple flows with consistent small-large pattern
+            # 2. Specific duration patterns (15s, 30s, 60s ads common)
+            # 3. Byte patterns suggesting video content
+            
+            pattern_score = 0.0
+            
+            # Check for common ad durations
+            ad_durations = {15, 30, 60, 90}  # Common ad lengths
+            for duration in durations:
+                if any(abs(duration - ad_dur) <= 5 for ad_dur in ad_durations):
+                    pattern_score += 0.3
+            
+            # Check for video streaming byte patterns
+            avg_bytes = np.mean(total_bytes)
+            if avg_bytes > 1024 * 100:  # >100KB suggests video content
+                pattern_score += 0.4
+            
+            # Check for burst patterns in byte transfers
+            if len(total_bytes) >= 3:
+                byte_variance = np.var(total_bytes)
+                byte_mean = np.mean(total_bytes)
+                if byte_mean > 0:
+                    cv = np.sqrt(byte_variance) / byte_mean
+                    if 0.5 <= cv <= 2.0:  # Moderate variance suggests ad/content mix
+                        pattern_score += 0.3
+            
+            return min(pattern_score, 1.0)
+            
+        except Exception as e:
+            self.logger.error(f"Error detecting video ad pattern: {e}")
+            return 0.0
+    
+    def _calculate_content_duration_ratio(self, recent_flows: List[Dict], current_duration: float) -> float:
+        """
+        Calculate ratio of current flow duration to typical content duration.
+        Ads typically have specific duration ratios compared to content.
+        """
+        try:
+            if not recent_flows or current_duration <= 0:
+                return 0.0
+            
+            # Get durations of recent flows
+            durations = [f.get('dur', 0) for f in recent_flows if f.get('dur', 0) > 0]
+            
+            if len(durations) < 2:
+                return 0.0
+            
+            # Separate potential ads (short) from content (long)
+            short_flows = [d for d in durations if d <= 120]  # ≤ 2 minutes
+            long_flows = [d for d in durations if d > 120]   # > 2 minutes
+            
+            if not short_flows and not long_flows:
+                return 0.0
+            
+            # Current flow is short - could be an ad
+            if current_duration <= 120:
+                if long_flows:
+                    avg_content_duration = np.mean(long_flows)
+                    ratio = current_duration / avg_content_duration
+                    
+                    # Score higher for typical ad/content ratios
+                    if 0.1 <= ratio <= 0.5:  # Ad is 10-50% of content length
+                        return min(ratio * 2.0, 1.0)
+                    elif ratio < 0.1:
+                        return 1.0  # Very short compared to content = likely ad
+                
+                return 0.5  # Short flow but no long reference
+            
+            # Current flow is long - likely content
+            if short_flows:
+                avg_ad_duration = np.mean(short_flows)
+                ratio = avg_ad_duration / current_duration
+                
+                if 0.1 <= ratio <= 0.5:  # Previous shorts were 10-50% of this
+                    return min((1.0 - ratio) * 1.5, 1.0)
+            
+            return 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating content duration ratio: {e}")
+            return 0.0
         self.logger.info("Feature cache cleared")

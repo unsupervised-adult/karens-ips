@@ -1,0 +1,87 @@
+# Netflix Advertising Domains
+# Blocks ads from Netflix ad-supported tiers
+
+# Netflix advertising domains  
+ads.netflix.com
+ad.netflix.com
+advertising.netflix.com
+adnxs.com
+adsystem.amazon.com
+
+# Netflix ad tracking and measurement
+ads-api.netflix.com
+measurement.netflix.com
+analytics.netflix.com
+metrics.netflix.com
+telemetry.netflix.com
+
+# Netflix third-party ad networks
+googleadservices.com
+googlesyndication.com
+doubleclick.net
+amazon-adsystem.com
+facebook.com/tr
+adsystem.amazon.com
+amazon-adsystem.com
+ads.yahoo.com
+adsystem.yahoo.com
+
+# Netflix marketing and promotion tracking
+marketing.netflix.com
+promo.netflix.com
+campaign.netflix.com
+tracking.netflix.com
+
+# Moat and other ad verification
+moatads.com
+adsafeprotected.com
+doubleverify.com
+integralads.com
+
+# Microsoft advertising (Netflix partnership)
+ads.microsoft.com
+bat.bing.com
+adsystem.microsoft.com
+
+# Trade Desk and other programmatic
+thetradedesk.com
+adsystem.com
+adsrvr.org
+
+# IAS and other viewability
+ias.com
+admeasure.com
+viewabilitymeasurement.com
+
+# Comscore and other measurement
+comscore.com
+scorecardresearch.com
+quantserve.com
+
+# Facebook/Meta advertising
+facebook.com/tr
+connect.facebook.net
+facebook.com/plugins
+
+# Twitter/X advertising  
+ads-twitter.com
+analytics.twitter.com
+ads.twitter.com
+
+# TikTok advertising
+ads.tiktok.com
+analytics.tiktok.com
+
+# Snapchat advertising
+ads.snapchat.com
+tr.snapchat.com
+
+# Adobe advertising
+adobe.com/privacy
+audiencemanager.com
+demdex.net
+
+# LiveRamp and other identity resolution
+liveramp.com
+acxiom.com
+rlcdn.com

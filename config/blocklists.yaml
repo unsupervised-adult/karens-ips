@@ -47,7 +47,7 @@ perflyst:
       enabled: true
       description: Session replay tracking scripts
 
-# hagezi/dns-blocklists configuration
+# hagezi IP blocklists configuration
 hagezi:
   enabled: true
   repository: https://github.com/hagezi/dns-blocklists.git
@@ -86,36 +86,35 @@ hagezi:
       file: domains/native.txt
       category: tracking
       enabled: true
-      description: Native app tracking domains
+      description: Native app tracking domains (IPs only)
 
     - name: ThreatIntelligence
       file: domains/tif.txt
       category: malware
       enabled: false
-      description: Threat Intelligence Feeds
+      description: Threat Intelligence Feeds (IPs only)
 
 # Custom blocklists (user-defined)
 custom:
   enabled: true
   lists:
-    # Example custom list
-    # - name: MyCustomList
-    #   file: /path/to/custom/domains.txt
-    #   category: ads
-    #   enabled: true
-    #   description: My custom blocklist
+    # Samsung IoT/Appliance blocking (fridges, washing machines, etc)
+    - name: SamsungIoT
+      file: /etc/karens-ips/custom/samsung-iot-ads.txt
+      category: iot_ads
+      enabled: true
+      description: Samsung IoT appliance advertising domains
+    
+    # Netflix ads blocking (new ad-tier subscriptions)
+    - name: NetflixAds
+      file: /etc/karens-ips/custom/netflix-ads.txt
+      category: streaming_ads
+      enabled: true
+      description: Netflix advertising domains and trackers
 
-# Exception lists (domains and IPs that should never be blocked)
+# Exception lists (IPs that should never be blocked)
 exceptions:
   enabled: true
-
-  # Domain exceptions (will not be blocked even if in blocklists)
-  domains:
-    - localhost
-    - localhost.localdomain
-    # Add your exceptions below:
-    # - example.com
-    # - trusted-domain.com
 
   # IP exceptions (will not be blocked even if in blocklists)
   ips:

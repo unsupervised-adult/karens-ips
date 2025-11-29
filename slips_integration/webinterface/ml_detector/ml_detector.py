@@ -240,3 +240,124 @@ def get_alerts():
     except Exception as e:
         logger.error(f"Error fetching alerts: {str(e)}")
         return jsonify({"error": "Failed to fetch alerts", "data": []}), 200
+
+
+# ----------------------------------------
+# SIMPLE DASHBOARD FOR FRIENDS
+# ----------------------------------------
+@ml_detector.route("/simple")
+def simple_dashboard():
+    """Simple dashboard for non-technical users"""
+    return render_template("simple_dashboard.html", title="Ad Blocking Status")
+
+
+@ml_detector.route("/simple/stats")
+def simple_stats():
+    """Simple stats API for non-technical dashboard"""
+    import subprocess
+    from pathlib import Path
+    from datetime import datetime, timedelta
+    
+    try:
+        # Check protection status
+        def check_service(service_name):
+            try:
+                result = subprocess.run(['systemctl', 'is-active', service_name], 
+                                      capture_output=True, text=True)
+                return result.returncode == 0
+            except:
+                return False
+        
+        services = {
+            'suricata': check_service('suricata'),
+            'slips': check_service('slips'),
+            'redis': check_service('redis-server')
+        }
+        
+        all_running = all(services.values())
+        protection_status = "PROTECTED" if all_running else "PARTIAL" if any(services.values()) else "NOT PROTECTED"
+        status_color = 'green' if all_running else 'yellow' if any(services.values()) else 'red'
+        
+        # Count blocked ads from Suricata logs
+        suricata_log = "/var/log/suricata/fast.log"
+        ads_today = 0
+        ads_week = 0
+        device_counts = {
+            'Samsung TV/Fridge': 0,
+            'Netflix': 0,
+            'Android Devices': 0, 
+            'Amazon FireTV': 0,
+            'Other Ads': 0
+        }
+        
+        try:
+            today = datetime.now().strftime('%m/%d')
+            
+            if Path(suricata_log).exists():
+                with open(suricata_log, 'r') as f:
+                    for line in f:
+                        if 'KARENS-IPS' in line and 'Block' in line:
+                            ads_week += 1
+                            
+                            if today in line:
+                                ads_today += 1
+                                
+                                # Categorize by device type
+                                line_lower = line.lower()
+                                if 'samsung' in line_lower or 'smarttv' in line_lower:
+                                    device_counts['Samsung TV/Fridge'] += 1
+                                elif 'netflix' in line_lower:
+                                    device_counts['Netflix'] += 1
+                                elif 'android' in line_lower:
+                                    device_counts['Android Devices'] += 1
+                                elif 'firetv' in line_lower or 'amazon' in line_lower:
+                                    device_counts['Amazon FireTV'] += 1
+                                else:
+                                    device_counts['Other Ads'] += 1
+        
+        except Exception as e:
+            logger.error(f"Error reading Suricata logs: {e}")
+        
+        # Get ML threat count from Redis
+        ml_threats = 0
+        try:
+            alerts = db.r.lrange("ml_detector:alerts", 0, -1)
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            
+            for alert in alerts:
+                try:
+                    if isinstance(alert, bytes):
+                        alert = alert.decode()
+                    alert_data = json.loads(alert)
+                    if today_str in alert_data.get('timestamp', ''):
+                        ml_threats += 1
+                except:
+                    continue
+        except Exception as e:
+            logger.error(f"Error getting ML threats: {e}")
+        
+        stats = {
+            'protection_status': {
+                'status': protection_status,
+                'color': status_color,
+                'services': services
+            },
+            'ads_blocked_today': ads_today,
+            'ads_blocked_week': ads_week,
+            'ml_threats_today': ml_threats,
+            'device_types': device_counts,
+            'last_updated': datetime.now().strftime('%H:%M:%S')
+        }
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Error getting simple stats: {e}")
+        return jsonify({
+            'protection_status': {'status': 'ERROR', 'color': 'red'},
+            'ads_blocked_today': 0,
+            'ads_blocked_week': 0,
+            'ml_threats_today': 0,
+            'device_types': {},
+            'last_updated': datetime.now().strftime('%H:%M:%S')
+        })

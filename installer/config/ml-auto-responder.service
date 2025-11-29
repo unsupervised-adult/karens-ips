@@ -1,0 +1,36 @@
+[Unit]
+Description=Karen's IPS ML Auto Responder
+Documentation=https://github.com/unsupervised-adult/suricata-ips
+After=network.target redis-server.service suricata.service slips.service
+Wants=redis-server.service suricata.service slips.service
+PartOf=karens-ips.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+Environment=PYTHONPATH=/opt/StratosphereLinuxIPS
+WorkingDirectory=/opt/karens-ips
+ExecStart=/usr/bin/python3 /opt/karens-ips/src/ml_auto_responder.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/karens-ips /var/lib/karens-ips /etc/suricata/rules
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Health monitoring
+WatchdogSec=60
+
+[Install]
+WantedBy=multi-user.target
+WantedBy=karens-ips.target

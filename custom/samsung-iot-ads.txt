@@ -1,0 +1,69 @@
+# Samsung IoT Appliance Advertising Domains
+# Blocks ads from Samsung smart appliances (fridges, washing machines, etc)
+
+# Samsung advertising and tracking domains
+ad.samsungadhub.com
+samsungads.com
+samsungadhub.com
+device-metrics-us.amazon.com
+analytics.samsungknox.com
+samsung-com.112.2o7.net
+analytics.samsung.com
+
+# Samsung appliance telemetry that serves ads
+openapi.samsung.com
+us-api.samsungyhs.com
+eu-api.samsungyhs.com
+kr-api.samsungyhs.com
+cn-api.samsungyhs.com
+
+# Samsung Smart Connect (Family Hub, etc)
+smartconnect.samsung.com
+config.samsungosp.com
+log-config.samsungosp.com
+deviceauth.samsungosp.com
+auth.samsungosp.com
+cdn.samsungcloudsolution.com
+cdn.samsungcloudsolution.net
+
+# Samsung push notification ads
+pushsvc.samsungosp.com
+samsungpush.com
+pushnotify.samsung.com
+
+# Samsung account/store ads
+shop.samsung.com
+store.samsung.com
+content.samsung.com
+promotion.samsung.com
+event.samsung.com
+
+# Samsung Smart Home ads
+smartthings-d.com
+api.smartthings.com
+graph.api.smartthings.com
+graph-eu01-euwest1.api.smartthings.com
+graph-ap02-apnortheast2.api.smartthings.com
+
+# Samsung appliance update servers that push ads
+fota-secure.samsungosp.com
+fota.samsungosp.com
+rms.samsungosp.com
+rum.samsungosp.com
+
+# Samsung Bixby ads (voice assistant)
+bixby.samsung.com
+bixby-api.samsung.com
+bixbyapi.samsung.com
+
+# Samsung diagnostic telemetry with ads
+diagnostics.samsungosp.com
+diagnosis.samsungosp.com
+supportinfo.samsung.com
+
+# Third-party ad networks on Samsung devices
+doubleclick.net
+googleadservices.com
+googlesyndication.com
+amazon-adsystem.com
+adsystem.amazon.com
