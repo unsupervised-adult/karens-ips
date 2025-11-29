@@ -26,8 +26,7 @@ active_blocking_install() {
         apt-get install -y python3
     fi
 
-    # Install required Python packages via system package manager
-    apt-get install -y python3-dnspython python3-requests
+    # Note: No additional Python packages needed - using built-in modules only
 
     success "Active blocking components installed"
 }
