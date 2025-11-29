@@ -14,7 +14,7 @@ module_dependencies=("base-system" "suricata")
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 
 active_blocking_install() {
-    log_info "Installing active blocking components..."
+    log "Installing active blocking components..."
 
     # Create directories
     mkdir -p /var/lib/karens-ips/rules
@@ -29,11 +29,11 @@ active_blocking_install() {
     # Install required Python packages
     pip3 install --quiet ipaddress dnspython requests
 
-    log_success "Active blocking components installed"
+    success "Active blocking components installed"
 }
 
 active_blocking_configure() {
-    log_info "Configuring active blocking..."
+    log "Configuring active blocking..."
     
     # Create the blocklist-to-rules converter
     cat > /usr/local/bin/karens-ips-rules-generator << 'EOF'
@@ -330,27 +330,27 @@ EOF
 
     chmod +x /usr/local/bin/karens-ips-active-blocking
     
-    log_success "Active blocking configured"
+    success "Active blocking configured"
 }
 
 active_blocking_enable() {
-    log_info "Enabling active blocking..."
+    log "Enabling active blocking..."
     
     # Generate initial rules from existing blocklists
     if /usr/local/bin/karens-ips-active-blocking generate; then
-        log_success "Active blocking rules generated and loaded"
+        success "Active blocking rules generated and loaded"
     else
-        log_warning "Could not generate initial rules - blocklists may not be available yet"
+        warn "Could not generate initial rules - blocklists may not be available yet"
     fi
 }
 
 # Main function called by installer
 install_active_blocking() {
-    log_info "Installing $module_name..."
+    log "Installing $module_name..."
     active_blocking_install
     active_blocking_configure
     active_blocking_enable
-    log_success "$module_name installation completed"
+    success "$module_name installation completed"
 }
 
 # Module execution
@@ -365,7 +365,7 @@ case "${1:-install}" in
         active_blocking_enable
         ;;
     *)
-        log_error "Unknown action: $1"
+        error_exit "Unknown action: $1"
         exit 1
         ;;
 esac
