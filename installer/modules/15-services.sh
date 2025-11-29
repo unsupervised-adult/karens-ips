@@ -223,8 +223,40 @@ start_suricata() {
     if systemctl start suricata.service; then
         sleep 5
         success "Suricata service started"
+        
+        # Fix socket permissions for suricatasc access
+        fix_suricata_socket_permissions
+        
     else
         error_exit "Failed to start Suricata service"
+    fi
+}
+
+fix_suricata_socket_permissions() {
+    log "Fixing Suricata socket permissions for dataset operations..."
+    
+    # Wait for socket to be created
+    local socket_path="/var/run/suricata/suricata.socket"
+    local wait_count=0
+    
+    while [[ ! -S "$socket_path" ]] && [[ $wait_count -lt 30 ]]; do
+        sleep 1
+        ((wait_count++))
+    done
+    
+    if [[ -S "$socket_path" ]]; then
+        # Make socket accessible to sudo users
+        chmod 666 "$socket_path"
+        log "Fixed socket permissions: $socket_path"
+        
+        # Test basic connectivity
+        if suricatasc -c "uptime" >/dev/null 2>&1; then
+            log "Suricatasc connectivity confirmed"
+        else
+            warn "Suricatasc connectivity test failed"
+        fi
+    else
+        warn "Suricata socket not found at $socket_path"
     fi
 }
 
@@ -367,6 +399,7 @@ export -f validate_suricata_datasets
 export -f validate_ip_datasets
 export -f test_suricata_config
 export -f start_suricata
+export -f fix_suricata_socket_permissions
 export -f verify_suricata_running
 export -f test_suricata_datasets
 export -f start_slips
