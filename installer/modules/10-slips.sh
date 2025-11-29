@@ -52,6 +52,9 @@ install_slips() {
     # Configure SLIPS web interface
     configure_slips_webui
 
+    # Install Karen's IPS ML integration modules
+    install_karens_ips_ml_modules
+
     # Patch SLIPS for bridge interface support
     patch_slips_bridge_support
 
@@ -258,6 +261,72 @@ configure_slips_webui() {
     fi
 
     success "SLIPS web UI configured"
+}
+
+install_karens_ips_ml_modules() {
+    log "Installing Karen's IPS ML integration modules..."
+
+    local modules_dir="$SLIPS_DIR/modules"
+    local source_modules_dir="$PROJECT_ROOT/slips_integration/modules"
+    local source_scripts_dir="$PROJECT_ROOT/slips_integration"
+    
+    # Create modules directory if it doesn't exist
+    mkdir -p "$modules_dir"
+    
+    # Copy ML dashboard feeder module
+    if [[ -d "$source_modules_dir/ml_dashboard_feeder" ]]; then
+        log "Installing ML Dashboard Feeder module..."
+        cp -r "$source_modules_dir/ml_dashboard_feeder" "$modules_dir/"
+        chown -R root:root "$modules_dir/ml_dashboard_feeder"
+        chmod 755 "$modules_dir/ml_dashboard_feeder"
+        chmod 644 "$modules_dir/ml_dashboard_feeder"/*.py
+        success "ML Dashboard Feeder module installed"
+    else
+        warn "ML Dashboard Feeder module not found at $source_modules_dir/ml_dashboard_feeder"
+    fi
+    
+    # Copy simple ML feeder script  
+    if [[ -f "$source_scripts_dir/simple_ml_feeder.py" ]]; then
+        log "Installing simple ML feeder script..."
+        cp "$source_scripts_dir/simple_ml_feeder.py" "$SLIPS_DIR/"
+        chown root:root "$SLIPS_DIR/simple_ml_feeder.py"
+        chmod 755 "$SLIPS_DIR/simple_ml_feeder.py"
+        success "Simple ML feeder script installed"
+    else
+        warn "Simple ML feeder script not found at $source_scripts_dir/simple_ml_feeder.py"
+    fi
+    
+    # Copy ML detector webinterface integration
+    local webinterface_dir="$SLIPS_DIR/webinterface"
+    local source_webinterface_dir="$PROJECT_ROOT/slips_integration/webinterface"
+    
+    if [[ -d "$source_webinterface_dir/ml_detector" ]]; then
+        log "Installing ML detector web interface..."
+        cp -r "$source_webinterface_dir/ml_detector" "$webinterface_dir/"
+        chown -R root:root "$webinterface_dir/ml_detector"
+        chmod 755 "$webinterface_dir/ml_detector"
+        chmod 644 "$webinterface_dir/ml_detector"/*.py
+        
+        # Update webinterface app.py to include ML detector blueprint
+        if [[ -f "$webinterface_dir/app.py" ]] && ! grep -q "ml_detector" "$webinterface_dir/app.py"; then
+            log "Integrating ML detector into SLIPS web interface..."
+            
+            # Backup original app.py
+            cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.backup"
+            
+            # Add ML detector import and blueprint registration
+            sed -i '/^from .*database import db$/a from .ml_detector.ml_detector import ml_detector' "$webinterface_dir/app.py"
+            sed -i '/app\.register_blueprint.*url_prefix/a app.register_blueprint(ml_detector, url_prefix="/ml_detector")' "$webinterface_dir/app.py"
+            
+            success "ML detector integrated into SLIPS web interface"
+        fi
+        
+        success "ML detector web interface installed"
+    else
+        warn "ML detector web interface not found at $source_webinterface_dir/ml_detector"
+    fi
+
+    success "Karen's IPS ML integration modules installed"
 }
 
 # ============================================================================
