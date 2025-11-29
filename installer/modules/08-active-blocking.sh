@@ -23,11 +23,11 @@ active_blocking_install() {
     # Install dependencies
     if ! command_exists python3; then
         apt-get update -qq
-        apt-get install -y python3 python3-pip
+        apt-get install -y python3
     fi
 
-    # Install required Python packages
-    pip3 install --quiet ipaddress dnspython requests
+    # Install required Python packages via system package manager
+    apt-get install -y python3-dnspython python3-requests
 
     success "Active blocking components installed"
 }
