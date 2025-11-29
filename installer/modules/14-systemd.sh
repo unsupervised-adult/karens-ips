@@ -35,6 +35,7 @@ create_systemd_services() {
     create_slips_webui_service
     create_ips_filter_sync_service
     create_threat_blocker_service
+    create_dataset_sync_service
     create_kalipso_launcher
 
     # Reload SystemD
@@ -334,6 +335,7 @@ enable_services() {
         "slips-webui.service"
         "threat-blocker.service"
         "ips-filter-sync.timer"
+        "ips-dataset-sync.timer"
     )
 
     for service in "${services[@]}"; do
@@ -425,6 +427,45 @@ EOF
     log "Threat blocker service created"
 }
 
+create_dataset_sync_service() {
+    log "Creating IP dataset sync service and timer..."
+
+    # Service file
+    cat > /etc/systemd/system/ips-dataset-sync.service << 'EOF'
+[Unit]
+Description=IPS Dataset Sync - Extract IPs from SQLite to Suricata datasets
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/extract-threat-ips.py
+StandardOutput=journal
+StandardError=journal
+User=root
+WorkingDirectory=/usr/local/bin
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Timer file - runs every 6 hours
+    cat > /etc/systemd/system/ips-dataset-sync.timer << 'EOF'
+[Unit]
+Description=IPS Dataset Sync Timer - Update threat IP datasets
+Requires=ips-dataset-sync.service
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+    log "IPS dataset sync service and timer created"
+}
+
 export -f create_systemd_services
 export -f create_suricata_service
 export -f create_slips_service
@@ -432,6 +473,7 @@ export -f create_zeek_service
 export -f create_slips_webui_service
 export -f create_ips_filter_sync_service
 export -f create_threat_blocker_service
+export -f create_dataset_sync_service
 export -f create_kalipso_launcher
 export -f reload_systemd
 export -f enable_services
