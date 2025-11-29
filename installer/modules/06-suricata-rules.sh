@@ -68,6 +68,9 @@ C2_IPS_EOF
 create_dataset_extraction_script() {
     log "Creating threat IP extraction script..."
     
+    # First create comprehensive update script that handles the full chain
+    create_comprehensive_update_script
+    
     cat > /usr/local/bin/extract-threat-ips.py << 'EXTRACT_SCRIPT_EOF'
 #!/usr/bin/env python3
 """
@@ -249,6 +252,96 @@ EXTRACT_SCRIPT_EOF
     log "Created threat IP extraction script: /usr/local/bin/extract-threat-ips.py"
 }
 
+create_comprehensive_update_script() {
+    log "Creating comprehensive threat intelligence update script..."
+    
+    cat > /usr/local/bin/update-threat-intelligence.sh << 'UPDATE_SCRIPT_EOF'
+#!/bin/bash
+# Comprehensive Threat Intelligence Update Script
+# Complete chain: Repos → SQLite → Suricata Datasets
+
+set -euo pipefail
+
+LOG_FILE="/var/log/threat-intelligence-update.log"
+LOCK_FILE="/var/run/threat-intelligence-update.lock"
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $*" | tee -a "$LOG_FILE"
+}
+
+# Check for lock file to prevent concurrent runs
+if [[ -f "$LOCK_FILE" ]]; then
+    log "Update already in progress (lock file exists), exiting"
+    exit 0
+fi
+
+# Create lock file
+echo $$ > "$LOCK_FILE"
+
+# Cleanup function
+cleanup() {
+    rm -f "$LOCK_FILE"
+}
+trap cleanup EXIT
+
+log "Starting comprehensive threat intelligence update"
+
+# Step 1: Update blocklist repositories (if ips-filter-db.py exists)
+if [[ -x "/opt/ips-filter-db.py" ]]; then
+    log "Step 1: Updating blocklist repositories and SQLite database..."
+    if /opt/ips-filter-db.py --db-path /var/lib/suricata/ips_filter.db --sync 2>&1 | tee -a "$LOG_FILE"; then
+        log "Successfully updated SQLite database from repositories"
+    else
+        log "WARNING: Failed to update SQLite database from repositories"
+        # Continue anyway - may have existing data
+    fi
+else
+    log "WARNING: /opt/ips-filter-db.py not found, skipping repository update"
+fi
+
+# Step 2: Extract IPs from SQLite to Suricata datasets  
+log "Step 2: Extracting threat IPs from SQLite to Suricata datasets..."
+if /usr/local/bin/extract-threat-ips.py 2>&1 | tee -a "$LOG_FILE"; then
+    log "Successfully extracted threat IPs to Suricata datasets"
+else
+    log "ERROR: Failed to extract IPs to datasets"
+    exit 1
+fi
+
+# Step 3: Reload Suricata datasets (if Suricata is running)
+if systemctl is-active --quiet suricata.service; then
+    log "Step 3: Reloading Suricata to pick up new datasets..."
+    if suricatasc -c "reload-rules" >/dev/null 2>&1; then
+        log "Successfully reloaded Suricata rules and datasets"
+    else
+        log "WARNING: Failed to reload Suricata rules"
+    fi
+else
+    log "Suricata not running, skipping rule reload"
+fi
+
+# Step 4: Show statistics
+log "Step 4: Showing final statistics..."
+if [[ -f "/etc/suricata/datasets/malicious-ips.txt" ]]; then
+    malicious_count=$(grep -c "^[0-9]" /etc/suricata/datasets/malicious-ips.txt 2>/dev/null || echo "0")
+    log "Malicious IPs dataset: $malicious_count entries"
+fi
+
+if [[ -f "/etc/suricata/datasets/c2-ips.txt" ]]; then
+    c2_count=$(grep -c "^[0-9]" /etc/suricata/datasets/c2-ips.txt 2>/dev/null || echo "0")
+    log "C2 IPs dataset: $c2_count entries"  
+fi
+
+log "Threat intelligence update completed successfully"
+UPDATE_SCRIPT_EOF
+
+    chmod +x /usr/local/bin/update-threat-intelligence.sh
+    chown root:root /usr/local/bin/update-threat-intelligence.sh
+    
+    log "Created comprehensive update script: /usr/local/bin/update-threat-intelligence.sh"
+}
+
 verify_suricata_rules() {
     local errors=0
     
@@ -282,4 +375,4 @@ verify_suricata_rules() {
     fi
 }
 
-export -f update_suricata_rules verify_suricata_rules create_malicious_ip_datasets create_dataset_extraction_script
+export -f update_suricata_rules verify_suricata_rules create_malicious_ip_datasets create_dataset_extraction_script create_comprehensive_update_script

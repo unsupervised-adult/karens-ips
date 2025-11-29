@@ -428,42 +428,45 @@ EOF
 }
 
 create_dataset_sync_service() {
-    log "Creating IP dataset sync service and timer..."
+    log "Creating comprehensive threat intelligence update service and timer..."
 
-    # Service file
+    # Service file - runs full chain: Repos → SQLite → Suricata
     cat > /etc/systemd/system/ips-dataset-sync.service << 'EOF'
 [Unit]
-Description=IPS Dataset Sync - Extract IPs from SQLite to Suricata datasets
-After=network.target
+Description=Threat Intelligence Update - Full chain (Repos → SQLite → Suricata)
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/extract-threat-ips.py
+ExecStart=/usr/local/bin/update-threat-intelligence.sh
 StandardOutput=journal
 StandardError=journal
 User=root
 WorkingDirectory=/usr/local/bin
+TimeoutStartSec=1800
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-    # Timer file - runs every 6 hours
+    # Timer file - runs every 6 hours for complete update
     cat > /etc/systemd/system/ips-dataset-sync.timer << 'EOF'
 [Unit]
-Description=IPS Dataset Sync Timer - Update threat IP datasets
+Description=Threat Intelligence Update Timer - Complete repo/SQLite/dataset refresh
 Requires=ips-dataset-sync.service
 
 [Timer]
 OnBootSec=10min
 OnUnitActiveSec=6h
 Persistent=true
+AccuracySec=1m
 
 [Install]
 WantedBy=timers.target
 EOF
 
-    log "IPS dataset sync service and timer created"
+    log "Comprehensive threat intelligence update service and timer created (6h interval)"
 }
 
 export -f create_systemd_services
