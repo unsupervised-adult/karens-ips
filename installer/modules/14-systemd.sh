@@ -34,6 +34,7 @@ create_systemd_services() {
     create_zeek_service
     create_slips_webui_service
     create_ips_filter_sync_service
+    create_threat_blocker_service
     create_kalipso_launcher
 
     # Reload SystemD
@@ -331,6 +332,7 @@ enable_services() {
         "suricata.service"
         "slips.service"
         "slips-webui.service"
+        "threat-blocker.service"
         "ips-filter-sync.timer"
     )
 
@@ -386,12 +388,50 @@ verify_systemd_services() {
 }
 
 # Export functions
+create_threat_blocker_service() {
+    log "Creating threat blocker service..."
+
+    cat > /etc/systemd/system/threat-blocker.service << 'EOF'
+[Unit]
+Description=Redis Threat Blocker - Automatic IP Blocking
+Documentation=https://github.com/unsupervised-adult/karens-ips
+After=network.target redis.service slips.service
+Wants=redis.service slips.service
+Requires=redis.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/usr/local/bin
+ExecStart=/usr/local/bin/redis-threat-blocker.py
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+Environment=HOME=/root
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Security
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/log /var/run
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    log "Threat blocker service created"
+}
+
 export -f create_systemd_services
 export -f create_suricata_service
 export -f create_slips_service
 export -f create_zeek_service
 export -f create_slips_webui_service
 export -f create_ips_filter_sync_service
+export -f create_threat_blocker_service
 export -f create_kalipso_launcher
 export -f reload_systemd
 export -f enable_services
