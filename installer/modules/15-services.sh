@@ -241,7 +241,7 @@ fix_suricata_socket_permissions() {
     
     while [[ ! -S "$socket_path" ]] && [[ $wait_count -lt 30 ]]; do
         sleep 1
-        ((wait_count++))
+        wait_count=$((wait_count + 1))
     done
     
     if [[ -S "$socket_path" ]]; then
