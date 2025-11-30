@@ -206,11 +206,6 @@ Environment=PYTHONUNBUFFERED=1
 MemoryMax=2G
 CPUQuota=150%
 
-# Security
-PrivateTmp=no
-ProtectHome=yes
-ReadWritePaths=/var/log/slips ${SLIPS_DIR} /tmp/slips
-
 [Install]
 WantedBy=multi-user.target
 EOF
