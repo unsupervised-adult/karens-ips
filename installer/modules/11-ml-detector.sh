@@ -174,12 +174,19 @@ patch_app_py() {
         fi
     fi
 
-    # Manual patch fallback
+    # Manual patch fallback - only if ml_detector not already in file
     warn "Patch file failed, attempting manual integration..."
     cd "$SLIPS_DIR" || return 1
+    
+    # Check if already patched
+    if grep -q 'from .ml_detector.ml_detector import ml_detector' webinterface/app.py; then
+        log "app.py already contains ml_detector import, skipping manual patch"
+        return 0
+    fi
+    
     sed -i '/from \.documentation\.documentation import documentation/a from .ml_detector.ml_detector import ml_detector' webinterface/app.py
     sed -i '/app.register_blueprint(documentation, url_prefix="\/documentation")/a \    app.register_blueprint(ml_detector, url_prefix="/ml_detector")' webinterface/app.py
-    log "app.py manually patched"
+    success "app.py manually patched"
 }
 
 patch_app_html() {
