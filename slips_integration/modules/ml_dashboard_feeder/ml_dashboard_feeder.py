@@ -224,8 +224,8 @@ class Module(IModule):
             
             # Add to recent detections list in Redis
             detection_json = json.dumps(detection)
-            self.db.r.redis().lpush('ml_detector:recent_detections', detection_json)
-            self.db.r.redis().ltrim('ml_detector:recent_detections', 0, 99)  # Keep last 100
+            self.db.rdb.r.lpush('ml_detector:recent_detections', detection_json)
+            self.db.rdb.r.ltrim('ml_detector:recent_detections', 0, 99)  # Keep last 100
             
         except Exception as e:
             self.print(f"Error adding ML detection: {e}", 1, 0)
@@ -235,8 +235,8 @@ class Module(IModule):
         try:
             # Add to alerts list in Redis
             alert_json = json.dumps(detection)
-            self.db.r.redis().lpush('ml_detector:alerts', alert_json)
-            self.db.r.redis().ltrim('ml_detector:alerts', 0, 49)  # Keep last 50
+            self.db.rdb.r.lpush('ml_detector:alerts', alert_json)
+            self.db.rdb.r.ltrim('ml_detector:alerts', 0, 49)  # Keep last 50
             
         except Exception as e:
             self.print(f"Error adding ML alert: {e}", 1, 0)
@@ -276,7 +276,7 @@ class Module(IModule):
             }
             
             # Write stats to Redis
-            self.db.r.redis().hset('ml_detector:stats', mapping=stats)
+            self.db.rdb.r.hset('ml_detector:stats', mapping=stats)
             
         except Exception as e:
             self.print(f"Error updating ML stats: {e}", 1, 0)

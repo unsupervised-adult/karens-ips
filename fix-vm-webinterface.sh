@@ -25,7 +25,7 @@ TEMP_SLIPS="/tmp/slips-restore-$$"
 git clone --depth 1 https://github.com/stratosphereips/StratosphereLinuxIPS.git "$TEMP_SLIPS"
 
 sudo cp "$TEMP_SLIPS/webinterface/app.py" "$SLIPS_DIR/webinterface/app.py"
-sudo chown -R slips:slips "$SLIPS_DIR/webinterface/app.py"
+sudo chown root:root "$SLIPS_DIR/webinterface/app.py"
 
 echo "Original app.py restored!"
 echo ""
@@ -49,7 +49,7 @@ fi
 if [ ! -d "$SLIPS_DIR/webinterface/ml_detector" ]; then
     echo "  Copying ml_detector blueprint..."
     sudo cp -r "$KARENS_IPS_REPO/slips_integration/webinterface/ml_detector" "$SLIPS_DIR/webinterface/"
-    sudo chown -R slips:slips "$SLIPS_DIR/webinterface/ml_detector"
+    sudo chown -R root:root "$SLIPS_DIR/webinterface/ml_detector"
     echo "  ✓ ml_detector blueprint installed"
 else
     echo "  ✓ ml_detector blueprint already exists"
@@ -59,7 +59,7 @@ fi
 if [ ! -d "$SLIPS_DIR/modules/ml_dashboard_feeder" ]; then
     echo "  Installing ML Dashboard Feeder SLIPS module..."
     sudo cp -r "$KARENS_IPS_REPO/slips_integration/modules/ml_dashboard_feeder" "$SLIPS_DIR/modules/"
-    sudo chown -R slips:slips "$SLIPS_DIR/modules/ml_dashboard_feeder"
+    sudo chown -R root:root "$SLIPS_DIR/modules/ml_dashboard_feeder"
     echo "  ✓ ml_dashboard_feeder module installed"
 else
     echo "  ✓ ml_dashboard_feeder module already exists"
@@ -67,7 +67,7 @@ fi
 
 # Fix permissions
 echo "Setting permissions..."
-sudo chown -R slips:slips "$SLIPS_DIR/webinterface"
+sudo chown -R root:root "$SLIPS_DIR/webinterface"
 sudo chmod -R 755 "$SLIPS_DIR/webinterface"
 
 # Clean up temp clone
