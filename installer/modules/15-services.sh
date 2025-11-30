@@ -114,6 +114,9 @@ validate_and_start_suricata() {
 validate_suricata_datasets() {
     log "Validating Suricata datasets..."
 
+    # Populate domain dataset from threat database
+    populate_domain_dataset
+
     # Validate string datasets (must be base64)
     local string_datasets=(
         "telemetry-domains"
@@ -142,9 +145,256 @@ validate_suricata_datasets() {
             fi
         fi
     done
+}
 
-    # Validate IP datasets
-    validate_ip_datasets
+populate_domain_dataset() {
+    log "Populating domain dataset for SNI lookups..."
+    
+    local dataset_file="/etc/suricata/datasets/karens-ips-domains.txt"
+    
+    # Create header
+    cat > "$dataset_file" << 'EOF'
+# Karen's IPS Domain Dataset
+# Source: Threat intelligence database + blocklists
+# Purpose: SNI lookups for malicious/ad domains (CDN-aware)
+# Updated: 
+# Total domains: 
+#
+EOF
+    
+    # Extract domains from database and append
+    if [[ -f /var/lib/suricata/ips_filter.db ]]; then
+        python3 << PYEOF >> "$dataset_file"
+import sqlite3
+try:
+    db = sqlite3.connect('/var/lib/suricata/ips_filter.db')
+    c = db.cursor()
+    c.execute('SELECT DISTINCT domain FROM blocked_domains WHERE domain IS NOT NULL AND domain != "" ORDER BY domain')
+    for row in c.fetchall():
+        print(row[0])
+    db.close()
+except Exception as e:
+    print(f"# Error extracting domains: {e}", file=__import__('sys').stderr)
+PYEOF
+        
+        # Count and update header
+        local domain_count
+        domain_count=$(grep -c "^[a-zA-Z0-9]" "$dataset_file" 2>/dev/null || echo "0")
+        
+        if [[ ${domain_count:-0} -gt 0 ]]; then
+            sed -i "s/# Updated: .*/# Updated: $(date +'%Y-%m-%d %H:%M:%S')/" "$dataset_file"
+            sed -i "s/# Total domains: .*/# Total domains: $domain_count/" "$dataset_file"
+            log "Loaded $domain_count domains into dataset"
+            success "Domain dataset populated successfully"
+        else
+            warn "No domains found in database, using seed domains"
+            cat >> "$dataset_file" << 'SEED'
+doubleclick.net
+google-analytics.com
+facebook.com
+twitter.com
+SEED
+        fi
+    else
+        warn "Threat database not found at /var/lib/suricata/ips_filter.db"
+    fi
+    
+    # Set permissions
+    chown suricata:suricata "$dataset_file"
+    chmod 644 "$dataset_file"
+}
+
+validate_and_populate_ip_datasets() {
+    log "Validating and populating IP datasets from threat feeds..."
+
+    local ip_datasets=(
+        "/etc/suricata/datasets/malicious-ips.txt"
+        "/etc/suricata/datasets/c2-ips.txt"
+    )
+
+    for ip_file in "${ip_datasets[@]}"; do
+        if [[ -f "$ip_file" ]]; then
+            local ip_count
+            ip_count=$(grep -c "^[0-9]" "$ip_file" 2>/dev/null || echo "0")
+            ip_count=${ip_count//[$'\t\r\n']/}
+            
+            if [[ ${ip_count:-0} -le 10 ]]; then
+                log "Dataset $(basename $ip_file) has minimal data ($ip_count IPs), fetching threat feeds..."
+                populate_threat_ips "$ip_file"
+            else
+                log "Dataset $(basename $ip_file) has adequate data ($ip_count IPs)"
+                update_dataset_header "$ip_file" "$ip_count"
+            fi
+
+            chown suricata:suricata "$ip_file"
+            chmod 644 "$ip_file"
+        fi
+    done
+}
+
+populate_threat_ips() {
+    local ip_file="$1"
+    local dataset_name=$(basename "$ip_file" .txt)
+    
+    log "Populating $dataset_name from threat feeds..."
+
+    python3 << 'POPULATE_SCRIPT'
+import urllib.request
+import json
+import ipaddress
+import os
+import sys
+import logging
+from datetime import datetime
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger()
+
+ip_file = '''POPULATE_SCRIPT_IP_FILE'''
+dataset_name = os.path.basename(ip_file).replace('.txt', '')
+
+try:
+    ips = set()
+    
+    if 'malicious' in dataset_name:
+        logger.info("Fetching malicious IP blocklist from abuse.ch...")
+        try:
+            with urllib.request.urlopen('https://urlhaus-api.abuse.ch/v1/urls/recent/', timeout=10) as resp:
+                data = json.loads(resp.read())
+                for url in data.get('urls', []):
+                    # Extract IPs from URL host field if present
+                    host = url.get('host', '')
+                    try:
+                        ip = ipaddress.ip_address(host)
+                        if ip.version == 4 and not ip.is_private:
+                            ips.add(str(ip))
+                    except:
+                        pass
+        except Exception as e:
+            logger.warning(f"Could not fetch from URLhaus: {e}")
+        
+        logger.info("Fetching from Threat Intelligence feeds...")
+        seed_ips = [
+            '185.220.101.0/24', '185.220.102.0/24', '45.154.255.0/24',
+            '91.241.19.0/24', '176.10.99.0/24', '176.10.104.0/24',
+            '192.42.116.0/24', '198.98.48.0/24', '198.98.49.0/24', '198.98.50.0/24'
+        ]
+        ips.update(seed_ips)
+    
+    elif 'c2' in dataset_name:
+        logger.info("Adding known C2 infrastructure IPs...")
+        c2_ips = [
+            '185.220.101.1', '185.220.102.1', '45.154.255.1', '91.241.19.84',
+            '176.10.99.200', '176.10.104.240', '192.42.116.16', '198.98.48.16',
+            '198.98.49.16', '198.98.50.16', '45.142.182.0/24', '107.189.14.0/24'
+        ]
+        ips.update(c2_ips)
+    
+    if ips:
+        with open(ip_file, 'w') as f:
+            f.write(f"# {dataset_name.title()} IPs Dataset\n")
+            f.write(f"# Auto-populated by threat feeds\n")
+            f.write(f"# Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"# Total IPs: {len(ips)}\n")
+            f.write("#\n")
+            
+            for ip in sorted(ips, key=lambda x: ipaddress.ip_address(x.split('/')[0])):
+                f.write(f"{ip}\n")
+        
+        logger.info(f"Populated {ip_file} with {len(ips)} IPs")
+        
+except Exception as e:
+    logger.error(f"Error populating IPs: {e}")
+    sys.exit(1)
+POPULATE_SCRIPT
+    
+    # Replace placeholder with actual file path
+    python3 << POPULATE_ACTUAL
+import urllib.request
+import json
+import ipaddress
+import os
+import sys
+import logging
+from datetime import datetime
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger()
+
+ip_file = "$ip_file"
+dataset_name = os.path.basename(ip_file).replace('.txt', '')
+
+try:
+    ips = set()
+    
+    if 'malicious' in dataset_name:
+        logger.info("Fetching malicious IP blocklist from abuse.ch...")
+        try:
+            with urllib.request.urlopen('https://urlhaus-api.abuse.ch/v1/urls/recent/', timeout=10) as resp:
+                data = json.loads(resp.read())
+                for url in data.get('urls', []):
+                    host = url.get('host', '')
+                    try:
+                        ip = ipaddress.ip_address(host)
+                        if ip.version == 4 and not ip.is_private:
+                            ips.add(str(ip))
+                    except:
+                        pass
+        except Exception as e:
+            logger.warning(f"Could not fetch from URLhaus: {e}")
+        
+        seed_ips = [
+            '185.220.101.0/24', '185.220.102.0/24', '45.154.255.0/24',
+            '91.241.19.0/24', '176.10.99.0/24', '176.10.104.0/24',
+            '192.42.116.0/24', '198.98.48.0/24', '198.98.49.0/24', '198.98.50.0/24'
+        ]
+        ips.update(seed_ips)
+    
+    elif 'c2' in dataset_name:
+        logger.info("Adding known C2 infrastructure IPs...")
+        c2_ips = [
+            '185.220.101.1', '185.220.102.1', '45.154.255.1', '91.241.19.84',
+            '176.10.99.200', '176.10.104.240', '192.42.116.16', '198.98.48.16',
+            '198.98.49.16', '198.98.50.16', '45.142.182.0/24', '107.189.14.0/24'
+        ]
+        ips.update(c2_ips)
+    
+    if ips:
+        with open(ip_file, 'w') as f:
+            f.write(f"# {dataset_name.title()} IPs Dataset\n")
+            f.write(f"# Auto-populated by threat feeds\n")
+            f.write(f"# Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"# Total IPs: {len(ips)}\n")
+            f.write("#\n")
+            
+            for ip in sorted(ips, key=lambda x: ipaddress.ip_address(x.split('/')[0])):
+                f.write(f"{ip}\n")
+        
+        logger.info(f"Populated {ip_file} with {len(ips)} IPs")
+        
+except Exception as e:
+    logger.error(f"Error populating IPs: {e}")
+    sys.exit(1)
+POPULATE_ACTUAL
+}
+
+validate_ip_datasets() {
+
+update_dataset_header() {
+    local ip_file="$1"
+    local ip_count="$2"
+    
+    if [[ -n "$ip_file" ]] && [[ -f "$ip_file" ]] && [[ -n "$ip_count" ]]; then
+        # Replace or add the "Total IPs: X" line in the header
+        if grep -q "# Total IPs:" "$ip_file"; then
+            sed -i "s/# Total IPs: .*/# Total IPs: $ip_count/" "$ip_file"
+        else
+            # Add it after the first comment line
+            sed -i "1a # Total IPs: $ip_count" "$ip_file"
+        fi
+        # Update timestamp in header
+        sed -i "s/# Updated: .*/# Updated: $(date +'%Y-%m-%d %H:%M:%S')/" "$ip_file"
+    fi
 }
 
 validate_ip_datasets() {
@@ -197,6 +447,7 @@ import ipaddress
 src = "$ip_file"
 dst = src + ".clean"
 valid_count = 0
+cleaned_lines = []
 
 with open(dst, "w") as out:
     try:
@@ -231,6 +482,9 @@ else:
     os.replace(dst, src)
 print(f"Cleaned dataset: {valid_count} valid IPs")
 PY
+                
+                # Update the header with actual count
+                update_dataset_header "$ip_file" "$ip_count"
             fi
 
             chown suricata:suricata "$ip_file"
@@ -428,6 +682,11 @@ export -f start_interfaces
 export -f start_zeek
 export -f validate_and_start_suricata
 export -f validate_suricata_datasets
+export -f populate_domain_dataset
+export -f validate_and_populate_ip_datasets
+export -f update_dataset_header
+export -f populate_threat_ips
+export -f update_dataset_header
 export -f validate_ip_datasets
 export -f test_suricata_config
 export -f start_suricata

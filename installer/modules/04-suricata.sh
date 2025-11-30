@@ -237,14 +237,24 @@ EOF
         
         success "Unix-command socket configuration added"
     else
+        # Unix-command section exists, ensure it's properly configured
+        log "Configuring existing unix-command section..."
+        
         # Ensure it's enabled
         sed -i '/^unix-command:/,/^[a-zA-Z]/ s/enabled: no/enabled: yes/g' "$suricata_yaml"
         sed -i '/^unix-command:/,/^[a-zA-Z]/ s/enabled: auto/enabled: yes/g' "$suricata_yaml"
-        log "Unix-command socket enabled"
+        
+        # Uncomment and fix the filename if it's commented
+        if grep -A2 "^unix-command:" "$suricata_yaml" | grep -q "^[[:space:]]*#filename:"; then
+            log "Uncommenting and setting unix socket filename..."
+            sed -i '/^unix-command:/,/^[a-zA-Z]/ s/^[[:space:]]*#filename:.*/  filename: \/var\/run\/suricata\/suricata.socket/' "$suricata_yaml"
+        fi
+        
+        log "Unix-command socket configured"
     fi
     
     # Verify the configuration
-    if grep -A2 "^unix-command:" "$suricata_yaml" | grep -q "enabled: yes"; then
+    if grep -A3 "^unix-command:" "$suricata_yaml" | grep -q "enabled: yes"; then
         success "Unix-command socket is enabled"
     else
         warn "Could not verify unix-command socket configuration"
