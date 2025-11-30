@@ -164,15 +164,19 @@ patch_app_py() {
 
     # Try patch file first
     if [ -f "$karens_ips_dir/slips_integration/patches/app.py.patch" ]; then
+        cd "$SLIPS_DIR" || return 1
         if patch -p1 --dry-run < "$karens_ips_dir/slips_integration/patches/app.py.patch" > /dev/null 2>&1; then
             patch -p1 < "$karens_ips_dir/slips_integration/patches/app.py.patch"
             success "app.py patched successfully"
             return 0
+        else
+            warn "Patch dry-run failed, patch may already be applied or file modified"
         fi
     fi
 
     # Manual patch fallback
     warn "Patch file failed, attempting manual integration..."
+    cd "$SLIPS_DIR" || return 1
     sed -i '/from \.documentation\.documentation import documentation/a from .ml_detector.ml_detector import ml_detector' webinterface/app.py
     sed -i '/app.register_blueprint(documentation, url_prefix="\/documentation")/a \    app.register_blueprint(ml_detector, url_prefix="/ml_detector")' webinterface/app.py
     log "app.py manually patched"
