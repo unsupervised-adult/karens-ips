@@ -157,10 +157,41 @@ validate_ip_datasets() {
 
     for ip_file in "${ip_datasets[@]}"; do
         if [[ -f "$ip_file" ]]; then
-            log "Cleaning IP dataset: $(basename $ip_file)"
-
-            python3 - <<PY
-import ipaddress, re
+            # Check if file has actual IP content (not just comments/empty)
+            local ip_count=$(grep -c "^[0-9]" "$ip_file" 2>/dev/null || echo "0")
+            
+            if [[ $ip_count -eq 0 ]]; then
+                # File is empty or only has comments, add seed IPs
+                log "Adding seed IPs to $(basename $ip_file)..."
+                
+                if [[ "$ip_file" == *"malicious"* ]]; then
+                    cat >> "$ip_file" << 'EOF'
+185.220.101.0/24
+185.220.102.0/24
+45.154.255.0/24
+91.241.19.0/24
+176.10.99.0/24
+176.10.104.0/24
+192.42.116.0/24
+198.98.48.0/24
+198.98.49.0/24
+198.98.50.0/24
+EOF
+                else
+                    cat >> "$ip_file" << 'EOF'
+185.220.101.1
+185.220.102.1
+45.154.255.1
+91.241.19.84
+195.154.33.0/24
+EOF
+                fi
+            else
+                log "Cleaning IP dataset: $(basename $ip_file) ($ip_count IPs)"
+                
+                # Run validation only if there's content
+                python3 - <<PY
+import ipaddress
 src = "$ip_file"
 dst = src + ".clean"
 valid_count = 0
@@ -168,13 +199,10 @@ valid_count = 0
 with open(dst, "w") as out:
     try:
         with open(src) as f:
-            for line_num, line in enumerate(f, 1):
+            for line in f:
                 s = line.strip()
                 # Skip empty lines and comments
                 if not s or s.startswith('#'):
-                    continue
-                # Skip lines that are pure text (no numbers or network notation)
-                if not any(c in s for c in '0123456789./:-'):
                     continue
                 try:
                     # Only allow IPv4 addresses/networks
@@ -191,15 +219,17 @@ with open(dst, "w") as out:
                 except ValueError:
                     pass
     except Exception as e:
-        # Ensure we have a valid file even on error
-        with open(dst, 'w') as f:
-            f.write("127.0.0.1\n")
-        valid_count = 1
+        pass
 
 import os
-os.replace(dst, src)
+if os.path.getsize(dst) == 0:
+    # If result is empty, keep original
+    os.remove(dst)
+else:
+    os.replace(dst, src)
 print(f"Cleaned dataset: {valid_count} valid IPs")
 PY
+            fi
 
             chown suricata:suricata "$ip_file"
             chmod 644 "$ip_file"
