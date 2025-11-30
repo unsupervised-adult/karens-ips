@@ -259,6 +259,13 @@ EOF
     else
         warn "Could not verify unix-command socket configuration"
     fi
+    
+    # Create symlink for backward compatibility (some tools expect suricata-command.socket)
+    if ! [[ -L "/var/run/suricata/suricata-command.socket" ]]; then
+        log "Creating symlink for backward compatibility..."
+        ln -sf /var/run/suricata/suricata.socket /var/run/suricata/suricata-command.socket
+        success "Symlink created for suricata-command.socket"
+    fi
 }
 
 # ============================================================================
