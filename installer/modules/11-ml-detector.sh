@@ -121,6 +121,19 @@ install_ml_detector_blueprint() {
     cp -r "$karens_ips_dir/slips_integration/webinterface/ml_detector" "$ml_detector_dest" || error_exit "Failed to copy ML Detector blueprint"
 
     success "ML Detector blueprint installed"
+    
+    # Install SLIPS module to feed dashboard data
+    log "Installing ML Dashboard Feeder SLIPS module..."
+    local ml_module_dest="$SLIPS_DIR/modules/ml_dashboard_feeder"
+    
+    if [ -d "$ml_module_dest" ]; then
+        log "ML Dashboard Feeder already exists, updating..."
+        rm -rf "$ml_module_dest"
+    fi
+    
+    cp -r "$karens_ips_dir/slips_integration/modules/ml_dashboard_feeder" "$ml_module_dest" || error_exit "Failed to copy ML Dashboard Feeder module"
+    
+    success "ML Dashboard Feeder module installed"
 }
 
 apply_slips_patches() {
