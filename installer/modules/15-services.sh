@@ -159,9 +159,50 @@ start_zeek() {
     fi
 }
 
-# ============================================================================
-# SERVICE STARTUP ORCHESTRATION
-# ============================================================================
+start_slips() {
+    log "Starting SLIPS service..."
+
+    if systemctl start slips.service; then
+        sleep 3
+        if systemctl is-active --quiet slips.service; then
+            success "SLIPS started"
+        else
+            warn "SLIPS failed to start"
+        fi
+    else
+        warn "Failed to start SLIPS"
+    fi
+}
+
+start_slips_webui() {
+    log "Starting SLIPS Web UI..."
+
+    if systemctl start slips-webui.service; then
+        sleep 2
+        if systemctl is-active --quiet slips-webui.service; then
+            success "SLIPS Web UI started"
+        else
+            warn "SLIPS Web UI failed to start"
+        fi
+    else
+        warn "Failed to start SLIPS Web UI"
+    fi
+}
+
+start_ips_filter_web() {
+    log "Starting IPS Filter web interface..."
+
+    # This is optional - only start if service exists
+    if [[ -f /etc/systemd/system/ips-filter-web.service ]]; then
+        if systemctl start ips-filter-web.service 2>/dev/null; then
+            log "IPS Filter web interface started"
+        else
+            log "IPS Filter web interface not available (optional)"
+        fi
+    else
+        log "IPS Filter web service not installed (optional)"
+    fi
+}
 
 start_services() {
     log_subsection "Starting IPS Services"
@@ -637,51 +678,6 @@ PY
             chmod 644 "$ip_file"
         fi
     done
-}
-
-start_slips() {
-    log "Starting SLIPS service..."
-
-    if systemctl start slips.service; then
-        sleep 3
-        if systemctl is-active --quiet slips.service; then
-            success "SLIPS started"
-        else
-            warn "SLIPS failed to start"
-        fi
-    else
-        warn "Failed to start SLIPS"
-    fi
-}
-
-start_slips_webui() {
-    log "Starting SLIPS Web UI..."
-
-    if systemctl start slips-webui.service; then
-        sleep 2
-        if systemctl is-active --quiet slips-webui.service; then
-            success "SLIPS Web UI started"
-        else
-            warn "SLIPS Web UI failed to start"
-        fi
-    else
-        warn "Failed to start SLIPS Web UI"
-    fi
-}
-
-start_ips_filter_web() {
-    log "Starting IPS Filter web interface..."
-
-    # This is optional - only start if service exists
-    if [[ -f /etc/systemd/system/ips-filter-web.service ]]; then
-        if systemctl start ips-filter-web.service 2>/dev/null; then
-            log "IPS Filter web interface started"
-        else
-            log "IPS Filter web interface not available (optional)"
-        fi
-    else
-        log "IPS Filter web service not installed (optional)"
-    fi
 }
 
 # ============================================================================
