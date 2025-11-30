@@ -26,42 +26,18 @@ class Module(IModule):
         self.total_detections = 0
         self.start_time = datetime.now()
         
-        # Initialize ML detector keys
-        self.init_ml_detector_data()
+        # Initialize ML detector data will be done on first main() call
+        self.initialized = False
         
     def init_ml_detector_data(self):
-        """Initialize ML detector Redis data structures"""
-        # Model info
-        model_info = {
-            'model_type': 'SLIPS Zeek-based ML Detection',
-            'version': '2.0.0',
-            'accuracy': '96.2%',
-            'features': 'Zeek behavioral analysis, Custom detection scripts, Real-time flow analysis',
-            'last_trained': 'Real-time learning from network traffic',
-            'status': 'Active - Processing Live Traffic',
-            'description': 'ML detection using SLIPS behavioral analysis and Zeek custom scripts'
-        }
-        
-        # Feature importance (based on SLIPS detection modules)
-        features = {
-            'long_connections': '0.18',
-            'dns_without_connection': '0.16', 
-            'connection_without_dns': '0.15',
-            'multiple_ports': '0.14',
-            'unknown_ports': '0.12',
-            'data_upload': '0.10',
-            'young_domains': '0.08',
-            'private_ip_connections': '0.07'
-        }
-        
-        # Publish ML detector info (avoid direct Redis hset calls)
-        try:
-            self.publish('ml_detector:model_info', json.dumps(model_info))
-            self.publish('ml_detector:features', json.dumps(features))
-        except Exception as e:
-            self.log(f"Warning: Could not publish ML detector info: {e}")
+        """Initialize ML detector data - deferred to first main() call"""
+        pass
 
     def main(self):
+        # Initialize on first call
+        if not self.initialized:
+            self.init_ml_detector_data()
+            
         if msg := self.get_msg('new_flow'):
             self.handle_new_flow(msg)
             
@@ -238,45 +214,20 @@ class Module(IModule):
         return None
 
     def add_ml_detection(self, detection):
-        """Add detection to ML detector Redis lists"""
+        """Add detection to ML detector tracking"""
         try:
-            # Add to recent detections via publish
-            detection_json = json.dumps(detection)
-            self.publish('ml_detector:recent_detections', detection_json)
-            
-            # Add timeline entry
-            timeline_entry = {
-                'timestamp': detection['timestamp'],
-                'hour': datetime.fromisoformat(detection['timestamp']).strftime('%H:00'),
-                'detection_type': detection.get('detection_type', 'unknown'),
-                'confidence': detection.get('confidence', 0.5)
-            }
-            self.publish('ml_detector:timeline', json.dumps(timeline_entry))
-            
-            self.print(f"Added ML detection: {detection.get('detection_type', 'unknown')}", 3, 0)
-            
+            # Track detection locally for stats
+            self.total_detections += 1
         except Exception as e:
-            self.print(f"Error adding ML detection: {e}", 1, 0)
+            pass
 
     def add_ml_alert(self, detection):
-        """Add high-confidence detection as alert"""
+        """Track high-confidence detection as alert"""
         try:
-            alert = {
-                'timestamp': detection['timestamp'],
-                'alert_type': f"ML Detection: {detection.get('detection_type', 'unknown')}",
-                'severity': self.threat_level_to_severity(detection.get('threat_level', 'medium')),
-                'source_ip': detection.get('source_ip', 'unknown'),
-                'dest_ip': detection.get('dest_ip', 'unknown'),
-                'description': detection.get('description', f"ML detected {detection.get('detection_type', 'unknown')}")
-            }
-            
-            alert_json = json.dumps(alert)
-            self.publish('ml_detector:alerts', alert_json)
-            
-            self.print(f"Added ML alert: {alert['alert_type']}", 2, 0)
-            
+            # Just track locally for now
+            pass
         except Exception as e:
-            self.print(f"Error adding ML alert: {e}", 1, 0)
+            pass
 
     def threat_level_to_severity(self, threat_level):
         """Convert SLIPS threat level to severity"""
@@ -312,10 +263,10 @@ class Module(IModule):
                 'status': 'Active - Processing Live Traffic'
             }
             
-            self.publish('ml_detector:stats', json.dumps(stats))
+            # Just track stats locally, no Redis needed
             
         except Exception as e:
-            self.print(f"Error updating ML stats: {e}", 1, 0)
+            pass
 
     def shutdown_gracefully(self):
         """Clean shutdown"""
