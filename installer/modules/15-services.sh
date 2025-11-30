@@ -158,9 +158,11 @@ validate_ip_datasets() {
     for ip_file in "${ip_datasets[@]}"; do
         if [[ -f "$ip_file" ]]; then
             # Check if file has actual IP content (not just comments/empty)
-            local ip_count=$(grep -c "^[0-9]" "$ip_file" 2>/dev/null || echo "0")
+            local ip_count
+            ip_count=$(grep -c "^[0-9]" "$ip_file" 2>/dev/null || echo "0")
+            ip_count=${ip_count//[$'\t\r\n']/}  # Remove whitespace
             
-            if [[ $ip_count -eq 0 ]]; then
+            if [[ ${ip_count:-0} -eq 0 ]]; then
                 # File is empty or only has comments, add seed IPs
                 log "Adding seed IPs to $(basename $ip_file)..."
                 
