@@ -186,6 +186,9 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=${SLIPS_DIR}
+# SLIPS requires /tmp/slips for SQLite lockfiles
+ExecStartPre=/bin/mkdir -p /tmp/slips
+ExecStartPre=/bin/chmod 1777 /tmp/slips
 # Run web-only interface via webinterface.sh script
 # Connects to main SLIPS instance via Redis to display analysis
 ExecStart=${SLIPS_DIR}/webinterface.sh
@@ -204,9 +207,9 @@ MemoryMax=2G
 CPUQuota=150%
 
 # Security
-PrivateTmp=yes
+PrivateTmp=no
 ProtectHome=yes
-ReadWritePaths=/var/log/slips ${SLIPS_DIR}
+ReadWritePaths=/var/log/slips ${SLIPS_DIR} /tmp/slips
 
 [Install]
 WantedBy=multi-user.target
