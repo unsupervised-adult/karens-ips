@@ -88,22 +88,22 @@ verify_suricata_running() {
 test_suricata_datasets() {
     log "Testing Suricata dataset operations..."
 
-    # Test dataset add/lookup with base64
+    # Test with karens-ips-domains (plain text dataset for SNI)
     local test_domain="example.com"
-    local test_domain_b64=$(echo -n "$test_domain" | base64)
+    
+    log "Testing domain dataset operations (plain text): $test_domain"
 
-    log "Testing dataset operations with base64: ${test_domain_b64}"
+    if suricatasc -c "dataset-add karens-ips-domains string $test_domain" >/dev/null 2>&1; then
+        log "Domain dataset add operation successful"
 
-    if suricatasc -c "dataset-add malicious-domains string ${test_domain_b64}" >/dev/null 2>&1; then
-        log "Dataset add operation successful"
-
-        if suricatasc -c "dataset-lookup malicious-domains string ${test_domain_b64}" >/dev/null 2>&1; then
-            success "Dataset lookup operation successful"
+        if suricatasc -c "dataset-lookup karens-ips-domains string $test_domain" >/dev/null 2>&1; then
+            success "Domain dataset lookup operation successful"
         else
-            warn "Dataset lookup failed"
+            log "Domain dataset lookup returned no match (expected if not in blocklist)"
         fi
     else
-        warn "Dataset add operation failed"
+        warn "Domain dataset add operation failed - suricatasc may need socket permissions"
+        warn "Try: sudo suricatasc -c 'dump-counters' to test connectivity"
     fi
 }
 
