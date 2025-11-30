@@ -226,25 +226,20 @@ enable_unix_socket() {
     if ! grep -q "^unix-command:" "$suricata_yaml"; then
         log "Adding unix-command configuration to suricata.yaml..."
         
-        # Create a temporary file with the unix-command section
-        local temp_file=$(mktemp)
-        cat > "$temp_file" << 'UNIX_CMD_EOF'
+        # Append unix-command section to the end of the file
+        cat >> "$suricata_yaml" << 'EOF'
 
 # Unix socket for interactive commands (suricatasc, dataset management)
 unix-command:
   enabled: yes
   filename: /var/run/suricata/suricata.socket
-UNIX_CMD_EOF
-        
-        # Insert after %YAML line
-        sed -i '/^%YAML/r '"$temp_file" "$suricata_yaml"
-        rm -f "$temp_file"
+EOF
         
         success "Unix-command socket configuration added"
     else
         # Ensure it's enabled
-        sed -i '/^unix-command:/,/^[a-z]/ s/enabled: no/enabled: yes/g' "$suricata_yaml"
-        sed -i '/^unix-command:/,/^[a-z]/ s/enabled: auto/enabled: yes/g' "$suricata_yaml"
+        sed -i '/^unix-command:/,/^[a-zA-Z]/ s/enabled: no/enabled: yes/g' "$suricata_yaml"
+        sed -i '/^unix-command:/,/^[a-zA-Z]/ s/enabled: auto/enabled: yes/g' "$suricata_yaml"
         log "Unix-command socket enabled"
     fi
     
