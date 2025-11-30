@@ -176,9 +176,8 @@ create_slips_webui_service() {
     cat > /etc/systemd/system/slips-webui.service << EOF
 [Unit]
 Description=SLIPS Web Interface
-After=network.target redis.service ips-interfaces.service slips.service
-Wants=redis.service ips-interfaces.service
-# Web UI reads from Redis, so it should start after main SLIPS
+After=network.target redis.service slips.service
+Wants=redis.service
 Requires=slips.service
 
 [Service]
@@ -186,25 +185,26 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=${SLIPS_DIR}
-# Web UI monitors management interface (has internet) instead of bridge (no IP)
-# This allows SLIPS to download threat intel updates while serving the dashboard
-ExecStart=${SLIPS_DIR}/venv/bin/python ${SLIPS_DIR}/slips.py -c ${SLIPS_DIR}/config/slips.yaml -i ${mgmt_iface} -w
+# Run SLIPS web interface connecting to running instance via Redis
+# Use -w flag on a separate instance that only serves web UI (no traffic analysis)
+ExecStart=${SLIPS_DIR}/venv/bin/python ${SLIPS_DIR}/slips.py -c ${SLIPS_DIR}/config/slips.yaml -w
 Restart=on-failure
-RestartSec=30
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=slips-webui
 Environment=HOME=/root
 Environment=PATH=${SLIPS_DIR}/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=SLIPS_WEB_HOST=${mgmt_ip}
 Environment=SLIPS_WEB_PORT=55000
+Environment=PYTHONUNBUFFERED=1
 
 # Resource limits
-MemoryMax=2G
-CPUQuota=150%
+MemoryMax=1G
+CPUQuota=100%
 
 # Security
 PrivateTmp=yes
-ProtectSystem=strict
 ProtectHome=yes
 ReadWritePaths=/var/log/slips ${SLIPS_DIR}
 
