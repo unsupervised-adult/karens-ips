@@ -31,7 +31,10 @@ class Module(IModule):
         
     def init_ml_detector_data(self):
         """Initialize ML detector data - deferred to first main() call"""
-        pass
+        self.print("Initializing ML Dashboard Feeder", 2, 0)
+        # Initialize stats in Redis
+        self.update_ml_stats()
+        self.initialized = True
 
     def main(self):
         # Initialize on first call
@@ -218,16 +221,25 @@ class Module(IModule):
         try:
             # Track detection locally for stats
             self.total_detections += 1
+            
+            # Add to recent detections list in Redis
+            detection_json = json.dumps(detection)
+            self.db.r.lpush('ml_detector:recent_detections', detection_json)
+            self.db.r.ltrim('ml_detector:recent_detections', 0, 99)  # Keep last 100
+            
         except Exception as e:
-            pass
+            self.print(f"Error adding ML detection: {e}", 1, 0)
 
     def add_ml_alert(self, detection):
         """Track high-confidence detection as alert"""
         try:
-            # Just track locally for now
-            pass
+            # Add to alerts list in Redis
+            alert_json = json.dumps(detection)
+            self.db.r.lpush('ml_detector:alerts', alert_json)
+            self.db.r.ltrim('ml_detector:alerts', 0, 49)  # Keep last 50
+            
         except Exception as e:
-            pass
+            self.print(f"Error adding ML alert: {e}", 1, 0)
 
     def threat_level_to_severity(self, threat_level):
         """Convert SLIPS threat level to severity"""
@@ -263,10 +275,11 @@ class Module(IModule):
                 'status': 'Active - Processing Live Traffic'
             }
             
-            # Just track stats locally, no Redis needed
+            # Write stats to Redis
+            self.db.r.hset('ml_detector:stats', mapping=stats)
             
         except Exception as e:
-            pass
+            self.print(f"Error updating ML stats: {e}", 1, 0)
 
     def shutdown_gracefully(self):
         """Clean shutdown"""
