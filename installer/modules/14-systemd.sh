@@ -105,6 +105,7 @@ RestartSec=30
 StandardOutput=journal
 StandardError=journal
 Environment=HOME=/root
+Environment=PYTHONPATH=${SLIPS_DIR}
 Environment=PATH=${SLIPS_DIR}/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Security (relaxed for network operations)
