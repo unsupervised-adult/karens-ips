@@ -101,6 +101,8 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=${SLIPS_DIR}
+ExecStartPre=/bin/mkdir -p /tmp/slips
+ExecStartPre=/bin/chmod 1777 /tmp/slips
 ExecStart=${SLIPS_DIR}/venv/bin/python ${SLIPS_DIR}/slips.py -c ${SLIPS_DIR}/config/slips.yaml -i br0
 Restart=on-failure
 RestartSec=30
@@ -109,12 +111,6 @@ StandardError=journal
 Environment=HOME=/root
 Environment=PYTHONPATH=${SLIPS_DIR}
 Environment=PATH=${SLIPS_DIR}/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
-# Security (relaxed for network operations)
-PrivateTmp=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/var/log/slips ${SLIPS_DIR}
 
 [Install]
 WantedBy=multi-user.target
