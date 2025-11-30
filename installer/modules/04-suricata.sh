@@ -232,7 +232,7 @@ enable_unix_socket() {
 # Unix socket for interactive commands (suricatasc, dataset management)\
 unix-command:\
   enabled: yes\
-  filename: suricata.socket' "$suricata_yaml"
+  filename: /var/run/suricata/suricata.socket' "$suricata_yaml"
         
         success "Unix-command socket configuration added"
     else

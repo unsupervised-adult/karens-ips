@@ -170,11 +170,11 @@ with open(dst, "w") as out:
         with open(src) as f:
             for line_num, line in enumerate(f, 1):
                 s = line.strip()
-                # Skip empty lines, comments, and lines with letters
+                # Skip empty lines and comments
                 if not s or s.startswith('#'):
                     continue
-                # Skip lines that look like labels or metadata
-                if re.search(r'^[a-zA-Z].*[a-zA-Z]', s):
+                # Skip lines that are pure text (no numbers or network notation)
+                if not any(c in s for c in '0123456789./:-'):
                     continue
                 try:
                     # Only allow IPv4 addresses/networks
