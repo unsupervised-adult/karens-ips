@@ -30,6 +30,135 @@ test_suricata_config() {
     fi
 }
 
+start_suricata() {
+    log "Starting Suricata service..."
+
+    if systemctl start suricata.service; then
+        sleep 5
+        success "Suricata service started"
+        
+        # Fix socket permissions for suricatasc access
+        fix_suricata_socket_permissions
+        
+    else
+        error_exit "Failed to start Suricata service"
+    fi
+}
+
+fix_suricata_socket_permissions() {
+    log "Fixing Suricata socket permissions for dataset operations..."
+    
+    # Wait for socket to be created
+    local socket_path="/var/run/suricata/suricata.socket"
+    local wait_count=0
+    
+    while [[ ! -S "$socket_path" ]] && [[ $wait_count -lt 30 ]]; do
+        sleep 1
+        wait_count=$((wait_count + 1))
+    done
+    
+    if [[ -S "$socket_path" ]]; then
+        # Make socket accessible to sudo users
+        chmod 666 "$socket_path"
+        log "Fixed socket permissions: $socket_path"
+        
+        # Test basic connectivity
+        if suricatasc -c "uptime" >/dev/null 2>&1; then
+            log "Suricatasc connectivity confirmed"
+        else
+            warn "Suricatasc connectivity test failed"
+        fi
+    else
+        warn "Suricata socket not found at $socket_path"
+    fi
+}
+
+verify_suricata_running() {
+    log "Verifying Suricata is running..."
+
+    if systemctl is-active --quiet suricata.service; then
+        success "Suricata service is active"
+    else
+        error_exit "Suricata service failed to start"
+        systemctl status suricata.service --no-pager -l
+        exit 1
+    fi
+}
+
+test_suricata_datasets() {
+    log "Testing Suricata dataset operations..."
+
+    # Test dataset add/lookup with base64
+    local test_domain="example.com"
+    local test_domain_b64=$(echo -n "$test_domain" | base64)
+
+    log "Testing dataset operations with base64: ${test_domain_b64}"
+
+    if suricatasc -c "dataset-add malicious-domains string ${test_domain_b64}" >/dev/null 2>&1; then
+        log "Dataset add operation successful"
+
+        if suricatasc -c "dataset-lookup malicious-domains string ${test_domain_b64}" >/dev/null 2>&1; then
+            success "Dataset lookup operation successful"
+        else
+            warn "Dataset lookup failed"
+        fi
+    else
+        warn "Dataset add operation failed"
+    fi
+}
+
+# ============================================================================
+# SERVICE STARTUP FUNCTIONS
+# ============================================================================
+
+start_redis() {
+    log "Starting Redis..."
+
+    if systemctl start redis-server; then
+        sleep 2
+        if systemctl is-active --quiet redis-server; then
+            success "Redis started"
+        else
+            error_exit "Redis failed to start"
+        fi
+    else
+        error_exit "Failed to start Redis"
+    fi
+}
+
+start_interfaces() {
+    log "Starting network interfaces..."
+
+    if systemctl start ips-interfaces.service; then
+        sleep 2
+        if systemctl is-active --quiet ips-interfaces.service; then
+            success "Network interfaces configured"
+        else
+            error_exit "Interface setup failed"
+        fi
+    else
+        error_exit "Failed to start interface setup"
+    fi
+}
+
+start_zeek() {
+    log "Starting Zeek (optional)..."
+
+    # Try to start Zeek but don't fail installation if it doesn't work
+    if systemctl start zeek.service 2>/dev/null; then
+        sleep 3
+        if systemctl is-active --quiet zeek.service; then
+            success "Zeek started successfully"
+        else
+            warn "Zeek failed to start - continuing without it (Suricata will provide main IPS functionality)"
+            systemctl disable zeek.service 2>/dev/null || true
+        fi
+    else
+        warn "Zeek failed to start - continuing without it"
+        systemctl disable zeek.service 2>/dev/null || true
+    fi
+}
+
 # ============================================================================
 # SERVICE STARTUP ORCHESTRATION
 # ============================================================================
@@ -58,7 +187,7 @@ start_services() {
 }
 
 # ============================================================================
-# SERVICE STARTUP FUNCTIONS
+# DATASET VALIDATION FUNCTIONS
 # ============================================================================
 
 start_redis() {
@@ -508,85 +637,6 @@ PY
             chmod 644 "$ip_file"
         fi
     done
-}
-
-start_suricata() {
-    log "Starting Suricata service..."
-
-    if systemctl start suricata.service; then
-        sleep 5
-        success "Suricata service started"
-        
-        # Fix socket permissions for suricatasc access
-        fix_suricata_socket_permissions
-        
-    else
-        error_exit "Failed to start Suricata service"
-    fi
-}
-
-fix_suricata_socket_permissions() {
-    log "Fixing Suricata socket permissions for dataset operations..."
-    
-    # Wait for socket to be created
-    local socket_path="/var/run/suricata/suricata.socket"
-    local wait_count=0
-    
-    while [[ ! -S "$socket_path" ]] && [[ $wait_count -lt 30 ]]; do
-        sleep 1
-        wait_count=$((wait_count + 1))
-    done
-    
-    if [[ -S "$socket_path" ]]; then
-        # Make socket accessible to sudo users
-        chmod 666 "$socket_path"
-        log "Fixed socket permissions: $socket_path"
-        
-        # Test basic connectivity
-        if suricatasc -c "uptime" >/dev/null 2>&1; then
-            log "Suricatasc connectivity confirmed"
-        else
-            warn "Suricatasc connectivity test failed"
-        fi
-    else
-        warn "Suricata socket not found at $socket_path"
-    fi
-}
-
-verify_suricata_running() {
-    log "Verifying Suricata is running..."
-
-    if systemctl is-active --quiet suricata.service; then
-        success "Suricata service is active"
-    else
-        error_exit "Suricata service failed to start"
-        systemctl status suricata.service --no-pager -l
-        exit 1
-    fi
-}
-
-test_suricata_datasets() {
-    log "Testing Suricata dataset operations..."
-
-    # Test dataset add/lookup with base64
-    local test_domain="example.com"
-    local test_domain_b64=$(echo -n "$test_domain" | base64)
-
-    log "Testing dataset operations with base64: ${test_domain_b64}"
-
-    if suricatasc -c "dataset-add malicious-domains string ${test_domain_b64}" >/dev/null 2>&1; then
-        log "Dataset add operation successful"
-
-        if suricatasc -c "dataset-lookup malicious-domains string ${test_domain_b64}" >/dev/null 2>&1; then
-            success "Dataset lookup operation successful"
-            success "Suricata dataset functionality confirmed"
-        else
-            warn "Dataset lookup failed - may be normal for new installation"
-        fi
-    else
-        warn "Dataset add operation failed - check suricatasc permissions"
-        warn "Try: sudo suricatasc -c 'dump-counters' to test socket connectivity"
-    fi
 }
 
 start_slips() {
