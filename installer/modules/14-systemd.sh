@@ -186,10 +186,9 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=${SLIPS_DIR}
-# Web UI reads analysis from main SLIPS instance via Redis (DB 1 shared cache)
-# No traffic analysis - only serves dashboard on port 55000
-# -w: web interface only (no input source)
-ExecStart=${SLIPS_DIR}/venv/bin/python ${SLIPS_DIR}/slips.py -c ${SLIPS_DIR}/config/slips.yaml -w
+# Run web-only interface (no SLIPS analysis)
+# Connects to main SLIPS instance via Redis to display analysis
+ExecStart=${SLIPS_DIR}/venv/bin/python3 -m webinterface.app
 Restart=on-failure
 RestartSec=30
 StandardOutput=journal
