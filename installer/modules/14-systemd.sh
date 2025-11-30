@@ -186,9 +186,9 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=${SLIPS_DIR}
-# Run web-only interface (no SLIPS analysis)
+# Run web-only interface via webinterface.sh script
 # Connects to main SLIPS instance via Redis to display analysis
-ExecStart=${SLIPS_DIR}/venv/bin/python3 -m webinterface.app
+ExecStart=${SLIPS_DIR}/webinterface.sh
 Restart=on-failure
 RestartSec=30
 StandardOutput=journal
