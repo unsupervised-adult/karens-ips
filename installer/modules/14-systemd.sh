@@ -206,10 +206,9 @@ MemoryMax=2G
 CPUQuota=150%
 
 # Security
-PrivateTmp=yes
-ProtectSystem=strict
+PrivateTmp=no
 ProtectHome=yes
-ReadWritePaths=/var/log/slips ${SLIPS_DIR}
+ReadWritePaths=/var/log/slips ${SLIPS_DIR} /tmp/slips
 
 [Install]
 WantedBy=multi-user.target
