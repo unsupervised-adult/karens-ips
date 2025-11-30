@@ -53,6 +53,18 @@ create_malicious_ip_datasets() {
 # Auto-populated by: /usr/local/bin/extract-threat-ips.py
 # Sources: Hagezi blocklists, Perflyst blocklists, SLIPS detections
 # Updated by: ips-dataset-sync.timer (every 6 hours)
+#
+# Initial seed IPs - known malicious infrastructure
+185.220.101.0/24
+185.220.102.0/24
+45.154.255.0/24
+91.241.19.0/24
+176.10.99.0/24
+176.10.104.0/24
+192.42.116.0/24
+198.98.48.0/24
+198.98.49.0/24
+198.98.50.0/24
 MALICIOUS_IPS_EOF
 
     cat > "/etc/suricata/datasets/c2-ips.txt" << 'C2_IPS_EOF'
@@ -60,6 +72,15 @@ MALICIOUS_IPS_EOF
 # Auto-populated by: /usr/local/bin/extract-threat-ips.py
 # Sources: Threat intelligence feeds, SLIPS C2 detections
 # Updated by: ips-dataset-sync.timer (every 6 hours)
+#
+# Initial seed IPs - known C2 infrastructure
+185.220.101.1
+185.220.102.1
+45.154.255.1
+91.241.19.84
+176.10.99.200
+176.10.104.240
+192.42.116.16
 C2_IPS_EOF
 
     log "Created IP dataset files with automatic SQLite extraction system"

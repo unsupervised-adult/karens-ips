@@ -4,7 +4,7 @@ SLIPS ML Dashboard Feeder Module
 Reads SLIPS detection data and feeds it to ML detector Redis keys for dashboard
 """
 
-from slips_files.common.abstracts.module import IModule
+from slips_files.common.abstracts.imodule import IModule
 from slips_files.common.slips_utils import utils
 import json
 import time

@@ -16,7 +16,7 @@ import ipaddress
 from pathlib import Path
 
 # SLIPS imports
-from slips_files.common.abstracts.module import IModule
+from slips_files.common.abstracts.imodule import IModule
 from slips_files.core.database.database_manager import DBManager
 
 # Local imports
