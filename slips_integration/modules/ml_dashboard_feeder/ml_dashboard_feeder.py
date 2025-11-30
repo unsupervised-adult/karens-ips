@@ -41,7 +41,7 @@ class Module(IModule):
             'status': 'Active - Processing Live Traffic',
             'description': 'ML detection using SLIPS behavioral analysis and Zeek custom scripts'
         }
-        self.db.rdb.hset('ml_detector:model_info', mapping=model_info)
+        self.db.hset('ml_detector:model_info', mapping=model_info)
         
         # Feature importance (based on SLIPS detection modules)
         features = {
@@ -54,7 +54,7 @@ class Module(IModule):
             'young_domains': '0.08',
             'private_ip_connections': '0.07'
         }
-        self.db.rdb.hset('ml_detector:feature_importance', mapping=features)
+        self.db.hset('ml_detector:feature_importance', mapping=features)
 
     def main(self):
         if msg := self.get_msg('new_flow'):
@@ -237,8 +237,8 @@ class Module(IModule):
         try:
             # Add to recent detections
             detection_json = json.dumps(detection)
-            self.db.rdb.lpush('ml_detector:recent_detections', detection_json)
-            self.db.rdb.ltrim('ml_detector:recent_detections', 0, 99)  # Keep last 100
+            self.db.lpush('ml_detector:recent_detections', detection_json)
+            self.db.ltrim('ml_detector:recent_detections', 0, 99)  # Keep last 100
             
             # Add timeline entry
             timeline_entry = {
@@ -247,8 +247,8 @@ class Module(IModule):
                 'detection_type': detection.get('detection_type', 'unknown'),
                 'confidence': detection.get('confidence', 0.5)
             }
-            self.db.rdb.lpush('ml_detector:timeline', json.dumps(timeline_entry))
-            self.db.rdb.ltrim('ml_detector:timeline', 0, 999)  # Keep last 1000
+            self.db.lpush('ml_detector:timeline', json.dumps(timeline_entry))
+            self.db.ltrim('ml_detector:timeline', 0, 999)  # Keep last 1000
             
             self.print(f"Added ML detection: {detection.get('detection_type', 'unknown')}", 3, 0)
             
@@ -268,8 +268,8 @@ class Module(IModule):
             }
             
             alert_json = json.dumps(alert)
-            self.db.rdb.lpush('ml_detector:alerts', alert_json)
-            self.db.rdb.ltrim('ml_detector:alerts', 0, 49)  # Keep last 50
+            self.db.lpush('ml_detector:alerts', alert_json)
+            self.db.ltrim('ml_detector:alerts', 0, 49)  # Keep last 50
             
             self.print(f"Added ML alert: {alert['alert_type']}", 2, 0)
             
@@ -310,7 +310,7 @@ class Module(IModule):
                 'status': 'Active - Processing Live Traffic'
             }
             
-            self.db.rdb.hset('ml_detector:stats', mapping=stats)
+            self.db.hset('ml_detector:stats', mapping=stats)
             
         except Exception as e:
             self.print(f"Error updating ML stats: {e}", 1, 0)
