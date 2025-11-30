@@ -186,11 +186,11 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=${SLIPS_DIR}
-# Create /tmp/slips directory before starting web UI
-ExecStartPre=/bin/mkdir -p /tmp/slips
+# Create temp directory before starting web UI
+ExecStartPre=/bin/mkdir -p ${SLIPS_DIR}/tmp
 # Run web-only interface via webinterface.sh script
 # Connects to main SLIPS instance via Redis to display analysis
-ExecStart=${SLIPS_DIR}/webinterface.sh
+ExecStart=/bin/bash -c 'export TMPDIR=${SLIPS_DIR}/tmp && exec ${SLIPS_DIR}/webinterface.sh'
 Restart=on-failure
 RestartSec=30
 StandardOutput=journal
@@ -209,7 +209,7 @@ CPUQuota=150%
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/log/slips ${SLIPS_DIR} /tmp/slips
+ReadWritePaths=/var/log/slips ${SLIPS_DIR}
 
 [Install]
 WantedBy=multi-user.target
