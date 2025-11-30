@@ -309,6 +309,9 @@ main() {
     # Pre-flight checks
     preflight_checks
 
+    # Disable unattended-upgrades to prevent conflicts
+    disable_unattended_upgrades
+
     # Configure network interfaces (auto-detect or interactive)
     configure_network_interfaces
 
@@ -324,6 +327,9 @@ main() {
 
     # Execute installation
     main_install
+    
+    # Re-enable unattended-upgrades
+    enable_unattended_upgrades
 }
 
 # Run main if executed (not sourced)

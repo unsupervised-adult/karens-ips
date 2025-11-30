@@ -42,6 +42,36 @@ package_installed() {
 }
 
 # Wait for apt locks to clear
+disable_unattended_upgrades() {
+    log "Disabling unattended-upgrades to prevent conflicts..."
+    
+    # Stop the service if running
+    if systemctl is-active --quiet unattended-upgrades; then
+        systemctl stop unattended-upgrades
+        log "Stopped unattended-upgrades service"
+    fi
+    
+    # Kill any running apt processes
+    pkill -9 unattended-upgr 2>/dev/null || true
+    pkill -9 apt 2>/dev/null || true
+    
+    # Wait for locks to clear
+    sleep 3
+    
+    success "Unattended-upgrades disabled"
+}
+
+enable_unattended_upgrades() {
+    log "Re-enabling unattended-upgrades..."
+    
+    if systemctl is-enabled --quiet unattended-upgrades 2>/dev/null; then
+        systemctl start unattended-upgrades
+        success "Unattended-upgrades re-enabled"
+    else
+        log "Unattended-upgrades was not enabled, leaving disabled"
+    fi
+}
+
 wait_for_apt_lock() {
     local max_wait=300  # 5 minutes maximum
     local waited=0
@@ -495,7 +525,7 @@ configure_network_interfaces() {
 
 # Export functions for use in other scripts
 export -f log warn error_exit info success debug
-export -f ask_yes_no command_exists package_installed wait_for_apt_lock
+export -f ask_yes_no command_exists package_installed wait_for_apt_lock disable_unattended_upgrades enable_unattended_upgrades
 export -f service_running service_enabled wait_for_service
 export -f check_root check_os backup_file restore_file
 export -f create_dir download_file check_internet
