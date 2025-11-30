@@ -17,6 +17,23 @@ fi
 # SERVICES STARTUP
 # ============================================================================
 
+# Define all helper functions first before calling any
+# This ensures functions are available when sourced
+
+test_suricata_config() {
+    log "Testing Suricata configuration..."
+
+    if suricata -T -c /etc/suricata/suricata.yaml; then
+        success "Suricata configuration test passed"
+    else
+        error_exit "Suricata configuration test failed. Run: suricata -T -c /etc/suricata/suricata.yaml"
+    fi
+}
+
+# ============================================================================
+# SERVICE STARTUP ORCHESTRATION
+# ============================================================================
+
 start_services() {
     log_subsection "Starting IPS Services"
 
@@ -491,16 +508,6 @@ PY
             chmod 644 "$ip_file"
         fi
     done
-}
-
-test_suricata_config() {
-    log "Testing Suricata configuration..."
-
-    if suricata -T -c /etc/suricata/suricata.yaml; then
-        success "Suricata configuration test passed"
-    else
-        error_exit "Suricata configuration test failed. Run: suricata -T -c /etc/suricata/suricata.yaml"
-    fi
 }
 
 start_suricata() {
