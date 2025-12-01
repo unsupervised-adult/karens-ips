@@ -46,25 +46,36 @@ function initializeMLDetector() {
 // ----------------------------------------
 // Initialize on page load and tab show
 // ----------------------------------------
-$(document).ready(function() {
-    // Initialize when ML Detector tab is shown
-    $('#nav-ml-detector-tab').on('shown.bs.tab', function (e) {
-        console.log("ML Detector: Tab shown, initializing...");
-        initializeMLDetector();
-    });
+(function checkJQuery() {
+    if (typeof jQuery === 'undefined') {
+        setTimeout(checkJQuery, 50);
+        return;
+    }
     
-    // If ML Detector tab is active on page load, initialize immediately
-    if ($('#nav-ml-detector').hasClass('active')) {
-        initializeMLDetector();
-    }
-});
+    jQuery(document).ready(function() {
+        var $ = jQuery;
+        
+        // Initialize when ML Detector tab is shown
+        $('#nav-ml-detector-tab').on('shown.bs.tab', function (e) {
+            console.log("ML Detector: Tab shown, initializing...");
+            initializeMLDetector();
+        });
+        
+        // If ML Detector tab is active on page load, initialize immediately
+        if ($('#nav-ml-detector').hasClass('active')) {
+            initializeMLDetector();
+        }
+        
+        // Cleanup on page unload
+        $(window).on('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    });
+})();
 
-// Cleanup on page unload
-$(window).on('beforeunload', function() {
-    if (refreshInterval) {
-        clearInterval(refreshInterval);
-    }
-});
+checkJQuery();
 
 // ----------------------------------------
 // Chart Initialization
