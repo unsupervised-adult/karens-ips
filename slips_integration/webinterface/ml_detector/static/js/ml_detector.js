@@ -75,8 +75,6 @@ function initializeMLDetector() {
     });
 })();
 
-checkJQuery();
-
 // ----------------------------------------
 // Chart Initialization
 // ----------------------------------------
