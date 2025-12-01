@@ -51,11 +51,16 @@ class Module(IModule):
         # Initialize on first call
         if not self.initialized:
             self.init_ml_detector_data()
+            self.print("ML Dashboard Feeder initialized and ready", 2, 0)
             
         if msg := self.get_msg('new_flow'):
+            self.total_flows += 1
+            if self.total_flows % 100 == 0:  # Log every 100 flows
+                self.print(f"Processed {self.total_flows} flows", 3, 0)
             self.handle_new_flow(msg)
             
         if msg := self.get_msg('evidence_added'):
+            self.print(f"Evidence received, total detections: {self.total_detections + 1}", 3, 0)
             self.handle_evidence_added(msg)
             
         if msg := self.get_msg('new_profile'):
@@ -127,26 +132,47 @@ class Module(IModule):
             dbytes = flow_data.get('dbytes', 0)
             duration = flow_data.get('dur', 0)
             
-            # Check for patterns that suggest ads/tracking
+            # Get DNS resolution for destination IP
+            dns_query = self.db.get_dns_resolution(daddr)
+            query_domain = dns_query.get('domains', [''])[0] if dns_query else daddr
+            
+            # Check for patterns that suggest ads/tracking/malicious behavior
             is_suspicious = False
             detection_type = 'normal'
             confidence = 0.5
             
-            # Ad/tracking domain patterns
-            ad_indicators = ['ads', 'doubleclick', 'googlesyndication', 'facebook', 'analytics']
+            # Ad/tracking domain patterns - check both domain and IP
+            ad_indicators = [
+                'ads', 'doubleclick', 'googlesyndication', 'google-analytics',
+                'facebook', 'fbcdn', 'analytics', 'adservice', 'tracking',
+                'telemetry', 'metrics', 'ad-', '-ad.', 'beacon',
+                'scorecardresearch', 'omtrdc', 'demdex', 'outbrain'
+            ]
+            check_string = query_domain.lower() if query_domain else daddr.lower()
             for indicator in ad_indicators:
-                if indicator in daddr.lower():
+                if indicator in check_string:
                     is_suspicious = True
-                    detection_type = 'advertising'
-                    confidence = 0.75
+                    detection_type = 'advertising/tracking'
+                    confidence = 0.80
                     break
+            
+            # Suspicious ports (non-standard web traffic)
+            suspicious_ports = [8080, 8888, 4444, 9999, 31337]
+            try:
+                if int(dport) in suspicious_ports:
+                    is_suspicious = True
+                    detection_type = 'suspicious_port'
+                    confidence = 0.65
+            except:
+                pass
             
             # High data transfer patterns
             total_bytes = int(sbytes) + int(dbytes)
             if total_bytes > 100000:  # >100KB
-                is_suspicious = True
-                detection_type = 'data_transfer'
-                confidence = 0.6
+                if not is_suspicious:  # Don't override higher confidence detections
+                    is_suspicious = True
+                    detection_type = 'high_data_transfer'
+                    confidence = 0.55
             
             # Short-lived connections (potential tracking)
             if float(duration) < 1.0 and total_bytes < 1000:
@@ -178,6 +204,8 @@ class Module(IModule):
     def evidence_to_ml_detection(self, evidence):
         """Convert SLIPS evidence to ML detection format"""
         try:
+            self.print(f"Converting evidence to ML detection: {evidence.get('description', 'no description')[:100]}", 3, 0)
+            
             description = evidence.get('description', '')
             attacker = evidence.get('attacker', {})
             victim = evidence.get('victim', {})
@@ -198,18 +226,27 @@ class Module(IModule):
             
             # Determine detection type from description
             detection_type = 'unknown'
-            if 'dns' in description.lower():
+            desc_lower = description.lower()
+            
+            # Categorize based on SLIPS evidence descriptions
+            if 'dns' in desc_lower or 'domain' in desc_lower:
                 detection_type = 'dns_anomaly'
-            elif 'connection' in description.lower():
+            elif 'connection' in desc_lower or 'flow' in desc_lower:
                 detection_type = 'connection_anomaly'
-            elif 'port' in description.lower():
+            elif 'port' in desc_lower or 'scan' in desc_lower:
                 detection_type = 'port_scan'
-            elif 'ssl' in description.lower() or 'certificate' in description.lower():
+            elif 'ssl' in desc_lower or 'certificate' in desc_lower or 'cert' in desc_lower:
                 detection_type = 'ssl_anomaly'
-            elif 'upload' in description.lower() or 'download' in description.lower():
+            elif 'upload' in desc_lower or 'download' in desc_lower or 'data' in desc_lower:
                 detection_type = 'data_transfer'
-            elif 'young domain' in description.lower():
+            elif 'young domain' in desc_lower or 'new domain' in desc_lower:
                 detection_type = 'young_domain'
+            elif 'malicious' in desc_lower or 'threat' in desc_lower:
+                detection_type = 'threat_intel_match'
+            elif 'ad' in desc_lower or 'track' in desc_lower or 'telemetry' in desc_lower:
+                detection_type = 'advertising/tracking'
+            elif 'c&c' in desc_lower or 'c2' in desc_lower or 'command' in desc_lower:
+                detection_type = 'c2_communication'
                 
             return {
                 'timestamp': timestamp,
