@@ -65,9 +65,7 @@ def set_pcap_info():
 
 if __name__ == "__main__":
     app.register_blueprint(analysis, url_prefix="/analysis")
-app.register_blueprint(ml_detector, url_prefix="/ml_detector")
     app.register_blueprint(general, url_prefix="/general")
-app.register_blueprint(ml_detector, url_prefix="/ml_detector")
     app.register_blueprint(documentation, url_prefix="/documentation")
-app.register_blueprint(ml_detector, url_prefix="/ml_detector")
+    app.register_blueprint(ml_detector, url_prefix="/ml_detector")
     app.run(host="0.0.0.0", port=ConfigParser().web_interface_port)
