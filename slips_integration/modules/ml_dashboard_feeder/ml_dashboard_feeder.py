@@ -85,6 +85,9 @@ class Module(IModule):
             
             if ml_features:
                 self.add_ml_detection(ml_features)
+                self.total_detections += 1
+                # Update stats immediately for ad detections
+                self.update_ml_stats()
                 
         except Exception as e:
             self.print(f"Error processing new flow: {e}", 1, 0)
@@ -105,6 +108,9 @@ class Module(IModule):
                 # Add to alerts if high confidence
                 if ml_detection.get('confidence', 0) > 0.8:
                     self.add_ml_alert(ml_detection)
+                
+                # Update stats immediately
+                self.update_ml_stats()
                     
         except Exception as e:
             self.print(f"Error processing evidence: {e}", 1, 0)
@@ -141,19 +147,48 @@ class Module(IModule):
             detection_type = 'normal'
             confidence = 0.5
             
-            # Ad/tracking domain patterns - check both domain and IP
+            # Comprehensive ad/tracking domain patterns - YouTube, video streaming, and general web ads
             ad_indicators = [
-                'ads', 'doubleclick', 'googlesyndication', 'google-analytics',
-                'facebook', 'fbcdn', 'analytics', 'adservice', 'tracking',
-                'telemetry', 'metrics', 'ad-', '-ad.', 'beacon',
-                'scorecardresearch', 'omtrdc', 'demdex', 'outbrain'
+                # Google Ads & YouTube
+                'doubleclick', 'googlesyndication', 'googleadservices', 'google-analytics',
+                'googletagmanager', 'googletagservices', 'gstatic', 'youtube.com/pagead',
+                'youtube.com/api/stats', 'youtube.com/ptracking', 's.ytimg.com/yts',
+                
+                # Video Ad Networks
+                'videoadex', 'spotxchange', 'fwmrm', 'innovid', 'extreme-ip-lookup',
+                'videoplaza', 'serving-sys', 'moatads', 'teads', 'cedexis',
+                
+                # General Ad Networks
+                'adservice', 'adsystem', 'adserver', 'advertising', 'ad-', '-ad.',
+                'ads.', '.ads', 'adtech', 'adform', 'admob', 'adsense', 'adnxs',
+                
+                # Tracking & Analytics
+                'analytics', 'tracking', 'telemetry', 'metrics', 'beacon', 'pixel',
+                'scorecardresearch', 'chartbeat', 'quantserve', 'newrelic', 'hotjar',
+                
+                # Social Media Tracking
+                'facebook', 'fbcdn', 'fbsbx', 'instagram', 'twitter.com/i/jot',
+                'linkedin.com/analytics', 'pinterest.com/ct', 't.co', 'bit.ly',
+                
+                # Data Brokers & RTB
+                'omtrdc', 'demdex', 'crwdcntrl', 'bluekai', 'exelator', 'rlcdn',
+                'tapad', 'rubiconproject', 'pubmatic', 'indexww', 'openx',
+                
+                # Content Recommendation
+                'outbrain', 'taboola', 'revcontent', 'sharethrough', 'zemanta',
+                
+                # Misc Trackers
+                'amplitude', 'segment.', 'mixpanel', 'heap', 'fullstory',
+                'loggly', 'sentry', 'bugsnag', 'rollbar', 'appsflyer'
             ]
+            
             check_string = query_domain.lower() if query_domain else daddr.lower()
             for indicator in ad_indicators:
                 if indicator in check_string:
                     is_suspicious = True
                     detection_type = 'advertising/tracking'
-                    confidence = 0.80
+                    confidence = 0.85
+                    self.print(f"Ad/tracker detected: {check_string} (matched: {indicator})", 3, 0)
                     break
             
             # Suspicious ports (non-standard web traffic)
