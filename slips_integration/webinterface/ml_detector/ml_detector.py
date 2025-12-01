@@ -52,7 +52,7 @@ def get_stats():
         # Try to fetch ML detector stats from Redis
         stats = None
         try:
-            stats = db.r.hgetall("ml_detector:stats")
+            stats = db.get_hash("ml_detector:stats")
         except Exception as redis_error:
             logger.warning(f"Redis connection issue for stats: {str(redis_error)}")
 
@@ -65,7 +65,7 @@ def get_stats():
                 "accuracy": "95.5%",
                 "blocked_ips": "127",
                 "detection_rate": "9.1%",
-                "last_update": utils.convert_format(str(datetime.now()), utils.alerts_format),
+                "last_update": str(datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
                 "uptime": "1h 23m",
                 "status": "Active"
             }
@@ -97,7 +97,7 @@ def get_recent_detections():
     """
     try:
         # Fetch recent detections from Redis
-        detections = db.r.lrange("ml_detector:recent_detections", 0, 99)
+        detections = db.rdb.lrange("ml_detector:recent_detections", 0, 99)
 
         data = []
         for detection in detections:
@@ -131,7 +131,7 @@ def get_detection_timeline():
     """
     try:
         # Fetch timeline data from Redis
-        timeline = db.r.lrange("ml_detector:timeline", 0, 999)
+        timeline = db.rdb.lrange("ml_detector:timeline", 0, 999)
 
         data = []
         for entry in timeline:
@@ -160,7 +160,7 @@ def get_model_info():
         # Try to fetch model info from Redis
         model_info = None
         try:
-            model_info = db.r.hgetall("ml_detector:model_info")
+            model_info = db.rdb.hgetall("ml_detector:model_info")
         except Exception as redis_error:
             logger.warning(f"Redis connection issue: {str(redis_error)}")
 
@@ -204,7 +204,7 @@ def get_feature_importance():
     """
     try:
         # Fetch feature importance from Redis
-        features = db.r.hgetall("ml_detector:feature_importance")
+        features = db.rdb.hgetall("ml_detector:feature_importance")
 
         if not features:
             # Default feature importance
@@ -250,7 +250,7 @@ def get_alerts():
     """
     try:
         # Fetch alerts from Redis
-        alerts = db.r.lrange("ml_detector:alerts", 0, 49)
+        alerts = db.rdb.lrange("ml_detector:alerts", 0, 49)
 
         data = []
         for alert in alerts:
@@ -355,7 +355,7 @@ def simple_stats():
         # Get ML threat count from Redis
         ml_threats = 0
         try:
-            alerts = db.r.lrange("ml_detector:alerts", 0, -1)
+            alerts = db.rdb.lrange("ml_detector:alerts", 0, -1)
             today_str = datetime.now().strftime('%Y-%m-%d')
             
             for alert in alerts:
