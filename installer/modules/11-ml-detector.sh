@@ -48,7 +48,8 @@ install_ml_detector_dashboard() {
     install_ml_detector_blueprint "$karens_ips_dir"
 
     # Apply patches to SLIPS web interface
-    apply_slips_patches "$karens_ips_dir"
+    install_app_py "$karens_ips_dir"
+    install_app_html "$karens_ips_dir"
 
     # Set proper permissions
     set_ml_detector_permissions
@@ -135,22 +136,39 @@ install_ml_detector_blueprint() {
     
     success "ML Dashboard Feeder module installed"
 }
-
-apply_slips_patches() {
+install_app_py() {
     local karens_ips_dir="$1"
+    local source_file="$karens_ips_dir/slips_integration/webinterface/app.py"
+    local dest_file="$SLIPS_DIR/webinterface/app.py"
 
-    log "Applying patches to SLIPS web interface..."
+    log "Installing webinterface/app.py..."
 
-    cd "$SLIPS_DIR" || error_exit "Failed to change to SLIPS directory"
+    if [ ! -f "$source_file" ]; then
+        error_exit "Source app.py not found at $source_file"
+    fi
 
-    # Patch app.py
-    patch_app_py "$karens_ips_dir"
+    cp "$source_file" "$dest_file" || error_exit "Failed to install app.py"
 
-    # Patch app.html
-    patch_app_html "$karens_ips_dir"
-
-    success "Patches applied"
+    success "app.py installed"
 }
+
+install_app_html() {
+    local karens_ips_dir="$1"
+    local source_file="$karens_ips_dir/slips_integration/webinterface/templates/app.html"
+    local dest_file="$SLIPS_DIR/webinterface/templates/app.html"
+
+    log "Installing webinterface/templates/app.html..."
+
+    if [ ! -f "$source_file" ]; then
+        error_exit "Source app.html not found at $source_file"
+    fi
+
+    cp "$source_file" "$dest_file" || error_exit "Failed to install app.html"
+
+    success "app.html installed"
+}
+
+
 
 patch_app_py() {
     local karens_ips_dir="$1"
@@ -329,7 +347,7 @@ export -f check_slips_installed
 export -f check_ml_detector_files
 export -f backup_slips_webinterface
 export -f install_ml_detector_blueprint
-export -f apply_slips_patches
+export -f install_app_py
 export -f patch_app_py
 export -f patch_app_html
 export -f set_ml_detector_permissions
