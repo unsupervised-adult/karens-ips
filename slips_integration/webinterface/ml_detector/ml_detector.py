@@ -101,7 +101,7 @@ def get_recent_detections():
     """
     try:
         # Fetch recent detections from Redis
-        detections = db.rdb.lrange("ml_detector:recent_detections", 0, 99)
+        detections = db.rdb.r.lrange("ml_detector:recent_detections", 0, 99)
 
         data = []
         for detection in detections:
@@ -134,8 +134,9 @@ def get_detection_timeline():
     Returns: Time-series data of detections
     """
     try:
-        # Fetch timeline data from Redis
-        timeline = db.rdb.lrange("ml_detector:timeline", 0, 999)
+        try:
+        # Fetch detection timeline from Redis
+        timeline_data = db.rdb.r.lrange("ml_detector:timeline", 0, 999)
 
         data = []
         for entry in timeline:
@@ -164,7 +165,11 @@ def get_model_info():
         # Try to fetch model info from Redis
         model_info = None
         try:
-            model_info = db.rdb.hgetall("ml_detector:model_info")
+            model_info_raw = db.rdb.r.hgetall("ml_detector:model_info")
+            if model_info_raw:
+                model_info = {k.decode() if isinstance(k, bytes) else k: 
+                             v.decode() if isinstance(v, bytes) else v 
+                             for k, v in model_info_raw.items()}
         except Exception as redis_error:
             logger.warning(f"Redis connection issue: {str(redis_error)}")
 
@@ -208,7 +213,7 @@ def get_feature_importance():
     """
     try:
         # Fetch feature importance from Redis
-        features = db.rdb.hgetall("ml_detector:feature_importance")
+        features = db.rdb.r.hgetall("ml_detector:feature_importance")
 
         if not features:
             # Default feature importance
@@ -359,7 +364,8 @@ def simple_stats():
         # Get ML threat count from Redis
         ml_threats = 0
         try:
-            alerts = db.rdb.lrange("ml_detector:alerts", 0, -1)
+            # Fetch all alerts from Redis
+            alerts = db.rdb.r.lrange("ml_detector:alerts", 0, -1)
             today_str = datetime.now().strftime('%Y-%m-%d')
             
             for alert in alerts:
