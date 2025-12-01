@@ -52,7 +52,7 @@ def get_stats():
         # Try to fetch ML detector stats from Redis
         stats = None
         try:
-            stats_raw = db.rdb.hgetall("ml_detector:stats")
+            stats_raw = db.rdb.r.hgetall("ml_detector:stats")
             if stats_raw:
                 stats = {k.decode() if isinstance(k, bytes) else k: 
                          v.decode() if isinstance(v, bytes) else v 
