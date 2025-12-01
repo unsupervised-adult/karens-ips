@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karen's IPS ML Ad Detector
 // SPDX-License-Identifier: GPL-2.0-only
 
-(function($) {
-    'use strict';
 
 // Import Chart.js if not already loaded
 let timelineChart = null;
@@ -358,4 +356,3 @@ function loadFeatureImportance() {
     });
 }
 
-})(window.jQuery || window.$);
