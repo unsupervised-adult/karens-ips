@@ -214,10 +214,9 @@ function loadStats() {
         success: function(response) {
             if (response.data) {
                 $('#stat_total_analyzed').text(response.data.total_analyzed || 0);
-                $('#stat_ads_detected').text(response.data.ads_detected || 0);
+                $('#stat_ads_detected').text(response.data.detections_found || response.data.ads_detected || 0);
                 $('#stat_legitimate').text(response.data.legitimate_traffic || 0);
-                const accuracy = parseFloat(response.data.accuracy || 0);
-                $('#stat_accuracy').text((isNaN(accuracy) ? 0 : accuracy * 100).toFixed(2) + '%');
+                $('#stat_accuracy').text(response.data.accuracy || '0%');
             }
         },
         error: function(xhr, status, error) {
@@ -234,9 +233,9 @@ function loadModelInfo() {
             if (response.data) {
                 $('#model_type').text(response.data.model_type || '-');
                 $('#model_version').text(response.data.version || '-');
-                $('#model_accuracy').text(response.data.accuracy || '-');
+                $('#model_accuracy').text(response.data.training_accuracy || '-');
                 $('#model_last_trained').text(response.data.last_trained || '-');
-                $('#model_features').text(response.data.features || '-');
+                $('#model_features').text(response.data.features_used || '-');
             }
         },
         error: function(xhr, status, error) {
