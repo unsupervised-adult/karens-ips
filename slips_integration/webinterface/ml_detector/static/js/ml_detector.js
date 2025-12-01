@@ -11,11 +11,17 @@ let featureChart = null;
 // Refresh interval (5 seconds)
 const REFRESH_INTERVAL = 5000;
 let refreshInterval = null;
+let isInitialized = false;
 
 // ----------------------------------------
-// Initialize on page load
+// Initialize function
 // ----------------------------------------
-$(document).ready(function() {
+function initializeMLDetector() {
+    if (isInitialized) {
+        console.log("ML Detector: Already initialized");
+        return;
+    }
+    
     console.log("ML Detector: Initializing...");
 
     // Initialize charts
@@ -28,9 +34,29 @@ $(document).ready(function() {
     loadAllData();
 
     // Set up auto-refresh
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
     refreshInterval = setInterval(loadAllData, REFRESH_INTERVAL);
 
+    isInitialized = true;
     console.log("ML Detector: Initialized successfully");
+}
+
+// ----------------------------------------
+// Initialize on page load and tab show
+// ----------------------------------------
+$(document).ready(function() {
+    // Initialize when ML Detector tab is shown
+    $('#nav-ml-detector-tab').on('shown.bs.tab', function (e) {
+        console.log("ML Detector: Tab shown, initializing...");
+        initializeMLDetector();
+    });
+    
+    // If ML Detector tab is active on page load, initialize immediately
+    if ($('#nav-ml-detector').hasClass('active')) {
+        initializeMLDetector();
+    }
 });
 
 // Cleanup on page unload
