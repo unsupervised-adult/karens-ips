@@ -134,17 +134,16 @@ def get_detection_timeline():
     Returns: Time-series data of detections
     """
     try:
-        try:
         # Fetch detection timeline from Redis
         timeline_data = db.rdb.r.lrange("ml_detector:timeline", 0, 999)
 
         data = []
-        for entry in timeline:
+        for entry in timeline_data:
             try:
                 if isinstance(entry, bytes):
                     entry = entry.decode()
-                timeline_data = json.loads(entry)
-                data.append(timeline_data)
+                timeline_entry = json.loads(entry)
+                data.append(timeline_entry)
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.warning(f"Skipping malformed timeline entry: {str(e)}")
                 continue
