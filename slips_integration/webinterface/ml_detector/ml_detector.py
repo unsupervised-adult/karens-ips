@@ -36,12 +36,6 @@ def ts_to_date(ts, seconds=False):
 # ----------------------------------------
 # ROUTE FUNCTIONS
 # ----------------------------------------
-@ml_detector.route("/")
-def index():
-    """Main ML Detector page"""
-    return render_template("ml_detector_page.html", title="ML Ad Detector")
-
-
 @ml_detector.route("/stats")
 def get_stats():
     """
