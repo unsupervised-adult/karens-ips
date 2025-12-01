@@ -412,24 +412,31 @@ file_path = sys.argv[1]
 with open(file_path, 'r') as f:
     lines = f.readlines()
 
-# Find the line where we need to insert the fallback code
+# Find where to insert - after the elif netifaces.AF_INET6 block
 insert_after = -1
+in_get_host_ips = False
 for i, line in enumerate(lines):
-    if 'if netifaces.AF_INET not in addrs:' in line:
-        insert_after = i
+    if 'def _get_host_ips' in line:
+        in_get_host_ips = True
+    if in_get_host_ips and 'elif netifaces.AF_INET6 in addrs:' in line:
+        # Find the end of this elif block (next line that's not indented more)
+        for j in range(i + 1, len(lines)):
+            if lines[j].strip() and not lines[j].startswith(' ' * 16):
+                insert_after = j - 1
+                break
         break
 
 if insert_after == -1:
     print("ERROR: Could not find insertion point")
     sys.exit(1)
 
-# The indentation of the if statement (should be 12 spaces based on SLIPS code)
+# The indentation should match the elif block (12 spaces)
 base_indent = ' ' * 12
 
-# Prepare the fallback code to insert
-fallback_code = f'''{base_indent}    # Interface has no IP (e.g., bridge interface)
+# Prepare the fallback code to insert as an else block
+fallback_code = f'''{base_indent}else:
+{base_indent}    # Interface has no IP (e.g., bridge interface)
 {base_indent}    # Fall back to default/management interface for host IP
-{base_indent}    # This allows monitoring bridges while using another interface for internet
 {base_indent}    default_iface = utils.infer_used_interface()
 {base_indent}    if default_iface and default_iface != iface:
 {base_indent}        try:
@@ -447,7 +454,7 @@ fallback_code = f'''{base_indent}    # Interface has no IP (e.g., bridge interfa
 {base_indent}            pass
 '''
 
-# Insert after the "if netifaces.AF_INET not in addrs:" line
+# Insert after the elif block
 lines.insert(insert_after + 1, fallback_code)
 
 # Write back
