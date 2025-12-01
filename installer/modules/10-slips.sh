@@ -373,113 +373,54 @@ verify_slips() {
 
 patch_slips_bridge_support() {
     log "═══════════════════════════════════════════════"
-    log "Patching SLIPS for bridge interface support..."
+    log "Installing SLIPS bridge interface support..."
     log "═══════════════════════════════════════════════"
 
-    local host_ip_manager="$SLIPS_DIR/managers/host_ip_manager.py"
+    local karens_ips_dir
+    karens_ips_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    
+    local source_file="$karens_ips_dir/slips_integration/managers/host_ip_manager.py"
+    local dest_file="$SLIPS_DIR/managers/host_ip_manager.py"
 
-    log "Checking for file: $host_ip_manager"
+    log "Checking for source file: $source_file"
 
-    if [[ ! -f "$host_ip_manager" ]]; then
-        warn "host_ip_manager.py not found at: $host_ip_manager"
-        warn "SLIPS_DIR is: $SLIPS_DIR"
-        ls -la "$SLIPS_DIR/managers/" 2>&1 | head -5 || true
+    if [[ ! -f "$source_file" ]]; then
+        warn "host_ip_manager.py not found at: $source_file"
         return 1
     fi
 
-    log "File found, checking if already patched..."
+    log "Checking destination: $dest_file"
 
-    # Check if already patched
-    if grep -q "Interface has no IP (e.g., bridge interface)" "$host_ip_manager"; then
-        success "SLIPS bridge support already patched"
+    if [[ ! -f "$dest_file" ]]; then
+        warn "Destination file not found at: $dest_file"
+        return 1
+    fi
+
+    # Check if already installed
+    if grep -q "Interface has no IP (e.g., bridge interface)" "$dest_file"; then
+        success "SLIPS bridge support already installed"
         return 0
     fi
 
-    log "Not yet patched, applying bridge support patch..."
+    log "Installing bridge-enabled host_ip_manager.py..."
 
     # Backup original file
-    cp "$host_ip_manager" "${host_ip_manager}.backup"
-    log "Backup created: ${host_ip_manager}.backup"
+    cp "$dest_file" "${dest_file}.backup"
+    log "Backup created: ${dest_file}.backup"
 
-    # Create Python script to apply the patch
-    cat > /tmp/patch_slips_bridge.py << 'PATCH_SCRIPT_EOF'
-#!/usr/bin/env python3
-import sys
-
-file_path = sys.argv[1]
-
-# Read the file
-with open(file_path, 'r') as f:
-    lines = f.readlines()
-
-# Find where to insert - after the elif netifaces.AF_INET6 block
-insert_after = -1
-in_get_host_ips = False
-for i, line in enumerate(lines):
-    if 'def _get_host_ips' in line:
-        in_get_host_ips = True
-    if in_get_host_ips and 'elif netifaces.AF_INET6 in addrs:' in line:
-        # Find the end of this elif block (next line that's not indented more)
-        for j in range(i + 1, len(lines)):
-            if lines[j].strip() and not lines[j].startswith(' ' * 16):
-                insert_after = j - 1
-                break
-        break
-
-if insert_after == -1:
-    print("ERROR: Could not find insertion point")
-    sys.exit(1)
-
-# The indentation should match the elif block (12 spaces)
-base_indent = ' ' * 12
-
-# Prepare the fallback code to insert as an else block
-fallback_code = f'''{base_indent}else:
-{base_indent}    # Interface has no IP (e.g., bridge interface)
-{base_indent}    # Fall back to default/management interface for host IP
-{base_indent}    default_iface = utils.infer_used_interface()
-{base_indent}    if default_iface and default_iface != iface:
-{base_indent}        try:
-{base_indent}            default_addrs = netifaces.ifaddresses(default_iface)
-{base_indent}            if netifaces.AF_INET in default_addrs:
-{base_indent}                for addr in default_addrs[netifaces.AF_INET]:
-{base_indent}                    fallback_ip = addr.get("addr")
-{base_indent}                    if fallback_ip and not fallback_ip.startswith("127."):
-{base_indent}                        found_ips[iface] = fallback_ip
-{base_indent}                        self.main.print(
-{base_indent}                            f"Interface {{iface}} has no IP. Using {{fallback_ip}} from {{default_iface}} for internet connectivity."
-{base_indent}                        )
-{base_indent}                        break
-{base_indent}        except Exception:
-{base_indent}            pass
-'''
-
-# Insert after the elif block
-lines.insert(insert_after + 1, fallback_code)
-
-# Write back
-with open(file_path, 'w') as f:
-    f.writelines(lines)
-
-print("SUCCESS: Patch applied")
-PATCH_SCRIPT_EOF
-
-    # Apply the patch
-    log "Executing Python patch script..."
-    if python3 /tmp/patch_slips_bridge.py "$host_ip_manager" 2>&1 | tee -a /var/log/slips_bridge_patch.log; then
-        success "SLIPS bridge support patched successfully!"
-        log "Verifying patch was applied..."
-        if grep -q "Interface has no IP" "$host_ip_manager"; then
-            success "✓ Patch verification successful - bridge support is active"
+    # Copy our modified version
+    if cp "$source_file" "$dest_file"; then
+        success "SLIPS bridge support installed successfully!"
+        log "Verifying installation..."
+        if grep -q "Interface has no IP" "$dest_file"; then
+            success "✓ Bridge support verification successful"
         else
-            warn "Patch script ran but verification failed"
+            warn "File copied but verification failed"
         fi
-        rm -f /tmp/patch_slips_bridge.py
         log "═══════════════════════════════════════════════"
         return 0
     else
-        warn "Python patch script failed"
-        log "Check /var/log/slips_bridge_patch.log for details"
+        warn "Failed to copy host_ip_manager.py"
         log "═══════════════════════════════════════════════"
         return 1
     fi
