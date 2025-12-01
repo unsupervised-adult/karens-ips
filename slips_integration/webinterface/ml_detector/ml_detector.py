@@ -52,7 +52,11 @@ def get_stats():
         # Try to fetch ML detector stats from Redis
         stats = None
         try:
-            stats = db.get_hash("ml_detector:stats")
+            stats_raw = db.rdb.hgetall("ml_detector:stats")
+            if stats_raw:
+                stats = {k.decode() if isinstance(k, bytes) else k: 
+                         v.decode() if isinstance(v, bytes) else v 
+                         for k, v in stats_raw.items()}
         except Exception as redis_error:
             logger.warning(f"Redis connection issue for stats: {str(redis_error)}")
 
