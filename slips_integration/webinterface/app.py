@@ -1,38 +1,73 @@
-#!/usr/bin/env python3
-"""
-SLIPS Web Interface Application
-Flask app entry point for the web-based dashboard
-"""
+# SPDX-FileCopyrightText: 2021 Sebastian Garcia <sebastian.garcia@agents.fel.cvut.cz>
+# SPDX-License-Identifier: GPL-2.0-only
+from flask import Flask, render_template, redirect, url_for
 
-from flask import Flask, render_template, jsonify, redirect, url_for
-import logging
-import os
+from slips_files.common.parsers.config_parser import ConfigParser
+from .database.database import db
+from .ml_detector.ml_detector import ml_detector
+from .database.signals import message_sent
+from .analysis.analysis import analysis
+from .general.general import general
+from .documentation.documentation import documentation
+from .utils import get_open_redis_ports_in_order
 
-app = Flask(__name__, 
-            template_folder=os.path.join(os.path.dirname(__file__), 'ml_detector/templates'),
-            static_folder=os.path.join(os.path.dirname(__file__), 'ml_detector/static'))
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+def create_app():
+    app = Flask(__name__)
+    app.config["JSON_SORT_KEYS"] = False  # disable sorting of timewindows
+    return app
 
-# Import blueprints
-try:
-    from ml_detector.ml_detector_live import ml_detector
-    app.register_blueprint(ml_detector, url_prefix='/ml_detector')
-except ImportError as e:
-    logger.error(f"Failed to import ml_detector: {e}")
 
-@app.route('/')
+app = create_app()
+
+
+@app.route("/redis")
+def read_redis_port():
+    """
+    is called when changing the db from the button at the top right
+    prints the available redis dbs and ports for the user to choose ffrom
+    """
+    res = get_open_redis_ports_in_order()
+    return {"data": res}
+
+
+@app.route("/")
 def index():
-    """Redirect to ML Detector dashboard"""
-    return redirect(url_for('ml_detector.index'))
+    return render_template("app.html", title="Slips")
 
-@app.route('/health')
-def health():
-    """Health check endpoint"""
-    return jsonify({"status": "ok", "service": "SLIPS Web Interface"})
 
-if __name__ == '__main__':
-    # Run on all interfaces for VM access
-    app.run(host='0.0.0.0', port=55000, debug=False)
+@app.route("/db/<new_port>")
+def get_post_javascript_data(new_port):
+    """
+    is called when the user chooses another db to connect to from the
+    button at the top right (from /redis)
+    should send a msg to update_db() in database.py
+    """
+    message_sent.send(int(new_port))
+    return redirect(url_for("index"))
+
+
+@app.route("/info")
+def set_pcap_info():
+    """
+    Set information about the pcap.
+    """
+    info = db.get_analysis_info()
+
+    profiles = db.get_profiles()
+    info["num_profiles"] = len(profiles) if profiles else 0
+
+    alerts_number = db.get_number_of_alerts_so_far()
+    info["num_alerts"] = int(alerts_number) if alerts_number else 0
+
+    return info
+
+
+if __name__ == "__main__":
+    app.register_blueprint(analysis, url_prefix="/analysis")
+app.register_blueprint(ml_detector, url_prefix="/ml_detector")
+    app.register_blueprint(general, url_prefix="/general")
+app.register_blueprint(ml_detector, url_prefix="/ml_detector")
+    app.register_blueprint(documentation, url_prefix="/documentation")
+app.register_blueprint(ml_detector, url_prefix="/ml_detector")
+    app.run(host="0.0.0.0", port=ConfigParser().web_interface_port)
