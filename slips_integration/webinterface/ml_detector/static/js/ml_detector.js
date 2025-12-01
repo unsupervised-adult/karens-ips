@@ -1,18 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karen's IPS ML Ad Detector
 // SPDX-License-Identifier: GPL-2.0-only
 
-// SPDX-FileCopyrightText: 2025 Karen's IPS ML Ad Detector
-// SPDX-License-Identifier: GPL-2.0-only
-
-// Wait for jQuery to be available
-(function waitForJQuery() {
-    if (typeof jQuery === 'undefined') {
-        setTimeout(waitForJQuery, 50);
-        return;
-    }
-
-(function($) {
-    'use strict';
 (function($) {
     'use strict';
 
@@ -58,7 +46,7 @@ function initializeMLDetector() {
 // ----------------------------------------
 // Initialize on page load and tab show
 // ----------------------------------------
-(function checkJQuery() { if (typeof jQuery === "undefined") { setTimeout(checkJQuery, 50); return; } jQuery(document).ready(function() { var $ = jQuery;
+$(document).ready(function() {
     // Initialize when ML Detector tab is shown
     $('#nav-ml-detector-tab').on('shown.bs.tab', function (e) {
         console.log("ML Detector: Tab shown, initializing...");
@@ -70,7 +58,6 @@ function initializeMLDetector() {
         initializeMLDetector();
     }
 });
-}); checkJQuery();
 
 // Cleanup on page unload
 $(window).on('beforeunload', function() {
@@ -362,4 +349,4 @@ function loadFeatureImportance() {
     });
 }
 
-})();
+})(window.jQuery || window.$);
