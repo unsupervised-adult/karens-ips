@@ -417,13 +417,40 @@ patch_slips_bridge_support() {
         else
             warn "File copied but verification failed"
         fi
-        log "═══════════════════════════════════════════════"
-        return 0
     else
         warn "Failed to copy host_ip_manager.py"
         log "═══════════════════════════════════════════════"
         return 1
     fi
+
+    log "Installing Bootstrap 5 compatible app.js..."
+    local app_js_source="$karens_ips_dir/slips_integration/webinterface/static/app.js"
+    local app_js_dest="$SLIPS_DIR/webinterface/static/app.js"
+    
+    if [[ -f "$app_js_source" ]]; then
+        cp "$app_js_dest" "${app_js_dest}.backup" 2>/dev/null || true
+        if cp "$app_js_source" "$app_js_dest"; then
+            success "✓ Bootstrap 5 app.js installed"
+        else
+            warn "Failed to copy app.js"
+        fi
+    fi
+
+    log "Installing Bootstrap 5 compatible app.html..."
+    local app_html_source="$karens_ips_dir/slips_integration/webinterface/templates/app.html"
+    local app_html_dest="$SLIPS_DIR/webinterface/templates/app.html"
+    
+    if [[ -f "$app_html_source" ]]; then
+        cp "$app_html_dest" "${app_html_dest}.backup" 2>/dev/null || true
+        if cp "$app_html_source" "$app_html_dest"; then
+            success "✓ Bootstrap 5 app.html installed"
+        else
+            warn "Failed to copy app.html"
+        fi
+    fi
+
+    log "═══════════════════════════════════════════════"
+    return 0
 }
 
 # Export functions
