@@ -185,8 +185,8 @@ WorkingDirectory=${SLIPS_DIR}
 # SLIPS requires /tmp/slips for SQLite lockfiles
 ExecStartPre=/bin/mkdir -p /tmp/slips
 ExecStartPre=/bin/chmod 1777 /tmp/slips
-# Wait for Redis to be fully ready with databases
-ExecStartPre=/bin/bash -c 'for i in {1..30}; do redis-cli ping > /dev/null 2>&1 && redis-cli DBSIZE > /dev/null 2>&1 && break || sleep 2; done'
+# Wait for SLIPS to create Redis databases (check for main_redis_port key)
+ExecStartPre=/bin/bash -c 'for i in {1..60}; do redis-cli EXISTS main_redis_port | grep -q "^1$" && break || sleep 2; done'
 # Run web-only interface via webinterface.sh script
 # Connects to main SLIPS instance via Redis to display analysis
 ExecStart=${SLIPS_DIR}/webinterface.sh
