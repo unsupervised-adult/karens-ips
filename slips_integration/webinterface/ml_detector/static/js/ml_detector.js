@@ -176,6 +176,14 @@ function initializeTables() {
         return;
     }
     
+    // Destroy existing DataTables if they exist
+    if ($.fn.DataTable.isDataTable('#table_detections')) {
+        $('#table_detections').DataTable().destroy();
+    }
+    if ($.fn.DataTable.isDataTable('#table_alerts')) {
+        $('#table_alerts').DataTable().destroy();
+    }
+    
     // Detections Table
     window.detectionsTable = $('#table_detections').DataTable({
         columns: [
