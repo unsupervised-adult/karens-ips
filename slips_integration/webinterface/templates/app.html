@@ -133,25 +133,19 @@
       </div>
     </div>
   </div>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="{{url_for('ml_detector.static', filename='js/ml_detector.js')}}</script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script type="text/javascript" src="https://cdn.datatables.net/v/bs5/jq-3.6.0/sl-1.4.0/dt-1.12.1/datatables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.2.3/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.colVis.min.js"></script>
+  <script src="https://kit.fontawesome.com/88b12c5474.js" crossorigin="anonymous"></script>
+  
+  <script type="module" src="{{url_for('analysis.static', filename='js/analysis.js')}}"></script>
+  <script type="module" src="{{url_for('analysis.static', filename='js/tableDefs.js')}}"></script>
+  <script type="module" src="{{url_for('general.static', filename='js/general.js')}}"></script>
+  <script src="{{url_for('ml_detector.static', filename='js/ml_detector.js')}}"></script>
+  <script type="module" src="{{url_for('static', filename='app.js')}}"></script>
 </body>
-
-<script type="text/javascript"
-  src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-<script type="text/javascript"
-  src="https://cdn.datatables.net/v/bs5/jq-3.6.0/sl-1.4.0/dt-1.12.1/datatables.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.2.3/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.colVis.min.js"></script>
-<script type="module" src="{{url_for('static', filename='app.js')}}"></script>
-<script src="https://kit.fontawesome.com/88b12c5474.js" crossorigin="anonymous"></script>
-
-<script type="module" 
-  src="{{url_for('analysis.static', filename='js/analysis.js')}}"></script>
-<script type="module" 
-  src="{{url_for('analysis.static', filename='js/tableDefs.js')}}"></script>
-<script type="module" 
-  src="{{url_for('general.static', filename='js/general.js')}}"></script>
 
 </html>
