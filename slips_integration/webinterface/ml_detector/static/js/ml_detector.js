@@ -164,6 +164,18 @@ function initializeCharts() {
 // Table Initialization
 // ----------------------------------------
 function initializeTables() {
+    // Check if tables already exist
+    if (window.detectionsTable) {
+        console.log("ML Detector: Tables already initialized");
+        return;
+    }
+    
+    // Check if DataTables is available
+    if (!$.fn.DataTable) {
+        console.error("DataTables is not loaded");
+        return;
+    }
+    
     // Detections Table
     window.detectionsTable = $('#table_detections').DataTable({
         columns: [
