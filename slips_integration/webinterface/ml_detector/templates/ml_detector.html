@@ -73,29 +73,100 @@
     <div class="col-12">
       <div class="card">
         <div class="card-header bg-light">
-          <h5>Model Information</h5>
+          <h5>Model Architecture & Performance</h5>
         </div>
         <div class="card-body">
-          <table class="table table-sm">
-            <tbody>
-              <tr>
-                <th width="200">Model Type:</th>
-                <td id="model_type">-</td>
-                <th width="200">Version:</th>
-                <td id="model_version">-</td>
-              </tr>
-              <tr>
-                <th>Training Accuracy:</th>
-                <td id="model_accuracy">-</td>
-                <th>Last Trained:</th>
-                <td id="model_last_trained">-</td>
-              </tr>
-              <tr>
-                <th>Features Used:</th>
-                <td colspan="3" id="model_features">-</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="row">
+            <div class="col-md-6">
+              <h6 class="text-primary">Core Configuration</h6>
+              <table class="table table-sm table-borderless">
+                <tbody>
+                  <tr>
+                    <th width="180">Model Type:</th>
+                    <td id="model_type">-</td>
+                  </tr>
+                  <tr>
+                    <th>Version:</th>
+                    <td id="model_version">-</td>
+                  </tr>
+                  <tr>
+                    <th>Algorithm:</th>
+                    <td id="model_algorithm">-</td>
+                  </tr>
+                  <tr>
+                    <th>Architecture:</th>
+                    <td id="model_architecture">-</td>
+                  </tr>
+                  <tr>
+                    <th>Confidence Threshold:</th>
+                    <td id="model_threshold">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6 class="text-primary">Performance Metrics</h6>
+              <table class="table table-sm table-borderless">
+                <tbody>
+                  <tr>
+                    <th width="180">Training Accuracy:</th>
+                    <td id="model_training_accuracy">-</td>
+                  </tr>
+                  <tr>
+                    <th>Validation Accuracy:</th>
+                    <td id="model_validation_accuracy">-</td>
+                  </tr>
+                  <tr>
+                    <th>False Positive Rate:</th>
+                    <td id="model_fpr">-</td>
+                  </tr>
+                  <tr>
+                    <th>Last Trained:</th>
+                    <td id="model_last_trained">-</td>
+                  </tr>
+                  <tr>
+                    <th>Training Dataset:</th>
+                    <td id="model_training_dataset">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-md-6">
+              <h6 class="text-primary">Detection Methods</h6>
+              <ul id="model_detection_methods" class="list-unstyled">
+                <li>-</li>
+              </ul>
+            </div>
+            <div class="col-md-6">
+              <h6 class="text-primary">Feature Extraction Details</h6>
+              <table class="table table-sm table-borderless">
+                <tbody>
+                  <tr>
+                    <th width="180">Extraction Method:</th>
+                    <td id="model_feature_extraction">-</td>
+                  </tr>
+                  <tr>
+                    <th>Detection Window:</th>
+                    <td id="model_detection_window">-</td>
+                  </tr>
+                  <tr>
+                    <th>Update Frequency:</th>
+                    <td id="model_update_frequency">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-12">
+              <h6 class="text-primary">Features Used (8 categories)</h6>
+              <ul id="model_features_list" class="list-group list-group-flush">
+                <li class="list-group-item">-</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>

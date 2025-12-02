@@ -287,11 +287,35 @@ function loadModelInfo() {
         method: 'GET',
         success: function(response) {
             if (response.data) {
-                $('#model_type').text(response.data.model_type || '-');
-                $('#model_version').text(response.data.version || '-');
-                $('#model_accuracy').text(response.data.training_accuracy || '-');
-                $('#model_last_trained').text(response.data.last_trained || '-');
-                $('#model_features').text(response.data.features_used || '-');
+                const d = response.data;
+                
+                $('#model_type').text(d.model_type || '-');
+                $('#model_version').text(d.version || '-');
+                $('#model_algorithm').text(d.algorithm || '-');
+                $('#model_architecture').text(d.model_architecture || '-');
+                $('#model_threshold').text(d.confidence_threshold || '-');
+                $('#model_training_accuracy').text(d.training_accuracy || '-');
+                $('#model_validation_accuracy').text(d.validation_accuracy || '-');
+                $('#model_fpr').text(d.false_positive_rate || '-');
+                $('#model_last_trained').text(d.last_trained || '-');
+                $('#model_training_dataset').text(d.training_dataset || '-');
+                $('#model_feature_extraction').text(d.feature_extraction || '-');
+                $('#model_detection_window').text(d.detection_window || '-');
+                $('#model_update_frequency').text(d.update_frequency || '-');
+                
+                if (d.detection_methods && Array.isArray(d.detection_methods)) {
+                    const methodsHtml = d.detection_methods.map(m => 
+                        `<li><i class="fa fa-check-circle text-success"></i> ${m}</li>`
+                    ).join('');
+                    $('#model_detection_methods').html(methodsHtml);
+                }
+                
+                if (d.features_used && Array.isArray(d.features_used)) {
+                    const featuresHtml = d.features_used.map(f => 
+                        `<li class="list-group-item py-1 small"><i class="fa fa-cog text-primary"></i> ${f}</li>`
+                    ).join('');
+                    $('#model_features_list').html(featuresHtml);
+                }
             }
         },
         error: function(xhr, status, error) {
