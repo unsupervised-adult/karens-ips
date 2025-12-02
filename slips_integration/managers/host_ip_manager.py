@@ -47,23 +47,9 @@ class HostIPManager:
                         found_ips[iface] = ip
                         break
             else:
-                # Interface has no IP (e.g., bridge interface)
-                # Fall back to default/management interface for host IP
-                default_iface = utils.infer_used_interface()
-                if default_iface and default_iface != iface:
-                    try:
-                        default_addrs = netifaces.ifaddresses(default_iface)
-                        if netifaces.AF_INET in default_addrs:
-                            for addr in default_addrs[netifaces.AF_INET]:
-                                fallback_ip = addr.get("addr")
-                                if fallback_ip and not fallback_ip.startswith("127."):
-                                    found_ips[iface] = fallback_ip
-                                    self.main.print(
-                                        f"Interface {iface} has no IP. Using {fallback_ip} from {default_iface} for internet connectivity."
-                                    )
-                                    break
-                    except Exception:
-                        pass
+                # Interface has no IP (e.g., bridge interface in IPS/NFQUEUE mode)
+                # This is normal for bridge interfaces - skip it
+                pass
         return found_ips
 
     def store_host_ip(self) -> Dict[str, str] | None:
