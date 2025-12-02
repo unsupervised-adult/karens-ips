@@ -1,0 +1,12 @@
+// SPDX-FileCopyrightText: 2025 Karen's IPS ML Ad Detector
+// SPDX-License-Identifier: GPL-2.0-only
+
+// Wait for jQuery to be available
+(function waitForJQuery() {
+    if (typeof jQuery === 'undefined') {
+        setTimeout(waitForJQuery, 50);
+        return;
+    }
+
+(function($) {
+    'use strict';

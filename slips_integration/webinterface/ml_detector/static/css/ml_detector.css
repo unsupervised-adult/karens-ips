@@ -3,6 +3,23 @@
 
 /* ML Detector Specific Styles */
 
+/* Navbar toggler styles */
+.navbar-toggler {
+    text-decoration: none;
+    padding: 13px 15px 0px 10px;
+    font-weight: bold;
+}
+
+/* Change DB button styles */
+#changedb_button {
+    color: #0d6efd !important;
+}
+
+/* Table styles */
+#table_choose_redis {
+    width: 100%;
+}
+
 .card {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     border-radius: 8px;
@@ -48,6 +65,7 @@ canvas {
 #table_detections,
 #table_alerts {
     font-size: 0.9rem;
+    width: 100%;
 }
 
 #table_detections thead th,
