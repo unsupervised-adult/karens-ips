@@ -68,28 +68,27 @@ cp -r "$SCRIPT_DIR/webinterface/ml_detector" "$ML_DETECTOR_DEST"
 echo -e "${GREEN}✓${NC} ML Detector blueprint installed"
 echo ""
 
-# Apply patches
-echo "Applying patches to SLIPS core files..."
+# Install pre-modified SLIPS files
+echo "Installing ML Detector integrated SLIPS files..."
 
-# Patch app.py
-echo "  - Patching webinterface/app.py"
-cd "$SLIPS_PATH"
-if patch -p1 --dry-run < "$SCRIPT_DIR/patches/app.py.patch" > /dev/null 2>&1; then
-    patch -p1 < "$SCRIPT_DIR/patches/app.py.patch"
-    echo -e "    ${GREEN}✓${NC} app.py patched successfully"
+# Install app.py
+echo "  - Installing webinterface/app.py"
+if [ -f "$SCRIPT_DIR/webinterface/app.py" ]; then
+    cp "$SCRIPT_DIR/webinterface/app.py" "$SLIPS_PATH/webinterface/app.py"
+    echo -e "    ${GREEN}✓${NC} app.py installed successfully"
 else
-    echo -e "    ${YELLOW}⚠${NC} app.py patch may already be applied or conflicts exist"
-    echo "    Please manually merge changes from patches/app.py.patch"
+    echo -e "    ${RED}✗${NC} app.py source file not found"
+    exit 1
 fi
 
-# Patch app.html
-echo "  - Patching webinterface/templates/app.html"
-if patch -p1 --dry-run < "$SCRIPT_DIR/patches/app.html.patch" > /dev/null 2>&1; then
-    patch -p1 < "$SCRIPT_DIR/patches/app.html.patch"
-    echo -e "    ${GREEN}✓${NC} app.html patched successfully"
+# Install app.html
+echo "  - Installing webinterface/templates/app.html"
+if [ -f "$SCRIPT_DIR/webinterface/templates/app.html" ]; then
+    cp "$SCRIPT_DIR/webinterface/templates/app.html" "$SLIPS_PATH/webinterface/templates/app.html"
+    echo -e "    ${GREEN}✓${NC} app.html installed successfully"
 else
-    echo -e "    ${YELLOW}⚠${NC} app.html patch may already be applied or conflicts exist"
-    echo "    Please manually merge changes from patches/app.html.patch"
+    echo -e "    ${RED}✗${NC} app.html source file not found"
+    exit 1
 fi
 
 echo ""

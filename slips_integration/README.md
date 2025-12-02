@@ -12,9 +12,7 @@ The integration adds a new "ML Detector" tab to the SLIPS web interface, providi
 slips_integration/
 ├── README.md                      # This file
 ├── install.sh                     # Automated installation script
-├── patches/                       # Patch files for SLIPS core files
-│   ├── app.py.patch              # Patches for webinterface/app.py
-│   └── app.html.patch            # Patches for webinterface/templates/app.html
+
 └── webinterface/
     └── ml_detector/               # ML Detector Flask Blueprint
         ├── __init__.py
@@ -47,7 +45,7 @@ slips_integration/
    - Validate the SLIPS installation
    - Create a backup of the webinterface directory
    - Copy the ML Detector blueprint
-   - Apply patches to core SLIPS files
+   - Install pre-modified SLIPS core files with ML Detector integration
 
 ### Manual Installation
 
@@ -203,13 +201,13 @@ See [ML_DETECTOR_INTEGRATION.md](../ML_DETECTOR_INTEGRATION.md) for detailed dat
 2. Verify Chart.js is loaded (check Network tab)
 3. Ensure timeline data format is correct
 
-### Patch application failed
+### File installation failed
 
-**Problem**: Installation script reports patch conflicts
+**Problem**: Installation script reports missing source files
 
-**Solutions**:
-1. Check if patches are already applied
-2. Manually merge changes using the patch files as reference
+**Solution**:
+1. Ensure slips_integration/webinterface directory contains app.py and templates/app.html
+2. Verify the repository clone is complete
 3. Check SLIPS version compatibility
 
 ## Dependencies

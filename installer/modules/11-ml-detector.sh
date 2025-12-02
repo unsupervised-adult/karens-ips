@@ -168,104 +168,6 @@ install_app_html() {
     success "app.html installed"
 }
 
-
-
-patch_app_py() {
-    local karens_ips_dir="$1"
-
-    if grep -q "from .ml_detector.ml_detector import ml_detector" webinterface/app.py; then
-        log "app.py already patched"
-        return 0
-    fi
-
-    log "Patching webinterface/app.py..."
-
-    # Try patch file first
-    if [ -f "$karens_ips_dir/slips_integration/patches/app.py.patch" ]; then
-        cd "$SLIPS_DIR" || return 1
-        if patch -p1 --dry-run < "$karens_ips_dir/slips_integration/patches/app.py.patch" > /dev/null 2>&1; then
-            patch -p1 < "$karens_ips_dir/slips_integration/patches/app.py.patch"
-            success "app.py patched successfully"
-            return 0
-        else
-            warn "Patch dry-run failed, patch may already be applied or file modified"
-        fi
-    fi
-
-    # Manual patch fallback - only if ml_detector not already in file
-    warn "Patch file failed, attempting manual integration..."
-    cd "$SLIPS_DIR" || return 1
-    
-    # Check if already patched
-    if grep -q 'from .ml_detector.ml_detector import ml_detector' webinterface/app.py; then
-        log "app.py already contains ml_detector import, skipping manual patch"
-        return 0
-    fi
-    
-    sed -i '/from \.documentation\.documentation import documentation/a from .ml_detector.ml_detector import ml_detector' webinterface/app.py
-    sed -i '/app.register_blueprint(documentation, url_prefix="\/documentation")/a \    app.register_blueprint(ml_detector, url_prefix="/ml_detector")' webinterface/app.py
-    success "app.py manually patched"
-}
-
-patch_app_html() {
-    local karens_ips_dir="$1"
-
-    if grep -q "ml_detector.html" webinterface/templates/app.html; then
-        log "app.html already patched"
-        return 0
-    fi
-
-    log "Patching webinterface/templates/app.html..."
-
-    # Try patch file first
-    if [ -f "$karens_ips_dir/slips_integration/patches/app.html.patch" ]; then
-        if patch -p1 --dry-run < "$karens_ips_dir/slips_integration/patches/app.html.patch" > /dev/null 2>&1; then
-            patch -p1 < "$karens_ips_dir/slips_integration/patches/app.html.patch"
-            success "app.html patched successfully"
-            return 0
-        fi
-    fi
-
-    # Manual patch fallback
-    warn "Patch file failed, attempting manual integration..."
-
-    local app_html="webinterface/templates/app.html"
-
-    # Add CSS link in <head> section after general.css
-    if ! grep -q "ml_detector.css" "$app_html"; then
-        sed -i '/<link rel="stylesheet" type="text\/css" href="{{url_for('\''general.static'\'', filename='\''css\/general.css'\'')}}" \/>/a\  <link rel="stylesheet" type="text/css" href="{{url_for('\''ml_detector.static'\'', filename='\''css\/ml_detector.css'\'')}}" />' "$app_html"
-    fi
-
-    # Add ML Detector tab in navigation (after Documentation tab)
-    if ! grep -q "nav-ml-detector-tab" "$app_html"; then
-        sed -i '/<a class="nav-link" type="button" id="nav-documentation-tab"/,/<\/li>/ {
-            /<\/li>/a\      <li class="nav-item">\n        <a class="nav-link" type="button" id="nav-ml-detector-tab" data-bs-toggle="tab" data-bs-target="#nav-ml-detector" role="tab"\n        aria-controls="nav-ml-detector" aria-selected="false">\n          ML Detector\n        </a>\n      </li>
-        }' "$app_html"
-    fi
-
-    # Add ML Detector tab content (after documentation tab content)
-    if ! grep -q "ml_detector.html" "$app_html"; then
-        # First ensure documentation tab is properly closed
-        sed -i '/{%.*include.*documentation.html.*%}/a\      </div>' "$app_html"
-        # Then add ML detector tab
-        sed -i '/{%.*include.*documentation.html.*%}/,/^.*<\/div>/ {
-            /^.*<\/div>/a\      <div class="tab-pane fade" id="nav-ml-detector" role="tabpanel" aria-labelledby="nav-ml-detector-tab">\n        {% include '\''ml_detector.html'\'' %}\n      </div>
-        }' "$app_html"
-    fi
-
-    # Add Chart.js library before closing </body>
-    if ! grep -q "chart.js" "$app_html"; then
-        sed -i 's|</body>|<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>\n</body>|' "$app_html"
-    fi
-
-    # Add ML Detector JavaScript before closing </body> (after Chart.js)
-    if ! grep -q "ml_detector.js" "$app_html"; then
-        sed -i 's|</body>|<script src="{{url_for('\''ml_detector.static'\'', filename='\''js/ml_detector.js'\'')}}\"></script>\n</body>|' "$app_html"
-    fi
-
-    success "app.html manually patched"
-}
-
 set_ml_detector_permissions() {
     local ml_detector_dest="$SLIPS_DIR/webinterface/ml_detector"
 
@@ -320,9 +222,9 @@ verify_ml_detector() {
         ((errors++))
     fi
 
-    # Check if app.py is patched
+    # Check if app.py has ML Detector integration
     if ! grep -q "from .ml_detector.ml_detector import ml_detector" "$SLIPS_DIR/webinterface/app.py" 2>/dev/null; then
-        warn "app.py not patched for ML Detector"
+        warn "app.py does not have ML Detector integration"
         ((errors++))
     fi
 
@@ -348,8 +250,7 @@ export -f check_ml_detector_files
 export -f backup_slips_webinterface
 export -f install_ml_detector_blueprint
 export -f install_app_py
-export -f patch_app_py
-export -f patch_app_html
+export -f install_app_html
 export -f set_ml_detector_permissions
 export -f install_ml_detector_dependencies
 export -f verify_ml_detector
