@@ -44,14 +44,24 @@ function initializeMLDetector() {
 // ----------------------------------------
 // Initialize on page load and tab show
 // ----------------------------------------
+console.log("ML Detector JS: Script loaded");
+
 (function checkJQuery() {
+    console.log("ML Detector JS: Checking for jQuery...", typeof jQuery);
+    
     if (typeof jQuery === 'undefined') {
+        console.log("ML Detector JS: jQuery not found, retrying...");
         setTimeout(checkJQuery, 50);
         return;
     }
     
+    console.log("ML Detector JS: jQuery found, setting up...");
+    
     jQuery(document).ready(function() {
         var $ = jQuery;
+        
+        console.log("ML Detector JS: DOM ready");
+        console.log("ML Detector JS: Tab element exists:", $('#nav-ml-detector-tab').length > 0);
         
         // Initialize when ML Detector tab is shown
         $('#nav-ml-detector-tab').on('shown.bs.tab', function (e) {
@@ -59,8 +69,20 @@ function initializeMLDetector() {
             initializeMLDetector();
         });
         
+        // Also try click event as backup
+        $('#nav-ml-detector-tab').on('click', function (e) {
+            console.log("ML Detector: Tab clicked");
+            setTimeout(function() {
+                if ($('#nav-ml-detector').hasClass('show') || $('#nav-ml-detector').hasClass('active')) {
+                    console.log("ML Detector: Tab is now visible, initializing...");
+                    initializeMLDetector();
+                }
+            }, 100);
+        });
+        
         // If ML Detector tab is active on page load, initialize immediately
         if ($('#nav-ml-detector').hasClass('active')) {
+            console.log("ML Detector: Tab active on load, initializing...");
             initializeMLDetector();
         }
         
@@ -70,6 +92,8 @@ function initializeMLDetector() {
                 clearInterval(refreshInterval);
             }
         });
+        
+        console.log("ML Detector JS: Setup complete");
     });
 })();
 
