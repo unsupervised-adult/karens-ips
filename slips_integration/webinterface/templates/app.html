@@ -141,6 +141,12 @@
   <script src="https://cdn.datatables.net/buttons/2.2.3/js/dataTables.buttons.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.colVis.min.js"></script>
   <script src="https://kit.fontawesome.com/88b12c5474.js" crossorigin="anonymous"></script>
+  <script>
+    $.fn.dataTable.ext.errMode = 'none';
+    $(document).on('error.dt', function(e, settings, techNote, message) {
+      console.log('DataTables warning suppressed:', message);
+    });
+  </script>
   
   <script type="module" src="{{url_for('analysis.static', filename='js/analysis.js')}}"></script>
   <script type="module" src="{{url_for('analysis.static', filename='js/tableDefs.js')}}"></script>
