@@ -200,79 +200,95 @@ function initializeTables() {
         return;
     }
     
-    // Destroy existing DataTables if they exist
-    if ($.fn.DataTable.isDataTable('#table_detections')) {
-        $('#table_detections').DataTable().destroy();
-    }
-    if ($.fn.DataTable.isDataTable('#table_alerts')) {
-        $('#table_alerts').DataTable().destroy();
+    // Check if table elements are visible (important for DataTables)
+    if (!$('#table_detections').is(':visible')) {
+        console.log("ML Detector: Tables not visible yet, deferring initialization");
+        return;
     }
     
-    // Detections Table
-    window.detectionsTable = $('#table_detections').DataTable({
-        columns: [
-            { data: 'timestamp_formatted', defaultContent: 'N/A' },
-            { data: 'src_ip', defaultContent: 'N/A' },
-            { data: 'dst_ip', defaultContent: 'N/A' },
-            { data: 'dst_port', defaultContent: 'N/A' },
-            { data: 'protocol', defaultContent: 'N/A' },
-            {
-                data: 'classification',
-                defaultContent: 'Unknown',
-                render: function(data) {
-                    const badge = data === 'ad' ? 'danger' : 'success';
-                    const text = data === 'ad' ? 'Advertisement' : 'Legitimate';
-                    return `<span class="badge bg-${badge}">${text}</span>`;
-                }
-            },
-            {
-                data: 'confidence',
-                defaultContent: '0',
-                render: function(data) {
-                    const value = parseFloat(data);
-                    return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
-                }
-            },
-            { data: 'total_bytes', defaultContent: '0' },
-            { data: 'total_packets', defaultContent: '0' }
-        ],
-        order: [[0, 'desc']],
-        pageLength: 25,
-        searching: true,
-        lengthChange: true
-    });
+    console.log("ML Detector: Initializing DataTables...");
+    
+    try {
+        // Destroy existing DataTables if they exist
+        if ($.fn.DataTable.isDataTable('#table_detections')) {
+            $('#table_detections').DataTable().destroy();
+        }
+        if ($.fn.DataTable.isDataTable('#table_alerts')) {
+            $('#table_alerts').DataTable().destroy();
+        }
+        
+        // Detections Table
+        window.detectionsTable = $('#table_detections').DataTable({
+            columns: [
+                { data: 'timestamp_formatted', defaultContent: 'N/A' },
+                { data: 'src_ip', defaultContent: 'N/A' },
+                { data: 'dst_ip', defaultContent: 'N/A' },
+                { data: 'dst_port', defaultContent: 'N/A' },
+                { data: 'protocol', defaultContent: 'N/A' },
+                {
+                    data: 'classification',
+                    defaultContent: 'Unknown',
+                    render: function(data) {
+                        const badge = data === 'ad' ? 'danger' : 'success';
+                        const text = data === 'ad' ? 'Advertisement' : 'Legitimate';
+                        return `<span class="badge bg-${badge}">${text}</span>`;
+                    }
+                },
+                {
+                    data: 'confidence',
+                    defaultContent: '0',
+                    render: function(data) {
+                        const value = parseFloat(data);
+                        return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
+                    }
+                },
+                { data: 'total_bytes', defaultContent: '0' },
+                { data: 'total_packets', defaultContent: '0' }
+            ],
+            order: [[0, 'desc']],
+            pageLength: 25,
+            searching: true,
+            lengthChange: true,
+            deferRender: true
+        });
+        console.log("ML Detector: Detections table initialized");
 
-    // Alerts Table
-    window.alertsTable = $('#table_alerts').DataTable({
-        columns: [
-            { data: 'timestamp_formatted', defaultContent: 'N/A' },
-            { data: 'alert_type', defaultContent: 'Unknown' },
-            {
-                data: 'severity',
-                defaultContent: 'low',
-                render: function(data) {
-                    let badge = 'info';
-                    if (data === 'high') badge = 'danger';
-                    else if (data === 'medium') badge = 'warning';
-                    return `<span class="badge bg-${badge}">${data}</span>`;
+        // Alerts Table
+        window.alertsTable = $('#table_alerts').DataTable({
+            columns: [
+                { data: 'timestamp_formatted', defaultContent: 'N/A' },
+                { data: 'alert_type', defaultContent: 'Unknown' },
+                {
+                    data: 'severity',
+                    defaultContent: 'low',
+                    render: function(data) {
+                        let badge = 'info';
+                        if (data === 'high') badge = 'danger';
+                        else if (data === 'medium') badge = 'warning';
+                        return `<span class="badge bg-${badge}">${data}</span>`;
+                    }
+                },
+                { data: 'src_ip', defaultContent: 'N/A' },
+                { data: 'description', defaultContent: 'No description' },
+                {
+                    data: 'confidence',
+                    defaultContent: '0',
+                    render: function(data) {
+                        const value = parseFloat(data);
+                        return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
+                    }
                 }
-            },
-            { data: 'src_ip', defaultContent: 'N/A' },
-            { data: 'description', defaultContent: 'No description' },
-            {
-                data: 'confidence',
-                defaultContent: '0',
-                render: function(data) {
-                    const value = parseFloat(data);
-                    return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
-                }
-            }
-        ],
-        order: [[0, 'desc']],
-        pageLength: 25,
-        searching: true,
-        lengthChange: true
-    });
+            ],
+            order: [[0, 'desc']],
+            pageLength: 25,
+            searching: true,
+            lengthChange: true,
+            deferRender: true
+        });
+        console.log("ML Detector: Alerts table initialized");
+    } catch (error) {
+        console.error("ML Detector: Error initializing tables:", error);
+    }
 }
 
 // ----------------------------------------
@@ -310,6 +326,7 @@ function loadModelInfo() {
         url: '/ml_detector/model/info',
         method: 'GET',
         success: function(response) {
+            console.log("ML Detector: Model info received:", response);
             if (response.data) {
                 const d = response.data;
                 
@@ -327,19 +344,43 @@ function loadModelInfo() {
                 $('#model_detection_window').text(d.detection_window || '-');
                 $('#model_update_frequency').text(d.update_frequency || '-');
                 
-                if (d.detection_methods && Array.isArray(d.detection_methods)) {
-                    const methodsHtml = d.detection_methods.map(m => 
+                // Parse detection_methods if it's a JSON string
+                let methods = d.detection_methods;
+                if (typeof methods === 'string') {
+                    try {
+                        methods = JSON.parse(methods);
+                    } catch (e) {
+                        console.warn("Failed to parse detection_methods:", e);
+                        methods = [];
+                    }
+                }
+                
+                if (methods && Array.isArray(methods)) {
+                    const methodsHtml = methods.map(m => 
                         `<li><i class="fa fa-check-circle text-success"></i> ${m}</li>`
                     ).join('');
                     $('#model_detection_methods').html(methodsHtml);
                 }
                 
-                if (d.features_used && Array.isArray(d.features_used)) {
-                    const featuresHtml = d.features_used.map(f => 
+                // Parse features_used if it's a JSON string
+                let features = d.features_used;
+                if (typeof features === 'string') {
+                    try {
+                        features = JSON.parse(features);
+                    } catch (e) {
+                        console.warn("Failed to parse features_used:", e);
+                        features = [];
+                    }
+                }
+                
+                if (features && Array.isArray(features)) {
+                    const featuresHtml = features.map(f => 
                         `<li class="list-group-item py-1 small"><i class="fa fa-cog text-primary"></i> ${f}</li>`
                     ).join('');
                     $('#model_features_list').html(featuresHtml);
                 }
+                
+                console.log("ML Detector: Model info populated successfully");
             }
         },
         error: function(xhr, status, error) {
