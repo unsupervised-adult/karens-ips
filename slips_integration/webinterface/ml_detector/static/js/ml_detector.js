@@ -253,39 +253,49 @@ function initializeTables() {
         });
         console.log("ML Detector: Detections table initialized");
 
-        // Alerts Table
-        window.alertsTable = $('#table_alerts').DataTable({
-            columns: [
-                { data: 'timestamp_formatted', defaultContent: 'N/A' },
-                { data: 'alert_type', defaultContent: 'Unknown' },
-                {
-                    data: 'severity',
-                    defaultContent: 'low',
-                    render: function(data) {
-                        let badge = 'info';
-                        if (data === 'high') badge = 'danger';
-                        else if (data === 'medium') badge = 'warning';
-                        return `<span class="badge bg-${badge}">${data}</span>`;
-                    }
-                },
-                { data: 'src_ip', defaultContent: 'N/A' },
-                { data: 'description', defaultContent: 'No description' },
-                {
-                    data: 'confidence',
-                    defaultContent: '0',
-                    render: function(data) {
-                        const value = parseFloat(data);
-                        return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
-                    }
+        // Initialize alerts table when its tab is shown
+        $('#alerts-tab').one('shown.bs.tab', function() {
+            if (!window.alertsTable && $('#table_alerts').is(':visible')) {
+                console.log("ML Detector: Initializing alerts table...");
+                try {
+                    window.alertsTable = $('#table_alerts').DataTable({
+                        columns: [
+                            { data: 'timestamp_formatted', defaultContent: 'N/A' },
+                            { data: 'alert_type', defaultContent: 'Unknown' },
+                            {
+                                data: 'severity',
+                                defaultContent: 'low',
+                                render: function(data) {
+                                    let badge = 'info';
+                                    if (data === 'high') badge = 'danger';
+                                    else if (data === 'medium') badge = 'warning';
+                                    return `<span class="badge bg-${badge}">${data}</span>`;
+                                }
+                            },
+                            { data: 'src_ip', defaultContent: 'N/A' },
+                            { data: 'description', defaultContent: 'No description' },
+                            {
+                                data: 'confidence',
+                                defaultContent: '0',
+                                render: function(data) {
+                                    const value = parseFloat(data);
+                                    return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
+                                }
+                            }
+                        ],
+                        order: [[0, 'desc']],
+                        pageLength: 25,
+                        searching: true,
+                        lengthChange: true,
+                        deferRender: true
+                    });
+                    console.log("ML Detector: Alerts table initialized");
+                    loadAlerts();
+                } catch (error) {
+                    console.error("ML Detector: Error initializing alerts table:", error);
                 }
-            ],
-            order: [[0, 'desc']],
-            pageLength: 25,
-            searching: true,
-            lengthChange: true,
-            deferRender: true
+            }
         });
-        console.log("ML Detector: Alerts table initialized");
     } catch (error) {
         console.error("ML Detector: Error initializing tables:", error);
     }
@@ -407,6 +417,11 @@ function loadDetections() {
 }
 
 function loadAlerts() {
+    // Only load if alerts table is initialized
+    if (!window.alertsTable) {
+        return;
+    }
+    
     $.ajax({
         url: '/ml_detector/alerts',
         method: 'GET',
