@@ -58,13 +58,14 @@ def analyze_video_ads():
             ad_detections.append({
                 'timestamp': datetime.now().isoformat(),
                 'timestamp_formatted': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'domain': domain,
+                'src_ip': '10.10.x.x',
                 'dst_ip': dst_ip,
-                'protocol': 'HTTPS/443',
-                'classification': 'ad_domain',
+                'dst_port': 443,
+                'protocol': 'HTTPS',
+                'classification': f'Ad: {domain}',
                 'confidence': 0.92,
-                'action': 'detected',
-                'category': 'Advertisement/Tracking'
+                'bytes': 0,
+                'packets': 0
             })
     
     profiles = r.keys('profile_*')
