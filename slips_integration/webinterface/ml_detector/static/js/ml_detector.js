@@ -242,8 +242,8 @@ function initializeTables() {
                         return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
                     }
                 },
-                { data: 'total_bytes', defaultContent: '0' },
-                { data: 'total_packets', defaultContent: '0' }
+                { data: 'bytes', defaultContent: '0' },
+                { data: 'packets', defaultContent: '0' }
             ],
             order: [[0, 'desc']],
             pageLength: 25,

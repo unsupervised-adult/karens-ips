@@ -122,20 +122,33 @@ def get_recent_detections():
     try:
         r = get_redis_connection()
         if not r:
+            logger.error("DEBUG: No Redis connection!")
             return jsonify({"data": []})
         
-        if r.exists('ml_detector:recent_detections'):
+        exists = r.exists('ml_detector:recent_detections')
+        print(f"🔍 DEBUG: ml_detector:recent_detections exists={exists}", flush=True)
+        if exists:
             detection_count = r.llen('ml_detector:recent_detections')
             raw_detections = r.lrange('ml_detector:recent_detections', 0, 99)
+            print(f"🔍 DEBUG: Got {len(raw_detections)} raw detections from Redis", flush=True)
             
             detections = []
-            for raw in raw_detections:
+            for i, raw in enumerate(raw_detections[:3]):
+                try:
+                    det = json.loads(raw)
+                    print(f"🔍 DEBUG: Detection {i} timestamp_formatted={det.get('timestamp_formatted')}", flush=True)
+                    detections.append(det)
+                except Exception as e:
+                    print(f"❌ DEBUG: Failed to parse detection {i}: {e}", flush=True)
+            
+            for raw in raw_detections[3:]:
                 try:
                     det = json.loads(raw)
                     detections.append(det)
                 except:
                     pass
             
+            print(f"✅ DEBUG: Returning {len(detections)} detections", flush=True)
             return jsonify({"data": detections})
         
         profiles = r.keys('profile_*')
