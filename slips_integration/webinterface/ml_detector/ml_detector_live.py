@@ -78,14 +78,18 @@ def index():
 
 @ml_detector.route("/stats")
 def get_stats():
-    """Get real ML detector statistics"""
+    """Get real ML detector statistics from Redis"""
     try:
+        r = get_redis_connection()
+        if r and r.exists('ml_detector:stats'):
+            stats = r.hgetall('ml_detector:stats')
+            return jsonify({"data": stats})
+        
         data = get_profiles_data()
         total = data["total"]
         malicious = data["malicious"]
         legitimate = data["benign"]
         
-        # Calculate accuracy based on threat level distribution
         threat_levels = data["threat_levels"]
         accuracy = 94.2 if total > 0 else 0
         
@@ -114,21 +118,33 @@ def get_stats():
 
 @ml_detector.route("/detections/recent")
 def get_recent_detections():
-    """Get recent ad detections with live data from Redis"""
+    """Get recent ad detections from Redis analyzer data"""
     try:
         r = get_redis_connection()
         if not r:
             return jsonify({"data": []})
         
+        if r.exists('ml_detector:recent_detections'):
+            detection_count = r.llen('ml_detector:recent_detections')
+            raw_detections = r.lrange('ml_detector:recent_detections', 0, 99)
+            
+            detections = []
+            for raw in raw_detections:
+                try:
+                    det = json.loads(raw)
+                    detections.append(det)
+                except:
+                    pass
+            
+            return jsonify({"data": detections})
+        
         profiles = r.keys('profile_*')
         detections = []
         
-        # Get threat-level profiles as detections
-        for profile in profiles[-10:]:  # Last 10 profiles
+        for profile in profiles[-10:]:
             try:
                 threat_level = r.hget(profile, 'threat_level')
                 if threat_level and threat_level.lower() in ['high', 'medium']:
-                    # Extract IP from profile key (format: profile_X.X.X.X)
                     ip = profile.replace('profile_', '')
                     detection = {
                         "timestamp": datetime.now().isoformat(),
