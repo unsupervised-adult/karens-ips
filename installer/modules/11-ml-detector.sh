@@ -70,7 +70,7 @@ install_ml_detector_dashboard() {
     log "Training System:"
     log "  - DNS Labeler: sudo systemctl start dns-labeler"
     log "  - Auto Labeler: sudo systemctl start auto-labeler"
-    log "  - Blocklist DB: /var/lib/karens-ips/blocklists.db"
+    log "  - Blocklist DB: /var/lib/suricata/ips_filter.db (336K+ domains)"
     log ""
     log "Redis keys used by ML Detector:"
     log "  - ml_detector:stats"
@@ -266,7 +266,7 @@ install_dns_labeler() {
     if [ -f "$karens_ips_dir/slips_integration/dns_blocklist_labeler.py" ]; then
         cp "$karens_ips_dir/slips_integration/dns_blocklist_labeler.py" "$SLIPS_DIR/slips_integration/"
         chmod +x "$SLIPS_DIR/slips_integration/dns_blocklist_labeler.py"
-        success "DNS labeler installed"
+        success "DNS labeler installed (uses Suricata blocklist DB)"
     else
         warn "DNS labeler not found, skipping"
         return 0

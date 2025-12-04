@@ -37,7 +37,7 @@ class DNSBlocklistLabeler:
     Automatic traffic labeling using DNS blocklists from existing SQLite database
     """
     
-    def __init__(self, db_path='/var/lib/karens-ips/blocklists.db'):
+    def __init__(self, db_path='/var/lib/suricata/ips_filter.db'):
         self.db_path = db_path
         self.ad_domains = set()
         self.tracking_domains = set()
@@ -97,8 +97,8 @@ class DNSBlocklistLabeler:
             self.db_conn = sqlite3.connect(':memory:')
     
     def load_blocklists(self):
-        """Load DNS blocklists from SQLite database created by installer"""
-        print("\n📋 Loading DNS blocklists from database...")
+        """Load DNS blocklists from Suricata SQLite database created by installer"""
+        print("\n📋 Loading DNS blocklists from Suricata database...")
         
         try:
             cursor = self.db_conn.cursor()
@@ -108,14 +108,13 @@ class DNSBlocklistLabeler:
             print(f"  Found {len(tables)} tables: {[t[0] for t in tables]}")
             
             cursor.execute("""
-                SELECT bd.domain, bd.category, bs.name, bd.confidence
-                FROM blocked_domains bd
-                JOIN blocklist_sources bs ON bd.source_id = bs.id
-                WHERE bs.enabled = 1
+                SELECT domain, category, source, blocked
+                FROM domains
+                WHERE blocked = 1
             """)
             rows = cursor.fetchall()
             
-            for domain, category, source_name, confidence in rows:
+            for domain, category, source_name, blocked in rows:
                 domain_lower = domain.lower()
                 
                 if category in ('ads', 'advertising'):
@@ -124,6 +123,8 @@ class DNSBlocklistLabeler:
                     self.tracking_domains.add(domain_lower)
                 elif category == 'malware':
                     self.malware_domains.add(domain_lower)
+                else:
+                    self.ad_domains.add(domain_lower)
             
             print(f"\n📊 Blocklist Summary:")
             print(f"  Ad domains:       {len(self.ad_domains):,}")
