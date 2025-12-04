@@ -402,10 +402,22 @@ def get_model_info():
                 "update_frequency": "Real-time (sub-second latency)"
             }
         else:
-            # Decode bytes to strings if needed
-            model_info = {k.decode() if isinstance(k, bytes) else k:
-                         v.decode() if isinstance(v, bytes) else v
-                         for k, v in model_info.items()}
+            # Decode bytes to strings if needed and parse JSON arrays
+            decoded_info = {}
+            for k, v in model_info.items():
+                key = k.decode() if isinstance(k, bytes) else k
+                value = v.decode() if isinstance(v, bytes) else v
+                
+                # Try to parse JSON strings (for lists like features_used, detection_methods)
+                if isinstance(value, str) and value.startswith('['):
+                    try:
+                        value = json.loads(value)
+                    except json.JSONDecodeError:
+                        pass
+                
+                decoded_info[key] = value
+            
+            model_info = decoded_info
 
         return jsonify({"data": model_info})
     except Exception as e:
