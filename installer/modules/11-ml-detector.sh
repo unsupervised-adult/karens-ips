@@ -57,10 +57,20 @@ install_ml_detector_dashboard() {
     # Install additional dependencies
     install_ml_detector_dependencies "$karens_ips_dir"
 
+    # Install DNS blocklist labeler and training system
+    install_dns_labeler "$karens_ips_dir"
+    install_auto_labeler "$karens_ips_dir"
+    install_training_scripts "$karens_ips_dir"
+
     success "ML Detector Dashboard installed successfully!"
     log ""
     log "The ML Detector Dashboard will be available at:"
     log "  http://[SLIPS-IP]:55000 -> Click 'ML Detector' tab"
+    log ""
+    log "Training System:"
+    log "  - DNS Labeler: sudo systemctl start dns-labeler"
+    log "  - Auto Labeler: sudo systemctl start auto-labeler"
+    log "  - Blocklist DB: /var/lib/karens-ips/blocklists.db"
     log ""
     log "Redis keys used by ML Detector:"
     log "  - ml_detector:stats"
@@ -69,6 +79,7 @@ install_ml_detector_dashboard() {
     log "  - ml_detector:model_info"
     log "  - ml_detector:feature_importance"
     log "  - ml_detector:alerts"
+    log "  - ml_detector:training_data"
     log ""
 }
 
@@ -243,6 +254,83 @@ verify_ml_detector() {
     fi
 }
 
+install_dns_labeler() {
+    local karens_ips_dir="$1"
+
+    log "Installing DNS blocklist labeler..."
+
+    # Create integration directory in SLIPS
+    mkdir -p "$SLIPS_DIR/slips_integration"
+
+    # Copy DNS labeler script
+    if [ -f "$karens_ips_dir/slips_integration/dns_blocklist_labeler.py" ]; then
+        cp "$karens_ips_dir/slips_integration/dns_blocklist_labeler.py" "$SLIPS_DIR/slips_integration/"
+        chmod +x "$SLIPS_DIR/slips_integration/dns_blocklist_labeler.py"
+        success "DNS labeler installed"
+    else
+        warn "DNS labeler not found, skipping"
+        return 0
+    fi
+
+    # Install systemd service
+    if [ -f "$karens_ips_dir/slips_integration/dns-labeler.service" ]; then
+        cp "$karens_ips_dir/slips_integration/dns-labeler.service" /etc/systemd/system/
+        systemctl daemon-reload
+        systemctl enable dns-labeler.service
+        success "DNS labeler service installed and enabled"
+    fi
+}
+
+install_auto_labeler() {
+    local karens_ips_dir="$1"
+
+    log "Installing behavioral auto-labeler..."
+
+    # Copy auto-labeler script
+    if [ -f "$karens_ips_dir/slips_integration/auto_label_traffic.py" ]; then
+        cp "$karens_ips_dir/slips_integration/auto_label_traffic.py" "$SLIPS_DIR/slips_integration/"
+        chmod +x "$SLIPS_DIR/slips_integration/auto_label_traffic.py"
+        success "Auto-labeler installed"
+    else
+        warn "Auto-labeler not found, skipping"
+        return 0
+    fi
+
+    # Install systemd service
+    if [ -f "$karens_ips_dir/slips_integration/auto-labeler.service" ]; then
+        cp "$karens_ips_dir/slips_integration/auto-labeler.service" /etc/systemd/system/
+        systemctl daemon-reload
+        systemctl enable auto-labeler.service
+        success "Auto-labeler service installed and enabled"
+    fi
+}
+
+install_training_scripts() {
+    local karens_ips_dir="$1"
+
+    log "Installing ML training scripts..."
+
+    # Copy training scripts to webinterface/ml_detector
+    local ml_detector_dest="$SLIPS_DIR/webinterface/ml_detector"
+
+    if [ -f "$karens_ips_dir/slips_integration/webinterface/ml_detector/train_model.py" ]; then
+        # Already copied with blueprint
+        success "Training scripts already installed with ML Detector blueprint"
+    else
+        warn "Training scripts not found"
+    fi
+
+    # Create models directory
+    mkdir -p "$ml_detector_dest/models"
+    chmod 755 "$ml_detector_dest/models"
+
+    # Create detector config
+    if [ -f "$karens_ips_dir/slips_integration/detector_config.json" ]; then
+        cp "$karens_ips_dir/slips_integration/detector_config.json" "$ml_detector_dest/"
+        success "Detector config installed"
+    fi
+}
+
 # Export functions
 export -f install_ml_detector_dashboard
 export -f check_slips_installed
@@ -253,4 +341,7 @@ export -f install_app_py
 export -f install_app_html
 export -f set_ml_detector_permissions
 export -f install_ml_detector_dependencies
+export -f install_dns_labeler
+export -f install_auto_labeler
+export -f install_training_scripts
 export -f verify_ml_detector
