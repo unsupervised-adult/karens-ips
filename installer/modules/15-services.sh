@@ -204,6 +204,30 @@ start_ips_filter_web() {
     fi
 }
 
+start_ml_detector_services() {
+    log "Starting ML Detector labeling services..."
+
+    if [[ -f /etc/systemd/system/dns-labeler.service ]]; then
+        if systemctl start dns-labeler.service 2>/dev/null; then
+            log "DNS labeler service started"
+        else
+            log "DNS labeler service failed to start"
+        fi
+    else
+        log "DNS labeler service not installed (optional)"
+    fi
+
+    if [[ -f /etc/systemd/system/auto-labeler.service ]]; then
+        if systemctl start auto-labeler.service 2>/dev/null; then
+            log "Auto-labeler service started"
+        else
+            log "Auto-labeler service failed to start"
+        fi
+    else
+        log "Auto-labeler service not installed (optional)"
+    fi
+}
+
 start_services() {
     log_subsection "Starting IPS Services"
 
@@ -223,6 +247,7 @@ start_services() {
     start_slips
     start_slips_webui
     start_ips_filter_web
+    start_ml_detector_services
 
     success "All services started successfully"
 }
