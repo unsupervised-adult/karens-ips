@@ -1,0 +1,17 @@
+[Unit]
+Description=ML Ad Detector Auto Traffic Labeler
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/ficus/Documents/Project-Code/IPS/karens-ips
+Environment="PYTHONPATH=/home/ficus/Documents/Project-Code/IPS/karens-ips"
+ExecStart=/usr/bin/python3 slips_integration/auto_label_traffic.py --continuous
+Restart=always
+RestartSec=10
+StandardOutput=append:/tmp/auto_labeler.log
+StandardError=append:/tmp/auto_labeler.log
+
+[Install]
+WantedBy=multi-user.target

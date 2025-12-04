@@ -1,0 +1,20 @@
+[Unit]
+Description=SLIPS Real-time Stream Ad Monitor
+After=network.target redis.service slips.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/StratosphereLinuxIPS/webinterface/ml_detector
+ExecStart=/usr/bin/python3 -u /opt/StratosphereLinuxIPS/webinterface/ml_detector/realtime_stream_monitor.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=stream-monitor
+
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
