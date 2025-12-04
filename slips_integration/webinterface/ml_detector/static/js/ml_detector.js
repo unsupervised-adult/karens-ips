@@ -229,9 +229,9 @@ function initializeTables() {
                     data: 'classification',
                     defaultContent: 'Unknown',
                     render: function(data) {
-                        const badge = data === 'ad' ? 'danger' : 'success';
-                        const text = data === 'ad' ? 'Advertisement' : 'Legitimate';
-                        return `<span class="badge bg-${badge}">${text}</span>`;
+                        const isAd = data && (data.toLowerCase().includes('ad') || data === 'ad');
+                        const badge = isAd ? 'danger' : 'success';
+                        return `<span class="badge bg-${badge}">${data || 'Unknown'}</span>`;
                     }
                 },
                 {
