@@ -1,0 +1,18 @@
+[Unit]
+Description=DNS Blocklist Traffic Labeler
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/ficus/Documents/Project-Code/IPS/karens-ips/slips_integration
+Environment="PYTHONPATH=/home/ficus/Documents/Project-Code/IPS/karens-ips"
+ExecStart=/usr/bin/python3 dns_blocklist_labeler.py --continuous --interval 300
+Restart=always
+RestartSec=10
+StandardOutput=append:/tmp/dns_labeler.log
+StandardError=append:/tmp/dns_labeler.log
+
+[Install]
+WantedBy=multi-user.target

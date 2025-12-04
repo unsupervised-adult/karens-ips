@@ -36,6 +36,44 @@ def ts_to_date(ts, seconds=False):
 # ----------------------------------------
 # ROUTE FUNCTIONS
 # ----------------------------------------
+@ml_detector.route("/config", methods=["GET"])
+def get_config():
+    """Get current detector configuration"""
+    try:
+        import os
+        config_path = os.path.join(os.path.dirname(__file__), 'detector_config.json')
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            return jsonify({"status": "success", "config": config})
+        else:
+            return jsonify({"status": "error", "message": "Config file not found"}), 404
+    except Exception as e:
+        logger.error(f"Error loading config: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@ml_detector.route("/config", methods=["POST"])
+def update_config():
+    """Update detector configuration"""
+    try:
+        from flask import request
+        import os
+        
+        config_path = os.path.join(os.path.dirname(__file__), 'detector_config.json')
+        new_config = request.get_json()
+        
+        with open(config_path, 'w') as f:
+            json.dump(new_config, f, indent=2)
+        
+        return jsonify({
+            "status": "success", 
+            "message": "Configuration updated. Restart stream-monitor service to apply changes."
+        })
+    except Exception as e:
+        logger.error(f"Error updating config: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @ml_detector.route("/stats")
 def get_stats():
     """
@@ -85,6 +123,167 @@ def get_stats():
             "last_update": "System startup"
         }
         return jsonify({"data": demo_stats})
+
+
+@ml_detector.route("/settings")
+def get_settings():
+    """Get current detector configuration"""
+    try:
+        import os
+        config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'detector_config.json')
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            return jsonify(config)
+        else:
+            return jsonify({
+                "detection_thresholds": {
+                    "streaming_min_duration": 120.0,
+                    "ad_duration_min": 5.0,
+                    "ad_duration_max": 120.0,
+                    "streaming_min_bytes": 15000,
+                    "streaming_min_packets": 20,
+                    "ad_min_bytes": 5000,
+                    "duration_ratio_threshold": 0.3,
+                    "confidence_threshold": 0.75
+                },
+                "protocol_detection": {
+                    "enable_quic_detection": True,
+                    "enable_encrypted_analysis": True,
+                    "analyze_timing_patterns": True,
+                    "analyze_packet_sizes": True
+                },
+                "ml_parameters": {
+                    "n_estimators": 100,
+                    "max_depth": 15,
+                    "model_type": "random_forest"
+                },
+                "feature_weights": {
+                    "timing_importance": 2.0,
+                    "size_importance": 1.2
+                }
+            })
+    except Exception as e:
+        logger.error(f"Error loading settings: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ml_detector.route("/settings", methods=["POST"])
+def update_settings():
+    """Update detector configuration and restart monitor service"""
+    try:
+        from flask import request
+        import os
+        import subprocess
+        
+        config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'detector_config.json')
+        new_config = request.get_json()
+        
+        with open(config_path, 'w') as f:
+            json.dump(new_config, f, indent=2)
+        
+        try:
+            subprocess.run(['sudo', 'systemctl', 'restart', 'stream-monitor'], check=True)
+            return jsonify({"success": True, "message": "Configuration saved and monitor restarted"})
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Failed to restart service: {e}")
+            return jsonify({"success": True, "message": "Configuration saved. Restart stream-monitor manually.", "warning": str(e)})
+        
+    except Exception as e:
+        logger.error(f"Error updating settings: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/settings/preset/<preset_name>", methods=["POST"])
+def apply_preset(preset_name):
+    """Apply a preset configuration"""
+    try:
+        import os
+        import subprocess
+        
+        presets = {
+            "aggressive": {
+                "detection_thresholds": {
+                    "streaming_min_duration": 90.0,
+                    "ad_duration_min": 3.0,
+                    "ad_duration_max": 150.0,
+                    "streaming_min_bytes": 10000,
+                    "streaming_min_packets": 15,
+                    "ad_min_bytes": 3000,
+                    "duration_ratio_threshold": 0.4,
+                    "confidence_threshold": 0.6
+                }
+            },
+            "conservative": {
+                "detection_thresholds": {
+                    "streaming_min_duration": 150.0,
+                    "ad_duration_min": 8.0,
+                    "ad_duration_max": 90.0,
+                    "streaming_min_bytes": 20000,
+                    "streaming_min_packets": 30,
+                    "ad_min_bytes": 8000,
+                    "duration_ratio_threshold": 0.2,
+                    "confidence_threshold": 0.85
+                }
+            },
+            "short_videos": {
+                "detection_thresholds": {
+                    "streaming_min_duration": 60.0,
+                    "ad_duration_min": 3.0,
+                    "ad_duration_max": 30.0,
+                    "streaming_min_bytes": 8000,
+                    "streaming_min_packets": 10,
+                    "ad_min_bytes": 3000,
+                    "duration_ratio_threshold": 0.35,
+                    "confidence_threshold": 0.7
+                }
+            },
+            "quic_optimized": {
+                "protocol_detection": {
+                    "enable_quic_detection": True,
+                    "enable_encrypted_analysis": True,
+                    "analyze_timing_patterns": True,
+                    "analyze_packet_sizes": True
+                },
+                "feature_weights": {
+                    "timing_importance": 2.5,
+                    "size_importance": 1.5
+                }
+            }
+        }
+        
+        if preset_name not in presets:
+            return jsonify({"success": False, "error": "Unknown preset"}), 400
+        
+        config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'detector_config.json')
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                current_config = json.load(f)
+        else:
+            current_config = {}
+        
+        preset_config = presets[preset_name]
+        for key, value in preset_config.items():
+            if key in current_config and isinstance(value, dict):
+                current_config[key].update(value)
+            else:
+                current_config[key] = value
+        
+        with open(config_path, 'w') as f:
+            json.dump(current_config, f, indent=2)
+        
+        try:
+            subprocess.run(['sudo', 'systemctl', 'restart', 'stream-monitor'], check=True)
+            return jsonify({"success": True, "message": f"{preset_name} preset applied and monitor restarted"})
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Failed to restart service: {e}")
+            return jsonify({"success": True, "message": f"{preset_name} preset applied. Restart stream-monitor manually."})
+        
+    except Exception as e:
+        logger.error(f"Error applying preset: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @ml_detector.route("/detections/recent")

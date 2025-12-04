@@ -188,6 +188,12 @@
             Alerts
           </button>
         </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="settings-tab" data-bs-toggle="tab"
+                  data-bs-target="#settings" type="button" role="tab">
+            <i class="bi bi-gear"></i> Settings
+          </button>
+        </li>
       </ul>
 
       <div class="tab-content" id="mlDetectorTabContent">
@@ -234,6 +240,253 @@
                 <tbody>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div class="tab-pane fade" id="settings" role="tabpanel">
+          <div class="card mt-3">
+            <div class="card-header bg-primary text-white">
+              <h5><i class="bi bi-gear"></i> Detection Settings</h5>
+              <p class="mb-0 small">Adjust detection thresholds and model parameters</p>
+            </div>
+            <div class="card-body">
+              
+              <!-- Save/Reset Buttons -->
+              <div class="row mb-3">
+                <div class="col-12">
+                  <button id="btn_save_config" class="btn btn-success me-2">
+                    <i class="bi bi-check-circle"></i> Save Configuration
+                  </button>
+                  <button id="btn_reset_config" class="btn btn-warning me-2">
+                    <i class="bi bi-arrow-clockwise"></i> Reset to Defaults
+                  </button>
+                  <button id="btn_restart_service" class="btn btn-info">
+                    <i class="bi bi-arrow-repeat"></i> Restart Monitor Service
+                  </button>
+                  <div id="config_status" class="mt-2"></div>
+                </div>
+              </div>
+
+              <!-- Duration Thresholds -->
+              <div class="row mb-4">
+                <div class="col-12">
+                  <h6 class="text-primary border-bottom pb-2">⏱️ Duration Thresholds (seconds)</h6>
+                </div>
+                <div class="col-md-4">
+                  <label for="streaming_min_duration" class="form-label">
+                    Content Minimum Duration
+                    <small class="text-muted">(videos shorter than this ignored)</small>
+                  </label>
+                  <input type="number" class="form-control" id="streaming_min_duration" min="10" max="600" step="10">
+                </div>
+                <div class="col-md-4">
+                  <label for="ad_duration_min" class="form-label">
+                    Ad Minimum Duration
+                    <small class="text-muted">(flows shorter ignored)</small>
+                  </label>
+                  <input type="number" class="form-control" id="ad_duration_min" min="1" max="30" step="1">
+                </div>
+                <div class="col-md-4">
+                  <label for="ad_duration_max" class="form-label">
+                    Ad Maximum Duration
+                    <small class="text-muted">(ads longer = false positive)</small>
+                  </label>
+                  <input type="number" class="form-control" id="ad_duration_max" min="10" max="300" step="10">
+                </div>
+              </div>
+
+              <!-- Size Thresholds -->
+              <div class="row mb-4">
+                <div class="col-12">
+                  <h6 class="text-primary border-bottom pb-2">📦 Size Thresholds (bytes)</h6>
+                </div>
+                <div class="col-md-4">
+                  <label for="streaming_min_bytes" class="form-label">
+                    Content Minimum Bytes
+                  </label>
+                  <input type="number" class="form-control" id="streaming_min_bytes" min="1000" max="100000" step="1000">
+                </div>
+                <div class="col-md-4">
+                  <label for="streaming_min_packets" class="form-label">
+                    Content Minimum Packets
+                  </label>
+                  <input type="number" class="form-control" id="streaming_min_packets" min="10" max="200" step="10">
+                </div>
+                <div class="col-md-4">
+                  <label for="ad_min_bytes" class="form-label">
+                    Ad Minimum Bytes
+                  </label>
+                  <input type="number" class="form-control" id="ad_min_bytes" min="1000" max="50000" step="1000">
+                </div>
+              </div>
+
+              <!-- Detection Sensitivity -->
+              <div class="row mb-4">
+                <div class="col-12">
+                  <h6 class="text-primary border-bottom pb-2">🎯 Detection Sensitivity</h6>
+                </div>
+                <div class="col-md-6">
+                  <label for="duration_ratio_threshold" class="form-label">
+                    Duration Ratio Threshold
+                    <small class="text-muted">(ad must be &lt; X% of content)</small>
+                  </label>
+                  <input type="range" class="form-range" id="duration_ratio_threshold" min="0.1" max="0.5" step="0.05">
+                  <div class="text-center" id="duration_ratio_value">30%</div>
+                </div>
+                <div class="col-md-6">
+                  <label for="confidence_threshold" class="form-label">
+                    Confidence Threshold
+                    <small class="text-muted">(minimum to report)</small>
+                  </label>
+                  <input type="range" class="form-range" id="confidence_threshold" min="0.5" max="0.95" step="0.05">
+                  <div class="text-center" id="confidence_value">75%</div>
+                </div>
+              </div>
+
+              <!-- Protocol Settings -->
+              <div class="row mb-4">
+                <div class="col-12">
+                  <h6 class="text-primary border-bottom pb-2">🔐 Protocol & Analysis</h6>
+                </div>
+                <div class="col-md-3">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="enable_quic_detection">
+                    <label class="form-check-label" for="enable_quic_detection">
+                      QUIC Detection
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="enable_encrypted_analysis">
+                    <label class="form-check-label" for="enable_encrypted_analysis">
+                      Encrypted Analysis
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="analyze_timing_patterns">
+                    <label class="form-check-label" for="analyze_timing_patterns">
+                      Timing Patterns
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="analyze_packet_sizes">
+                    <label class="form-check-label" for="analyze_packet_sizes">
+                      Packet Sizes
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ML Parameters -->
+              <div class="row mb-4">
+                <div class="col-12">
+                  <h6 class="text-primary border-bottom pb-2">🤖 ML Model Parameters</h6>
+                </div>
+                <div class="col-md-3">
+                  <label for="n_estimators" class="form-label">
+                    Number of Estimators
+                    <small class="text-muted">(trees in forest)</small>
+                  </label>
+                  <input type="number" class="form-control" id="n_estimators" min="50" max="200" step="10">
+                </div>
+                <div class="col-md-3">
+                  <label for="max_depth" class="form-label">
+                    Maximum Tree Depth
+                  </label>
+                  <input type="number" class="form-control" id="max_depth" min="5" max="30" step="5">
+                </div>
+                <div class="col-md-3">
+                  <label for="model_type_select" class="form-label">
+                    Model Type
+                  </label>
+                  <select class="form-select" id="model_type_select" aria-label="Machine learning model type selection">
+                    <option value="random_forest">Random Forest</option>
+                    <option value="gradient_boosting">Gradient Boosting</option>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label for="cpu_cores" class="form-label">
+                    CPU Cores
+                    <small class="text-muted">(-1 = all)</small>
+                  </label>
+                  <input type="number" class="form-control" id="cpu_cores" min="-1" max="64" step="1">
+                </div>
+              </div>
+
+              <!-- Training Settings -->
+              <div class="row mb-4">
+                <div class="col-12">
+                  <h6 class="text-primary border-bottom pb-2">📚 Training Configuration</h6>
+                </div>
+                <div class="col-md-3">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="auto_retrain">
+                    <label class="form-check-label" for="auto_retrain">
+                      Auto Retrain
+                    </label>
+                  </div>
+                  <small class="text-muted">Periodically retrain model</small>
+                </div>
+                <div class="col-md-3">
+                  <label for="retrain_interval" class="form-label">
+                    Retrain Interval (hours)
+                  </label>
+                  <input type="number" class="form-control" id="retrain_interval" min="1" max="168" step="1">
+                </div>
+                <div class="col-md-3">
+                  <label for="min_training_samples" class="form-label">
+                    Min Training Samples
+                  </label>
+                  <input type="number" class="form-control" id="min_training_samples" min="50" max="1000" step="50">
+                </div>
+                <div class="col-md-3">
+                  <div class="form-check form-switch mt-4">
+                    <input class="form-check-input" type="checkbox" id="cache_predictions">
+                    <label class="form-check-label" for="cache_predictions">
+                      Cache Predictions
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick Presets -->
+              <div class="row">
+                <div class="col-12">
+                  <h6 class="text-primary border-bottom pb-2">⚡ Quick Presets</h6>
+                </div>
+                <div class="col-md-3">
+                  <button class="btn btn-outline-primary w-100 mb-2" id="preset_aggressive">
+                    <i class="bi bi-lightning"></i> More Sensitive
+                  </button>
+                  <small class="text-muted">Catch more ads (more false positives)</small>
+                </div>
+                <div class="col-md-3">
+                  <button class="btn btn-outline-success w-100 mb-2" id="preset_conservative">
+                    <i class="bi bi-shield-check"></i> Less Sensitive
+                  </button>
+                  <small class="text-muted">Fewer false positives (miss some ads)</small>
+                </div>
+                <div class="col-md-3">
+                  <button class="btn btn-outline-info w-100 mb-2" id="preset_short_videos">
+                    <i class="bi bi-clock"></i> Short Videos
+                  </button>
+                  <small class="text-muted">TikTok, Shorts (1min+ content)</small>
+                </div>
+                <div class="col-md-3">
+                  <button class="btn btn-outline-warning w-100 mb-2" id="preset_quic">
+                    <i class="bi bi-lock"></i> QUIC Optimized
+                  </button>
+                  <small class="text-muted">Encrypted traffic (timing focus)</small>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>

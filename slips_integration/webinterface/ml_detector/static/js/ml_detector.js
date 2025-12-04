@@ -480,3 +480,192 @@ function loadFeatureImportance() {
     });
 }
 
+let currentConfig = {};
+
+function loadSettings() {
+    $.ajax({
+        url: '/ml_detector/settings',
+        method: 'GET',
+        success: function(config) {
+            currentConfig = config;
+            populateForm(config);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading settings:', error);
+            showStatus('Failed to load settings', 'danger');
+        }
+    });
+}
+
+function populateForm(config) {
+    const dt = config.detection_thresholds || {};
+    const pd = config.protocol_detection || {};
+    const ml = config.ml_parameters || {};
+    
+    $('#streaming_min_duration').val(dt.streaming_min_duration || 120);
+    $('#ad_duration_min').val(dt.ad_duration_min || 5);
+    $('#ad_duration_max').val(dt.ad_duration_max || 120);
+    
+    $('#streaming_min_bytes').val(dt.streaming_min_bytes || 15000);
+    $('#streaming_min_packets').val(dt.streaming_min_packets || 20);
+    $('#ad_min_bytes').val(dt.ad_min_bytes || 5000);
+    
+    const durationRatio = dt.duration_ratio_threshold || 0.3;
+    $('#duration_ratio_threshold').val(durationRatio);
+    $('#duration_ratio_value').text(Math.round(durationRatio * 100) + '%');
+    
+    const confidence = dt.confidence_threshold || 0.75;
+    $('#confidence_threshold').val(confidence);
+    $('#confidence_value').text(Math.round(confidence * 100) + '%');
+    
+    $('#enable_quic_detection').prop('checked', pd.enable_quic_detection !== false);
+    $('#enable_encrypted_analysis').prop('checked', pd.enable_encrypted_analysis !== false);
+    $('#analyze_timing_patterns').prop('checked', pd.analyze_timing_patterns !== false);
+    $('#analyze_packet_sizes').prop('checked', pd.analyze_packet_sizes !== false);
+    
+    $('#n_estimators').val(ml.n_estimators || 100);
+    $('#max_depth').val(ml.max_depth || 15);
+    $('#model_type_select').val(ml.model_type || 'random_forest');
+    $('#cpu_cores').val(ml.n_jobs || -1);
+    $('#auto_retrain').prop('checked', ml.auto_retrain || false);
+    $('#retrain_interval').val(ml.retrain_interval_hours || 24);
+    $('#min_training_samples').val(ml.min_samples_for_training || 100);
+    
+    const perf = config.performance || {};
+    $('#cache_predictions').prop('checked', perf.cache_predictions !== false);
+}
+
+$('#duration_ratio_threshold').on('input', function() {
+    $('#duration_ratio_value').text(Math.round($(this).val() * 100) + '%');
+});
+
+$('#confidence_threshold').on('input', function() {
+    $('#confidence_value').text(Math.round($(this).val() * 100) + '%');
+});
+
+function saveSettings() {
+    const config = {
+        detection_thresholds: {
+            streaming_min_duration: parseFloat($('#streaming_min_duration').val()),
+            ad_duration_min: parseFloat($('#ad_duration_min').val()),
+            ad_duration_max: parseFloat($('#ad_duration_max').val()),
+            streaming_min_bytes: parseInt($('#streaming_min_bytes').val()),
+            streaming_min_packets: parseInt($('#streaming_min_packets').val()),
+            ad_min_bytes: parseInt($('#ad_min_bytes').val()),
+            duration_ratio_threshold: parseFloat($('#duration_ratio_threshold').val()),
+            confidence_threshold: parseFloat($('#confidence_threshold').val())
+        },
+        protocol_detection: {
+            enable_quic_detection: $('#enable_quic_detection').is(':checked'),
+            enable_encrypted_analysis: $('#enable_encrypted_analysis').is(':checked'),
+            analyze_timing_patterns: $('#analyze_timing_patterns').is(':checked'),
+            analyze_packet_sizes: $('#analyze_packet_sizes').is(':checked')
+        },
+        ml_parameters: {
+            n_estimators: parseInt($('#n_estimators').val()),
+            max_depth: parseInt($('#max_depth').val()),
+            model_type: $('#model_type_select').val(),
+            n_jobs: parseInt($('#cpu_cores').val()),
+            auto_retrain: $('#auto_retrain').is(':checked'),
+            retrain_interval_hours: parseInt($('#retrain_interval').val()),
+            min_samples_for_training: parseInt($('#min_training_samples').val())
+        },
+        feature_weights: currentConfig.feature_weights || {},
+        performance: {
+            cpu_cores: parseInt($('#cpu_cores').val()),
+            cache_predictions: $('#cache_predictions').is(':checked')
+        }
+    };
+
+    showStatus('Saving configuration...', 'info');
+    
+    $.ajax({
+        url: '/ml_detector/settings',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(config),
+        success: function(data) {
+            if (data.success) {
+                showStatus('Configuration saved and monitor restarted', 'success');
+                currentConfig = config;
+            } else {
+                showStatus('Failed to save: ' + data.error, 'danger');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error saving settings:', error);
+            showStatus('Failed to save configuration', 'danger');
+        }
+    });
+}
+
+function applyPreset(presetName) {
+    showStatus(`Applying ${presetName} preset...`, 'info');
+    
+    $.ajax({
+        url: `/ml_detector/settings/preset/${presetName}`,
+        method: 'POST',
+        success: function(data) {
+            if (data.success) {
+                showStatus(`${presetName} preset applied`, 'success');
+                loadSettings();
+            } else {
+                showStatus('Failed to apply preset: ' + data.error, 'danger');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error applying preset:', error);
+            showStatus('Failed to apply preset', 'danger');
+        }
+    });
+}
+
+function restartMonitor() {
+    showStatus('Restarting monitor service...', 'info');
+    
+    $.ajax({
+        url: '/ml_detector/settings',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(currentConfig),
+        success: function(data) {
+            if (data.success) {
+                showStatus('Monitor service restarted', 'success');
+            } else {
+                showStatus('Failed to restart: ' + data.error, 'danger');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error restarting monitor:', error);
+            showStatus('Failed to restart monitor', 'danger');
+        }
+    });
+}
+
+function showStatus(message, type) {
+    const statusDiv = $('#config_status');
+    statusDiv.html(`<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>`);
+    
+    if (type === 'success') {
+        setTimeout(() => {
+            statusDiv.html('');
+        }, 5000);
+    }
+}
+
+$(document).ready(function() {
+    loadSettings();
+    
+    $('#btn_save_config').on('click', saveSettings);
+    $('#btn_reset_config').on('click', loadSettings);
+    $('#btn_restart_service').on('click', restartMonitor);
+    
+    $('#preset_aggressive').on('click', () => applyPreset('aggressive'));
+    $('#preset_conservative').on('click', () => applyPreset('conservative'));
+    $('#preset_short_videos').on('click', () => applyPreset('short_videos'));
+    $('#preset_quic').on('click', () => applyPreset('quic_optimized'));
+});
+
