@@ -221,6 +221,16 @@ main_install() {
         fi
     fi
 
+    # Phase 11.5: ML Detector Service
+    if [[ "${INSTALL_ML_DETECTOR:-true}" == "true" ]]; then
+        if command -v install_ml_detector_service &>/dev/null; then
+            log "Phase 11.5: Installing ML Detector Service..."
+            install_ml_detector_service
+        else
+            warn "Module install_ml_detector_service not found, skipping..."
+        fi
+    fi
+
     # Phase 12: ML Detector Dashboard
     if [[ "${INSTALL_ML_DETECTOR:-true}" == "true" ]]; then
         if command -v install_ml_detector_dashboard &>/dev/null; then
