@@ -109,19 +109,8 @@ setup_slips_venv() {
     pip install flask flask-socketio eventlet || warn "Failed to install web dependencies"
 
     # Install SLIPS requirements
-    # Check if requirements.txt exists and show contents for debugging
     if [[ -f install/requirements.txt ]]; then
-        log "Found SLIPS requirements.txt, contents:"
-        cat install/requirements.txt | head -20  # Show first 20 lines for debugging
-        
-        log "Installing SLIPS dependencies (this may take several minutes)..."
-        pip install -r install/requirements.txt || warn "Some SLIPS dependencies failed to install"
-    else
-        log "requirements.txt not found, checking alternate locations..."
-        find . -name "requirements*.txt" -type f | head -5 | while read req_file; do
-            log "Found: $req_file"
-            cat "$req_file" | head -10
-        done
+        log "Found SLIPS requirements.txt"
         log "Installing SLIPS dependencies (this may take several minutes)..."
         pip install -r install/requirements.txt || warn "Some SLIPS dependencies failed to install"
 
@@ -140,7 +129,7 @@ setup_slips_venv() {
             error_exit "idmefv2 import failed - installation incomplete"
         fi
     else
-        warn "SLIPS requirements.txt not found"
+        warn "SLIPS requirements.txt not found at install/requirements.txt"
     fi
 
     deactivate
