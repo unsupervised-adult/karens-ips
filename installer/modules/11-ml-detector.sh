@@ -272,13 +272,32 @@ install_dns_labeler() {
         return 0
     fi
 
-    # Install systemd service
-    if [ -f "$karens_ips_dir/slips_integration/dns-labeler.service" ]; then
-        cp "$karens_ips_dir/slips_integration/dns-labeler.service" /etc/systemd/system/
-        systemctl daemon-reload
-        systemctl enable dns-labeler.service
-        success "DNS labeler service installed and enabled"
-    fi
+    # Create systemd service dynamically with correct paths
+    log "Creating DNS labeler systemd service..."
+    cat > /etc/systemd/system/dns-labeler.service << EOF
+[Unit]
+Description=DNS Blocklist Traffic Labeler
+After=network.target redis.service slips.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$SLIPS_DIR/slips_integration
+Environment="PYTHONPATH=$SLIPS_DIR"
+ExecStart=/usr/bin/python3 $SLIPS_DIR/slips_integration/dns_blocklist_labeler.py --continuous --interval 300
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable dns-labeler.service
+    success "DNS labeler service installed and enabled"
 }
 
 install_auto_labeler() {
@@ -296,13 +315,32 @@ install_auto_labeler() {
         return 0
     fi
 
-    # Install systemd service
-    if [ -f "$karens_ips_dir/slips_integration/auto-labeler.service" ]; then
-        cp "$karens_ips_dir/slips_integration/auto-labeler.service" /etc/systemd/system/
-        systemctl daemon-reload
-        systemctl enable auto-labeler.service
-        success "Auto-labeler service installed and enabled"
-    fi
+    # Create systemd service dynamically with correct paths
+    log "Creating auto-labeler systemd service..."
+    cat > /etc/systemd/system/auto-labeler.service << EOF
+[Unit]
+Description=Behavioral Traffic Auto-Labeler
+After=network.target redis.service slips.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$SLIPS_DIR/slips_integration
+Environment="PYTHONPATH=$SLIPS_DIR"
+ExecStart=/usr/bin/python3 $SLIPS_DIR/slips_integration/auto_label_traffic.py --continuous
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable auto-labeler.service
+    success "Auto-labeler service installed and enabled"
 }
 
 install_training_scripts() {
