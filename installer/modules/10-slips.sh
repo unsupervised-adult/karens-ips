@@ -6,12 +6,7 @@
 # Phase: 10
 # Description: Install Stratosphere Linux IPS (SLIPS) ML behavioral analysis engine
 
-# Ensure this script is sourced, not executed
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "Error: This module must be sourced, not executed"
-    echo "Usage: source $(basename "${BASH_SOURCE[0]}")"
-    exit 1
-fi
+# Note: This module must be sourced by main.sh, not executed directly
 
 # ============================================================================
 # SLIPS INSTALLATION
