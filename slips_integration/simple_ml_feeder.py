@@ -82,40 +82,110 @@ def main():
             }
             r.hset('ml_detector:stats', mapping=stats)
             
-            # Add some sample detections based on actual SLIPS data
+            # Process SLIPS evidence into ML detector format
             if evidence_count > 0:
-                # Get recent evidence
-                for profile_key in profiles[:5]:  # Check first 5 profiles
+                # Track unique evidence IDs we've already processed to avoid duplicates
+                processed_key = 'ml_detector:processed_evidence'
+
+                # Get recent evidence from SLIPS profiles
+                for profile_key in profiles:
                     if '_evidence' in profile_key:
+                        # Extract profile ID (IP address) from key like 'profile_192.168.1.5_evidence'
+                        profile_id = profile_key.replace('profile_', '').replace('_evidence', '')
+
                         evidence_data = r.hgetall(profile_key)
-                        for eid, evidence_json in list(evidence_data.items())[-2:]:  # Last 2 evidence
+
+                        for eid, evidence_json in evidence_data.items():
+                            # Skip if already processed
+                            evidence_hash = f"{profile_key}:{eid}"
+                            if r.sismember(processed_key, evidence_hash):
+                                continue
+
                             try:
                                 evidence = json.loads(evidence_json)
-                                detection = {
-                                    'timestamp': datetime.now().isoformat(),
-                                    'source_ip': evidence.get('attacker', {}).get('value', 'unknown'),
-                                    'dest_ip': evidence.get('victim', {}).get('value', 'unknown'),
-                                    'detection_type': 'behavioral_anomaly',
-                                    'description': evidence.get('description', 'SLIPS behavioral detection'),
-                                    'confidence': 0.85,
-                                    'threat_level': evidence.get('threat_level', 'medium')
+
+                                # Extract evidence details
+                                description = evidence.get('description', 'Unknown detection')
+                                threat_level = evidence.get('threat_level', 'medium')
+                                confidence = evidence.get('confidence', 0.85)
+                                evidence_type = evidence.get('type_detection', 'behavioral_anomaly')
+                                timestamp = evidence.get('timestamp', datetime.now().isoformat())
+
+                                # Get attacker/victim info
+                                attacker_info = evidence.get('attacker', {})
+                                victim_info = evidence.get('victim', {})
+
+                                source_ip = attacker_info.get('value', profile_id) if isinstance(attacker_info, dict) else str(attacker_info)
+                                dest_ip = victim_info.get('value', 'unknown') if isinstance(victim_info, dict) else str(victim_info)
+
+                                # Determine protocol and port from description
+                                protocol = 'tcp'
+                                dest_port = 'unknown'
+                                if 'DNS' in description.upper():
+                                    protocol = 'udp'
+                                    dest_port = '53'
+                                elif 'HTTP' in description.upper():
+                                    protocol = 'tcp'
+                                    dest_port = '80'
+                                elif 'HTTPS' in description.upper() or 'SSL' in description.upper():
+                                    protocol = 'tcp'
+                                    dest_port = '443'
+
+                                # Map SLIPS detection types to ML classifications
+                                classification_map = {
+                                    'MaliciousJA3': 'Malicious SSL/TLS',
+                                    'MaliciousJA3s': 'Malicious SSL/TLS',
+                                    'SSHSuccessful': 'SSH Bruteforce',
+                                    'LongConnection': 'Command & Control',
+                                    'PortScanType': 'Port Scan',
+                                    'DNSWithoutConnection': 'DNS Tunneling',
+                                    'IncompatibleUserAgent': 'Suspicious HTTP',
+                                    'MultipleSSHVersions': 'SSH Anomaly'
                                 }
-                                
-                                # Add to recent detections
+
+                                classification = classification_map.get(evidence_type, 'Behavioral Anomaly')
+
+                                # Create detection record for dashboard
+                                detection = {
+                                    'timestamp': timestamp,
+                                    'source_ip': source_ip,
+                                    'dest_ip': dest_ip,
+                                    'protocol': protocol.upper(),
+                                    'dest_port': dest_port,
+                                    'classification': classification,
+                                    'description': description[:150],  # Truncate long descriptions
+                                    'confidence': float(confidence) if isinstance(confidence, (int, float, str)) else 0.85,
+                                    'threat_level': threat_level,
+                                    'detection_type': evidence_type
+                                }
+
+                                # Add to recent detections (keep last 100)
                                 r.lpush('ml_detector:recent_detections', json.dumps(detection))
                                 r.ltrim('ml_detector:recent_detections', 0, 99)
-                                
-                                # Add timeline entry
+
+                                # Add timeline entry for hourly aggregation
+                                hour_key = datetime.now().strftime('%Y-%m-%d %H:00')
                                 timeline = {
-                                    'timestamp': detection['timestamp'],
-                                    'hour': datetime.now().strftime('%H:00'),
+                                    'timestamp': timestamp,
+                                    'hour': hour_key,
                                     'detections': 1,
-                                    'type': 'behavioral'
+                                    'type': classification,
+                                    'threat_level': threat_level
                                 }
                                 r.lpush('ml_detector:timeline', json.dumps(timeline))
                                 r.ltrim('ml_detector:timeline', 0, 999)
-                                
-                            except json.JSONDecodeError:
+
+                                # Mark as processed
+                                r.sadd(processed_key, evidence_hash)
+
+                                # Keep processed set size manageable (last 1000)
+                                if r.scard(processed_key) > 1000:
+                                    # Remove oldest entries (FIFO simulation with sets is tricky,
+                                    # but we'll just clear it periodically)
+                                    r.delete(processed_key)
+
+                            except (json.JSONDecodeError, KeyError, ValueError) as e:
+                                print(f"Error processing evidence {eid}: {e}")
                                 continue
             
             cycle += 1
