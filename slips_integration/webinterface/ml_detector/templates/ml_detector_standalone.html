@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Karen's IPS - ML Detector Dashboard</title>
+
+  <!-- Bootstrap 5 CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.1.3/css/bootstrap.min.css" />
+
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/v/bs5/jq-3.6.0/sl-1.4.0/dt-1.12.1/datatables.min.css" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .dashboard-container {
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .card {
+      border: none;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+      transition: transform 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+    }
+
+    .stat-card {
+      text-align: center;
+      padding: 1.5rem;
+    }
+
+    .stat-card h5 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+    }
+
+    .stat-card h2 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .page-header {
+      background: white;
+      border-radius: 15px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    .page-header h1 {
+      color: #667eea;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .page-header p {
+      color: #6c757d;
+      margin: 0;
+    }
+
+    .table-card {
+      background: white;
+      border-radius: 15px;
+      padding: 2rem;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+
+    .bg-primary-gradient {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .bg-danger-gradient {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .bg-success-gradient {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .bg-info-gradient {
+      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+
+    .badge {
+      padding: 0.5em 1em;
+      font-size: 0.85rem;
+    }
+
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    .status-active {
+      background-color: #00f2fe;
+      box-shadow: 0 0 10px #00f2fe;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="dashboard-container">
+    <!-- Header -->
+    <div class="page-header">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <h1><span class="status-indicator status-active"></span>Karen's IPS ML Detector</h1>
+          <p>Real-time Machine Learning Ad Detection & Behavioral Analysis</p>
+        </div>
+        <div>
+          <span class="badge bg-success">Live</span>
+          <span class="badge bg-info" id="last_update">Updated: --:--:--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+      <div class="col-lg-3 col-md-6">
+        <div class="card stat-card bg-primary-gradient text-white">
+          <h5>Total Analyzed</h5>
+          <h2 id="stat_total_analyzed">0</h2>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <div class="card stat-card bg-danger-gradient text-white">
+          <h5>Ads Detected</h5>
+          <h2 id="stat_ads_detected">0</h2>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <div class="card stat-card bg-success-gradient text-white">
+          <h5>Legitimate Traffic</h5>
+          <h2 id="stat_legitimate">0</h2>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <div class="card stat-card bg-info-gradient text-white">
+          <h5>Model Accuracy</h5>
+          <h2 id="stat_accuracy">0%</h2>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">Feature Importance</h5>
+            <div class="chart-container">
+              <canvas id="feature_chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">Detection Timeline</h5>
+            <div class="chart-container">
+              <canvas id="timeline_chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Information -->
+    <div class="row mb-4">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">Model Information</h5>
+            <div class="row">
+              <div class="col-md-3">
+                <p><strong>Type:</strong> <span id="model_type">--</span></p>
+              </div>
+              <div class="col-md-3">
+                <p><strong>Version:</strong> <span id="model_version">--</span></p>
+              </div>
+              <div class="col-md-3">
+                <p><strong>Training Accuracy:</strong> <span id="model_accuracy">--</span></p>
+              </div>
+              <div class="col-md-3">
+                <p><strong>Status:</strong> <span id="model_status" class="badge bg-success">Active</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Detections Table -->
+    <div class="row">
+      <div class="col-12">
+        <div class="table-card">
+          <h5 class="mb-4">Recent Detections</h5>
+          <table id="detections_table" class="table table-striped table-hover">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Source IP</th>
+                <th>Destination IP</th>
+                <th>Protocol</th>
+                <th>Port</th>
+                <th>Classification</th>
+                <th>Confidence</th>
+                <th>Threat Level</th>
+              </tr>
+            </thead>
+            <tbody>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- jQuery -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+
+  <!-- DataTables -->
+  <script src="https://cdn.datatables.net/v/bs5/jq-3.6.0/sl-1.4.0/dt-1.12.1/datatables.min.js"></script>
+
+  <script>
+    let featureChart, timelineChart, detectionsTable;
+
+    // Initialize DataTable
+    $(document).ready(function() {
+      detectionsTable = $('#detections_table').DataTable({
+        order: [[0, 'desc']],
+        pageLength: 25,
+        responsive: true,
+        columns: [
+          { data: 'timestamp_formatted' },
+          { data: 'source_ip' },
+          { data: 'dest_ip' },
+          { data: 'protocol' },
+          { data: 'dest_port' },
+          { data: 'classification' },
+          {
+            data: 'confidence',
+            render: function(data) {
+              return (data * 100).toFixed(1) + '%';
+            }
+          },
+          {
+            data: 'threat_level',
+            render: function(data) {
+              const colors = {
+                'INFO': 'secondary',
+                'MEDIUM': 'warning',
+                'HIGH': 'danger',
+                'CRITICAL': 'dark'
+              };
+              return `<span class="badge bg-${colors[data] || 'secondary'}">${data}</span>`;
+            }
+          }
+        ]
+      });
+
+      // Load initial data
+      loadStats();
+      loadDetections();
+      loadFeatureImportance();
+      loadTimeline();
+      loadModelInfo();
+
+      // Auto-refresh every 5 seconds
+      setInterval(function() {
+        loadStats();
+        loadDetections();
+      }, 5000);
+    });
+
+    function loadStats() {
+      $.getJSON('/ml_detector/stats', function(data) {
+        $('#stat_total_analyzed').text(data.total_analyzed || '0');
+        $('#stat_ads_detected').text(data.detections_found || '0');
+        $('#stat_legitimate').text(data.legitimate_traffic || '0');
+        $('#stat_accuracy').text(data.accuracy || '0%');
+        $('#last_update').text('Updated: ' + (data.last_update || '--:--:--'));
+      });
+    }
+
+    function loadDetections() {
+      $.getJSON('/ml_detector/detections/recent', function(response) {
+        if (response.data) {
+          detectionsTable.clear();
+          detectionsTable.rows.add(response.data);
+          detectionsTable.draw();
+        }
+      });
+    }
+
+    function loadFeatureImportance() {
+      $.getJSON('/ml_detector/features/importance', function(response) {
+        if (response.data) {
+          const ctx = document.getElementById('feature_chart').getContext('2d');
+          featureChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: response.data.map(f => f.feature),
+              datasets: [{
+                label: 'Importance',
+                data: response.data.map(f => f.importance),
+                backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                borderColor: 'rgba(102, 126, 234, 1)',
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  max: 1
+                }
+              }
+            }
+          });
+        }
+      });
+    }
+
+    function loadTimeline() {
+      $.getJSON('/ml_detector/detections/timeline', function(response) {
+        if (response.data && response.data.length > 0) {
+          const ctx = document.getElementById('timeline_chart').getContext('2d');
+          const hours = response.data.map(t => t.hour);
+          const counts = response.data.map(t => t.detections);
+
+          timelineChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: hours,
+              datasets: [{
+                label: 'Detections',
+                data: counts,
+                borderColor: 'rgba(245, 87, 108, 1)',
+                backgroundColor: 'rgba(245, 87, 108, 0.2)',
+                fill: true,
+                tension: 0.4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: true
+                }
+              }
+            }
+          });
+        }
+      });
+    }
+
+    function loadModelInfo() {
+      $.getJSON('/ml_detector/model/info', function(response) {
+        if (response.data) {
+          $('#model_type').text(response.data.model_type || '--');
+          $('#model_version').text(response.data.version || '--');
+          $('#model_accuracy').text(response.data.accuracy || '--');
+          $('#model_status').text(response.data.status || 'Active');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
