@@ -111,6 +111,11 @@ def main():
                                 evidence_type = evidence.get('type_detection', 'behavioral_anomaly')
                                 timestamp = evidence.get('timestamp', datetime.now().isoformat())
 
+                                # Filter: Only process MEDIUM, HIGH, and CRITICAL threats
+                                # Skip INFO-level detections to reduce noise from normal streaming traffic
+                                if threat_level.upper() == 'INFO':
+                                    continue
+
                                 # Get attacker/victim info
                                 attacker_info = evidence.get('attacker', {})
                                 victim_info = evidence.get('victim', {})
