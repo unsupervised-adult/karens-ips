@@ -1,12 +1,23 @@
 # SPDX-FileCopyrightText: 2025 Karen's IPS ML Ad Detector
 # SPDX-License-Identifier: GPL-2.0-only
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, request
 import json
 import logging
+import sys
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List
 from ..database.database import db
 from slips_files.common.slips_utils import utils
+
+# Add src directory to path for importing exception_manager
+sys.path.insert(0, '/opt/StratosphereLinuxIPS/../../../')
+try:
+    from src.exception_manager import ExceptionManager
+    EXCEPTION_MANAGER_AVAILABLE = True
+except ImportError:
+    EXCEPTION_MANAGER_AVAILABLE = False
+    logging.warning("ExceptionManager not available - exception management endpoints will be disabled")
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -634,3 +645,342 @@ def simple_stats():
             'device_types': {},
             'last_updated': datetime.now().strftime('%H:%M:%S')
         })
+# ----------------------------------------
+# EXCEPTION MANAGEMENT ENDPOINTS
+# ----------------------------------------
+
+@ml_detector.route("/exceptions/list")
+def list_exceptions():
+    """List all whitelist exceptions"""
+    if not EXCEPTION_MANAGER_AVAILABLE:
+        return jsonify({"error": "Exception manager not available"}), 503
+
+    try:
+        manager = ExceptionManager()
+        exceptions = manager.list_exceptions()
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "ips": exceptions.get('ips', []),
+                "domains": exceptions.get('domains', []),
+                "urls": exceptions.get('urls', []),
+                "cidrs": exceptions.get('cidrs', [])
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error listing exceptions: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/exceptions/add", methods=["POST"])
+def add_exception():
+    """Add a new exception to whitelist"""
+    if not EXCEPTION_MANAGER_AVAILABLE:
+        return jsonify({"error": "Exception manager not available"}), 503
+
+    try:
+        data = request.get_json()
+        exc_type = data.get('type')  # 'ip', 'domain', 'url', 'cidr'
+        value = data.get('value')
+        reason = data.get('reason', 'Added via WebUI')
+        permanent = data.get('permanent', True)
+        expires_hours = data.get('expires_hours')
+
+        if not exc_type or not value:
+            return jsonify({"success": False, "error": "Missing type or value"}), 400
+
+        manager = ExceptionManager()
+
+        if exc_type == 'ip':
+            success = manager.add_ip_exception(value, reason, "webui", permanent, expires_hours)
+        elif exc_type == 'domain':
+            success = manager.add_domain_exception(value, reason, "webui", permanent, expires_hours)
+        elif exc_type == 'url':
+            success = manager.add_url_exception(value, reason, "webui", permanent, expires_hours)
+        elif exc_type == 'cidr':
+            success = manager.add_cidr_exception(value, reason, "webui", permanent, expires_hours)
+        else:
+            return jsonify({"success": False, "error": "Invalid exception type"}), 400
+
+        if success:
+            return jsonify({
+                "success": True,
+                "message": f"{exc_type.capitalize()} exception added successfully"
+            })
+        else:
+            return jsonify({"success": False, "error": "Failed to add exception"}), 500
+
+    except Exception as e:
+        logger.error(f"Error adding exception: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/exceptions/remove", methods=["POST"])
+def remove_exception():
+    """Remove an exception from whitelist"""
+    if not EXCEPTION_MANAGER_AVAILABLE:
+        return jsonify({"error": "Exception manager not available"}), 503
+
+    try:
+        data = request.get_json()
+        exc_type = data.get('type')
+        value = data.get('value')
+
+        if not exc_type or not value:
+            return jsonify({"success": False, "error": "Missing type or value"}), 400
+
+        manager = ExceptionManager()
+
+        if exc_type == 'ip':
+            success = manager.remove_ip_exception(value)
+        elif exc_type == 'domain':
+            success = manager.remove_domain_exception(value)
+        elif exc_type == 'url':
+            success = manager.remove_url_exception(value)
+        elif exc_type == 'cidr':
+            success = manager.remove_cidr_exception(value)
+        else:
+            return jsonify({"success": False, "error": "Invalid exception type"}), 400
+
+        if success:
+            return jsonify({
+                "success": True,
+                "message": f"{exc_type.capitalize()} exception removed successfully"
+            })
+        else:
+            return jsonify({"success": False, "error": "Failed to remove exception"}), 500
+
+    except Exception as e:
+        logger.error(f"Error removing exception: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/exceptions/check", methods=["POST"])
+def check_exception():
+    """Check if a value is in the whitelist"""
+    if not EXCEPTION_MANAGER_AVAILABLE:
+        return jsonify({"error": "Exception manager not available"}), 503
+
+    try:
+        data = request.get_json()
+        exc_type = data.get('type')
+        value = data.get('value')
+
+        if not exc_type or not value:
+            return jsonify({"success": False, "error": "Missing type or value"}), 400
+
+        manager = ExceptionManager()
+
+        if exc_type == 'ip':
+            excepted, reason = manager.is_ip_excepted(value)
+        elif exc_type == 'domain':
+            excepted, reason = manager.is_domain_excepted(value)
+        elif exc_type == 'url':
+            excepted, reason = manager.is_url_excepted(value)
+        else:
+            return jsonify({"success": False, "error": "Invalid exception type"}), 400
+
+        return jsonify({
+            "success": True,
+            "excepted": excepted,
+            "reason": reason
+        })
+
+    except Exception as e:
+        logger.error(f"Error checking exception: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/exceptions/stats")
+def get_exception_stats():
+    """Get statistics about exceptions"""
+    if not EXCEPTION_MANAGER_AVAILABLE:
+        return jsonify({"error": "Exception manager not available"}), 503
+
+    try:
+        manager = ExceptionManager()
+        stats = manager.get_stats()
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "ip_count": stats.get('ip_count', 0),
+                "domain_count": stats.get('domain_count', 0),
+                "url_count": stats.get('url_count', 0),
+                "cidr_count": stats.get('cidr_count', 0),
+                "total": sum(stats.values())
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting exception stats: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ----------------------------------------
+# URL PATTERN MANAGEMENT ENDPOINTS
+# ----------------------------------------
+
+@ml_detector.route("/patterns/list")
+def list_patterns():
+    """List custom URL patterns"""
+    try:
+        # Try to read patterns from Redis or config file
+        patterns = db.rdb.r.hgetall("ml_detector:custom_patterns")
+
+        if not patterns:
+            # Return default patterns
+            patterns = {
+                "ad_patterns": json.dumps([
+                    r'.*doubleclick\.net',
+                    r'.*googlesyndication\.com',
+                    r'.*googleadservices\.com'
+                ]),
+                "content_patterns": json.dumps([
+                    r'.*googlevideo\.com/videoplayback(?!.*&adsid=)',
+                    r'.*youtube\.com/api/stats/watchtime'
+                ])
+            }
+        else:
+            patterns = {k.decode() if isinstance(k, bytes) else k:
+                       v.decode() if isinstance(v, bytes) else v
+                       for k, v in patterns.items()}
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "ad_patterns": json.loads(patterns.get('ad_patterns', '[]')),
+                "content_patterns": json.loads(patterns.get('content_patterns', '[]'))
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error listing patterns: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/patterns/add", methods=["POST"])
+def add_pattern():
+    """Add a custom URL pattern"""
+    try:
+        data = request.get_json()
+        pattern_type = data.get('type')  # 'ad' or 'content'
+        pattern = data.get('pattern')
+        description = data.get('description', '')
+
+        if not pattern_type or not pattern:
+            return jsonify({"success": False, "error": "Missing type or pattern"}), 400
+
+        # Validate regex pattern
+        try:
+            import re
+            re.compile(pattern)
+        except re.error as e:
+            return jsonify({"success": False, "error": f"Invalid regex pattern: {str(e)}"}), 400
+
+        # Get existing patterns
+        patterns = db.rdb.r.hgetall("ml_detector:custom_patterns")
+        if patterns:
+            patterns = {k.decode() if isinstance(k, bytes) else k:
+                       v.decode() if isinstance(v, bytes) else v
+                       for k, v in patterns.items()}
+        else:
+            patterns = {"ad_patterns": "[]", "content_patterns": "[]"}
+
+        # Add new pattern
+        key = 'ad_patterns' if pattern_type == 'ad' else 'content_patterns'
+        pattern_list = json.loads(patterns.get(key, '[]'))
+
+        if pattern not in pattern_list:
+            pattern_list.append(pattern)
+            patterns[key] = json.dumps(pattern_list)
+
+            # Save to Redis
+            db.rdb.r.hset("ml_detector:custom_patterns", key, patterns[key])
+
+            return jsonify({
+                "success": True,
+                "message": f"{pattern_type.capitalize()} pattern added successfully"
+            })
+        else:
+            return jsonify({"success": False, "error": "Pattern already exists"}), 400
+
+    except Exception as e:
+        logger.error(f"Error adding pattern: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/patterns/remove", methods=["POST"])
+def remove_pattern():
+    """Remove a custom URL pattern"""
+    try:
+        data = request.get_json()
+        pattern_type = data.get('type')
+        pattern = data.get('pattern')
+
+        if not pattern_type or not pattern:
+            return jsonify({"success": False, "error": "Missing type or pattern"}), 400
+
+        # Get existing patterns
+        patterns = db.rdb.r.hgetall("ml_detector:custom_patterns")
+        if patterns:
+            patterns = {k.decode() if isinstance(k, bytes) else k:
+                       v.decode() if isinstance(v, bytes) else v
+                       for k, v in patterns.items()}
+        else:
+            return jsonify({"success": False, "error": "No patterns found"}), 404
+
+        # Remove pattern
+        key = 'ad_patterns' if pattern_type == 'ad' else 'content_patterns'
+        pattern_list = json.loads(patterns.get(key, '[]'))
+
+        if pattern in pattern_list:
+            pattern_list.remove(pattern)
+            patterns[key] = json.dumps(pattern_list)
+
+            # Save to Redis
+            db.rdb.r.hset("ml_detector:custom_patterns", key, patterns[key])
+
+            return jsonify({
+                "success": True,
+                "message": f"{pattern_type.capitalize()} pattern removed successfully"
+            })
+        else:
+            return jsonify({"success": False, "error": "Pattern not found"}), 404
+
+    except Exception as e:
+        logger.error(f"Error removing pattern: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/patterns/test", methods=["POST"])
+def test_pattern():
+    """Test a URL pattern against sample URLs"""
+    try:
+        data = request.get_json()
+        pattern = data.get('pattern')
+        test_urls = data.get('test_urls', [])
+
+        if not pattern:
+            return jsonify({"success": False, "error": "Missing pattern"}), 400
+
+        # Validate regex
+        try:
+            import re
+            compiled_pattern = re.compile(pattern, re.IGNORECASE)
+        except re.error as e:
+            return jsonify({"success": False, "error": f"Invalid regex: {str(e)}"}), 400
+
+        # Test against URLs
+        results = []
+        for url in test_urls:
+            match = compiled_pattern.match(url) is not None
+            results.append({"url": url, "matches": match})
+
+        return jsonify({
+            "success": True,
+            "results": results
+        })
+
+    except Exception as e:
+        logger.error(f"Error testing pattern: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
