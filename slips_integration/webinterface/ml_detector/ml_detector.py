@@ -47,6 +47,11 @@ def ts_to_date(ts, seconds=False):
 # ----------------------------------------
 # ROUTE FUNCTIONS
 # ----------------------------------------
+@ml_detector.route("/")
+def index():
+    """Main ML Detector Dashboard"""
+    return render_template("ml_detector.html")
+
 @ml_detector.route("/config", methods=["GET"])
 def get_config():
     """Get current detector configuration"""
