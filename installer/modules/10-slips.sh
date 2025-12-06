@@ -106,9 +106,27 @@ setup_slips_venv() {
 
     # Upgrade pip
     pip install --upgrade pip setuptools wheel || warn "Failed to upgrade pip"
+    
+    # Install core ML and Redis dependencies first
+    pip install scikit-learn joblib numpy pandas redis || warn "Failed to install core ML dependencies"
+    
+    # Install additional dependencies for Karen's IPS integration
+    pip install flask flask-socketio eventlet || warn "Failed to install web dependencies"
 
     # Install SLIPS requirements
-    if [ -f install/requirements.txt ]; then
+    # Check if requirements.txt exists and show contents for debugging
+    if [[ -f install/requirements.txt ]]; then
+        log "Found SLIPS requirements.txt, contents:"
+        cat install/requirements.txt | head -20  # Show first 20 lines for debugging
+        
+        log "Installing SLIPS dependencies (this may take several minutes)..."
+        pip install -r install/requirements.txt || warn "Some SLIPS dependencies failed to install"
+    else
+        log "requirements.txt not found, checking alternate locations..."
+        find . -name "requirements*.txt" -type f | head -5 | while read req_file; do
+            log "Found: $req_file"
+            cat "$req_file" | head -10
+        done
         log "Installing SLIPS dependencies (this may take several minutes)..."
         pip install -r install/requirements.txt || warn "Some SLIPS dependencies failed to install"
 

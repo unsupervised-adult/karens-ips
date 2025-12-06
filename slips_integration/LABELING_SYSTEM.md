@@ -4,7 +4,7 @@ Zero-manual-labeling training data generation using DNS blocklists + behavioral 
 
 ## How It Works
 
-```
+```bash
 Installer → SQLite DB → DNS Labeler → ML Training → Deployed Model
    ↓           ↓            ↓             ↓              ↓
 Blocklists  100K+      Auto-labels    RandomForest   Real-time
@@ -17,6 +17,7 @@ from repos  stored     flows          labeled data    in SLIPS
 ### 1. Blocklist Database (`/var/lib/karens-ips/blocklists.db`)
 
 Created by installer with schema:
+
 ```sql
 CREATE TABLE blocklist_sources (
     id INTEGER PRIMARY KEY,
@@ -41,6 +42,7 @@ CREATE TABLE blocked_domains (
 **Connects to existing database** - no manual input required!
 
 **Labeling Strategy:**
+
 1. **Blocklist Exact Match** → 98% confidence ad
 2. **Blocklist Parent Match** → 98% confidence ad  
 3. **YouTube Ad Pattern** → 95% confidence ad
@@ -48,6 +50,7 @@ CREATE TABLE blocked_domains (
 5. **Behavioral Heuristics** → 70-90% confidence
 
 **Example Labeling:**
+
 ```python
 # doubleclick.net in blocklist
 'ad', 0.98, 'blocklist_exact_match'
@@ -92,6 +95,7 @@ http://10.10.254.39:55000 → ML Detector tab
 ## DNS Blocklist Sources
 
 **Pre-loaded by installer:**
+
 - Perflyst PiHoleBlocklist
   - SmartTV.txt
   - AmazonFireTV.txt  
@@ -107,6 +111,7 @@ http://10.10.254.39:55000 → ML Detector tab
 ## Zero Manual Work
 
 **What you DON'T need to do:**
+
 - ❌ Manually label traffic
 - ❌ Export Pi-hole databases
 - ❌ Download blocklists
@@ -114,6 +119,7 @@ http://10.10.254.39:55000 → ML Detector tab
 - ❌ Maintain text files
 
 **What happens automatically:**
+
 - ✅ Installer downloads all blocklists
 - ✅ SQLite database populated
 - ✅ DNS labeler reads from DB
@@ -124,6 +130,7 @@ http://10.10.254.39:55000 → ML Detector tab
 ## Usage Examples
 
 ### Basic Operation
+
 ```bash
 # One-time labeling
 python3 dns_blocklist_labeler.py
@@ -133,12 +140,14 @@ python3 dns_blocklist_labeler.py --continuous --interval 300
 ```
 
 ### Custom Database Path
+
 ```bash
 # If you installed to non-standard location
 python3 dns_blocklist_labeler.py --db-path /custom/path/blocklists.db
 ```
 
 ### Check Statistics
+
 ```bash
 # Database stats
 sqlite3 /var/lib/karens-ips/blocklists.db \
@@ -151,6 +160,7 @@ sqlite3 /var/lib/karens-ips/blocklists.db \
 ```
 
 ### Training Data Status
+
 ```bash
 # Redis training samples
 redis-cli -n 1 LRANGE ml_detector:training_data 0 5
@@ -178,6 +188,7 @@ redis-cli -n 1 LRANGE ml_detector:training_data 0 5
 | **DNS blocklists** | **Instant** | **Very High** | **Excellent** |
 
 **DNS blocklists win because:**
+
 - Curated by security community
 - Updated daily
 - Cover 99% of ad networks
@@ -187,6 +198,7 @@ redis-cli -n 1 LRANGE ml_detector:training_data 0 5
 ## Deployment on VM
 
 ### One-Time Setup
+
 ```bash
 # Install labeler service
 sudo cp dns-labeler.service /etc/systemd/system/
@@ -196,6 +208,7 @@ sudo systemctl start dns-labeler
 ```
 
 ### Monitor Progress
+
 ```bash
 # Service logs
 journalctl -u dns-labeler -f
@@ -210,6 +223,7 @@ python3 train_model.py
 ### VM Running YouTube 24/7
 
 Perfect! The system will:
+
 1. Watch SLIPS detect YouTube flows
 2. Match domains against 100K+ blocklist
 3. Auto-label flows as ad/content
@@ -221,6 +235,7 @@ Perfect! The system will:
 ## Configuration
 
 Edit `/etc/karens-ips/blocklists.yaml` to:
+
 - Enable/disable specific blocklists
 - Add custom domain lists
 - Set update schedules
@@ -229,6 +244,7 @@ Edit `/etc/karens-ips/blocklists.yaml` to:
 ## Troubleshooting
 
 ### Database not found
+
 ```bash
 # Check installer created it
 ls -lh /var/lib/karens-ips/blocklists.db
@@ -239,6 +255,7 @@ cd /path/to/installer
 ```
 
 ### No domains loaded
+
 ```bash
 # Check blocklist_sources enabled
 sqlite3 /var/lib/karens-ips/blocklists.db \
@@ -250,6 +267,7 @@ sqlite3 /var/lib/karens-ips/blocklists.db \
 ```
 
 ### Low label confidence
+
 ```bash
 # This is normal for behavioral-only detections
 # Blocklist matches get 95-98% confidence
@@ -260,16 +278,19 @@ sqlite3 /var/lib/karens-ips/blocklists.db \
 ## Performance
 
 **Labeling Speed:**
+
 - 10,000 flows/minute
 - Real-time (no lag)
 - 0.01ms per domain lookup (indexed)
 
 **Training Speed:**
+
 - 100 samples: 1-2 seconds
 - 1000 samples: 5-10 seconds
 - CPU cores used: all (-1)
 
 **Memory Usage:**
+
 - Database: ~50-200MB (depends on blocklists)
 - Labeler: ~100MB RAM
 - Model: ~50MB RAM
@@ -282,4 +303,5 @@ sqlite3 /var/lib/karens-ips/blocklists.db \
 4. **Monitor** - Dashboard shows detection accuracy
 5. **Iterate** - Model improves with more training data
 
-**Timeline: 1-2 hours to 1000+ labeled samples with VM watching YouTube**
+  *Timeline: 1-2 hours to 1000+ labeled samples with VM watching YouTube*
+Enjoy automated, zero-manual-effort traffic labeling for your IPS!

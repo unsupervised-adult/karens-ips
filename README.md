@@ -17,6 +17,7 @@ An intelligent Intrusion Prevention System with ML-powered behavioral analysis, 
 ## Overview
 
 Karen's IPS is a comprehensive network security solution that combines:
+
 - **Stratosphere Linux IPS (SLIPS)** - ML-based behavioral threat analysis
 - **Suricata** - High-performance IPS engine with NFQUEUE integration
 - **Custom ML Detector Dashboard** - Real-time ad detection visualization
@@ -28,16 +29,18 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 ## ✅ **VERIFIED OPERATIONAL STATUS (2025-11-29)**
 
 **Production Deployment Confirmed:**
+
 - **Hagezi Blocklists**: ✅ 338,844 domains loaded in SQLite database
 - **Suricata IPS**: ✅ 332,356 domains converted and active in datasets
 - **SLIPS ML Engine**: ✅ TensorFlow 2.16.1 with behavioral threat detection
 - **Network Bridge**: ✅ br0 monitoring 332+ packets through NFQUEUE
 - **Flow Blocking**: ✅ nftables integration with blocked4 IP set
 - **ML Detection**: ✅ Active flow analysis detecting malicious characteristics
-- **Web Dashboard**: ✅ SLIPS UI accessible at http://10.10.254.39:55000
+- **Web Dashboard**: ✅ SLIPS UI accessible at <http://10.10.254.39:55000>
 - **ML Dashboard**: ✅ **FULLY FUNCTIONAL** with live traffic analysis and real-time data
 
 **System Performance:**
+
 - Load Average: 5.91 (normal for ML processing)
 - Services: All critical services active (suricata, slips, redis, ml-detector-bridge)
 - Memory Usage: ~6GB total across all components
@@ -47,6 +50,7 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 ## Key Features
 
 ### Core Security
+
 - ✅ Real-time network monitoring via NFQUEUE bridge mode
 - ✅ ML-based behavioral threat detection (SLIPS)
 - ✅ High-performance IPS with Suricata (drop/reject capabilities)
@@ -55,6 +59,7 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 - ✅ Zeek network security monitor integration
 
 ### Community Blocklists (300K+ Domains)
+
 - ✅ **Perflyst/PiHoleBlocklist** - SmartTV, Android, FireTV tracking
 - ✅ **hagezi/dns-blocklists** - Pro & Native tracker blocking
 - ✅ Automatic weekly updates via systemd timer
@@ -65,6 +70,7 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 - ✅ CLI management: `ips-filter update-blocklists`, `ips-filter exception`
 
 ### ML Ad Detector Dashboard
+
 - ✅ Real-time ad detection visualization
 - ✅ Detection timeline charts (ads vs legitimate traffic)
 - ✅ Feature importance analysis
@@ -74,6 +80,7 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 - ✅ Fully integrated with SLIPS Web UI
 
 ### Monitoring & Management
+
 - ✅ SLIPS Web UI (browser-based dashboard)
 - ✅ Kalipso CLI (terminal interface)
 - ✅ SystemD service management
@@ -89,6 +96,7 @@ sudo ./karens-ips-installer.sh
 ```
 
 **What gets installed:**
+
 1. Base system dependencies and Zeek
 2. Kernel tuning and nftables firewall
 3. Suricata IPS (NFQUEUE bridge mode)
@@ -105,11 +113,13 @@ sudo ./karens-ips-installer.sh
 ### Post-Installation
 
 **Access the dashboards:**
+
 - **SLIPS Web UI**: `http://[SERVER-IP]:55000`
 - **ML Detector**: Click "ML Detector" tab in SLIPS Web UI
 - **Kalipso CLI**: `sudo kalipso` (terminal interface)
 
 **Service management:**
+
 ```bash
 # Check all services
 systemctl status redis-server suricata slips slips-webui zeek
@@ -169,6 +179,7 @@ Internet
 The installer uses a **modular architecture** for maintainability and flexibility:
 
 ### Architecture
+
 ```
 installer/
 ├── main.sh                  # Main orchestrator
@@ -221,6 +232,7 @@ sudo NON_INTERACTIVE=1 ./karens-ips-installer.sh
 ```
 
 **Find your interfaces:**
+
 ```bash
 # List all interfaces
 ip link show
@@ -230,6 +242,7 @@ ip addr show
 ```
 
 **Skip specific components:**
+
 ```bash
 # Skip blocklists
 sudo INSTALL_BLOCKLISTS=false ./karens-ips-installer.sh
@@ -242,6 +255,7 @@ sudo INSTALL_ZEEK=false ./karens-ips-installer.sh
 ```
 
 **Custom configuration file:**
+
 ```bash
 # Copy and edit configuration
 cp installer/config/installer.conf installer/config/custom.conf
@@ -252,6 +266,7 @@ sudo CONFIG_FILE=installer/config/custom.conf ./karens-ips-installer.sh
 ```
 
 **Debug mode:**
+
 ```bash
 sudo DEBUG=1 ./karens-ips-installer.sh
 ```
@@ -263,6 +278,7 @@ See [installer/README.md](installer/README.md) for complete modular installer do
 ### Automatic Updates
 
 Blocklists auto-update weekly (Sundays at 3 AM):
+
 ```bash
 # Check update timer
 systemctl status blocklist-update.timer
@@ -277,6 +293,7 @@ systemctl list-timers blocklist-update.timer
 ### Exception Management (Whitelist)
 
 Add exceptions for false positives:
+
 ```bash
 # Add domain exception
 ips-filter exception add domain example.com "trusted site"
@@ -315,6 +332,7 @@ ips-filter sync
 ### Configuration
 
 Edit `/etc/karens-ips/blocklists.yaml` to customize:
+
 - Enabled/disabled blocklists
 - Update schedule
 - Exception lists (domains and IPs)
@@ -323,6 +341,7 @@ Edit `/etc/karens-ips/blocklists.yaml` to customize:
 ## ML Detector Dashboard
 
 ### Features
+
 - **Statistics Cards**: Total analyzed, ads detected, legitimate traffic, accuracy
 - **Timeline Chart**: Real-time ad detection trends (Chart.js)
 - **Feature Importance**: ML model feature weights visualization
@@ -330,12 +349,14 @@ Edit `/etc/karens-ips/blocklists.yaml` to customize:
 - **Alerts**: High-priority ML detector alerts
 
 ### Technical Details
+
 - **Backend**: Flask Blueprint integrated into SLIPS
 - **Frontend**: Chart.js for charts, DataTables for tables
 - **Data Storage**: Redis (auto-refresh every 5 seconds)
 - **Security**: Input validation, error handling, no info disclosure
 
 ### Redis Keys
+
 ```
 ml_detector:stats               # Overall statistics (hash)
 ml_detector:recent_detections   # Recent detections (list, max 100)
@@ -379,18 +400,21 @@ karens-ips/
 ## System Requirements
 
 **Minimum:**
+
 - CPU: 4 cores
 - RAM: 8 GB
 - Disk: 50 GB
 - OS: Ubuntu 22.04/24.04 or Debian 11/12
 
 **Recommended:**
+
 - CPU: 8+ cores
 - RAM: 16 GB
 - Disk: 100 GB (for extended logs)
 - Network: 3 NICs (1 management, 2 bridge)
 
 **Resource Usage:**
+
 - Suricata: ~1-2 GB RAM, 100-200% CPU
 - SLIPS: ~1-2 GB RAM, 50-100% CPU
 - Redis: ~2 GB RAM (configured limit)
@@ -429,6 +453,7 @@ karens-ips/
 ## Troubleshooting
 
 ### Services not starting
+
 ```bash
 # Check service status
 systemctl status suricata slips slips-webui
@@ -442,6 +467,7 @@ suricata -T -c /etc/suricata/suricata.yaml
 ```
 
 ### No traffic blocking
+
 ```bash
 # Check bridge status
 ip link show br0
@@ -457,6 +483,7 @@ suricatasc -c "datasets.list"
 ```
 
 ### Interface issues
+
 ```bash
 # Check interface status
 ip link show  # Shows all interfaces
@@ -480,6 +507,7 @@ bridge link show
 ## Performance Tuning
 
 See `installer/modules/02-kernel-tuning.sh` for kernel optimizations:
+
 - Ring buffer sizes (268 MB)
 - Network backlog (300K packets)
 - TCP BBR congestion control
@@ -518,6 +546,7 @@ echo -n "example.com" | base64 | xargs -I {} suricatasc -c "dataset-add maliciou
 ## Contributing
 
 Contributions welcome! This project integrates with:
+
 - [Stratosphere Linux IPS (SLIPS)](https://github.com/stratosphereips/StratosphereLinuxIPS)
 - [Suricata IPS](https://suricata.io/)
 - [Perflyst/PiHoleBlocklist](https://github.com/Perflyst/PiHoleBlocklist)

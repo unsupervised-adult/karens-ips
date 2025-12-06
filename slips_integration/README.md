@@ -8,7 +8,7 @@ The integration adds a new "ML Detector" tab to the SLIPS web interface, providi
 
 ## Directory Structure
 
-```
+```bash
 slips_integration/
 ├── README.md                      # This file
 ├── install.sh                     # Automated installation script
@@ -155,7 +155,7 @@ The ML Detector blueprint provides the following REST API endpoints:
 
 The ML Detector reads from the following Redis keys (populated by the Karen's IPS ML detector module):
 
-```
+```bash
 ml_detector:stats                   # Hash: Overall statistics
 ml_detector:recent_detections       # List: Recent detections
 ml_detector:timeline                # List: Timeline data
