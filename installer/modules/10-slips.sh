@@ -476,5 +476,6 @@ export -f install_kalipso
 export -f configure_zeek_integration
 export -f setup_slips_directories
 export -f configure_slips_webui
+export -f install_karens_ips_ml_modules
 export -f patch_slips_bridge_support
 export -f verify_slips
