@@ -44,6 +44,7 @@ configure_nginx_proxy() {
     configure_ssl_certificate
     configure_authentication
     create_nginx_config
+    setup_letsencrypt_helper
     enable_nginx_service
 }
 
@@ -101,6 +102,92 @@ configure_ssl_certificate() {
     info "Key: $key_file"
 }
 
+create_custom_auth_page() {
+    log "Creating custom authentication page..."
+    
+    mkdir -p /var/www/html/errors
+    
+    cat > /var/www/html/errors/401.html << 'AUTH_PAGE_EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karen's IPS - Authentication Required</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 500px;
+        }
+        .logo {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            opacity: 0.95;
+            margin-bottom: 2rem;
+        }
+        .info {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .info strong { display: block; margin-bottom: 0.5rem; }
+        code {
+            background: rgba(0,0,0,0.2);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🛡️</div>
+        <h1>Karen's IPS</h1>
+        <p>Intrusion Prevention System with ML Behavioral Analysis</p>
+        <p><strong>Authentication Required</strong></p>
+        <p>Please enter your credentials to access the management interface.</p>
+        <div class="info">
+            <strong>🔐 Security Features:</strong>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem;">
+                TLS 1.2+ Encryption • Rate Limiting • HSTS • Security Headers
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+AUTH_PAGE_EOF
+
+    chmod 644 /var/www/html/errors/401.html
+}
+
 configure_authentication() {
     log_subsection "Authentication Setup"
 
@@ -116,11 +203,9 @@ configure_authentication() {
 
     if [[ -z "$password" ]]; then
         if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
-            # Generate random password in non-interactive mode
             password=$(openssl rand -base64 16)
             info "Generated random password for user '$username'"
         else
-            # Prompt for password in interactive mode
             while true; do
                 read -sp "Enter password for user '$username': " password
                 echo
@@ -170,6 +255,8 @@ create_nginx_config() {
     local webui_ip="${WEBUI_IP:-127.0.0.1}"
 
     log "Creating reverse proxy configuration..."
+    
+    create_custom_auth_page
 
     cat > "$config_file" << 'NGINX_CONFIG_EOF'
 # Karen's IPS Web Interface - Nginx Reverse Proxy
@@ -179,6 +266,7 @@ create_nginx_config() {
 # Rate limiting zones
 limit_req_zone $binary_remote_addr zone=login_limit:10m rate=5r/m;
 limit_req_zone $binary_remote_addr zone=general_limit:10m rate=30r/m;
+limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/m;
 
 # HTTP -> HTTPS redirect
 server {
@@ -252,7 +340,7 @@ server {
 
     # API endpoints with stricter rate limiting
     location /api/ {
-        limit_req zone=general_limit burst=5 nodelay;
+        limit_req zone=api_limit burst=5 nodelay;
         proxy_pass http://WEBUI_IP:WEBUI_PORT;
     }
 
@@ -261,6 +349,13 @@ server {
         proxy_pass http://WEBUI_IP:WEBUI_PORT;
         expires 1h;
         add_header Cache-Control "public, immutable";
+    }
+
+    # Custom 401 error page
+    error_page 401 /errors/401.html;
+    location = /errors/401.html {
+        root /var/www/html;
+        internal;
     }
 }
 NGINX_CONFIG_EOF
@@ -309,19 +404,54 @@ enable_nginx_service() {
     log "  🔐 Credentials: See /root/.karens-ips-credentials"
     log ""
     log "  Features enabled:"
-    log "    ✓ HTTPS/TLS encryption"
-    log "    ✓ HTTP Basic Authentication"
-    log "    ✓ Rate limiting (30 req/min general, 5 req/min API)"
-    log "    ✓ Security headers"
+    log "    ✓ TLS 1.2/1.3 encryption with modern ciphers"
+    log "    ✓ HTTP Basic Authentication with custom page"
+    log "    ✓ Rate limiting (30 req/min general, 10 req/min API)"
+    log "    ✓ Security headers (HSTS, X-Frame-Options, CSP)"
     log "    ✓ Auto HTTP->HTTPS redirect"
+    log "    ✓ WebSocket support for real-time updates"
     log ""
-    log "  Notes:"
-    log "    • Self-signed certificate will show browser warning"
-    log "    • Replace with Let's Encrypt: certbot --nginx"
-    log "    • Credentials file: /root/.karens-ips-credentials"
+    log "  Certificate Management:"
+    log "    • Current: Self-signed (browser warning expected)"
+    log "    • Let's Encrypt: certbot --nginx -d your-domain.com"
+    log "    • Replace cert: /etc/nginx/ssl/karens-ips.{crt,key}"
+    log ""
+    log "  Add users: htpasswd /etc/nginx/.htpasswd newuser"
+    log "  Reload config: systemctl reload nginx"
     log ""
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     log ""
+}
+
+setup_letsencrypt_helper() {
+    log_subsection "Let's Encrypt Helper"
+    
+    cat > /usr/local/bin/karens-ips-letsencrypt << 'LETSENCRYPT_SCRIPT_EOF'
+#!/bin/bash
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <domain>"
+    echo "Example: $0 ips.example.com"
+    exit 1
+fi
+
+DOMAIN="$1"
+
+echo "Installing certbot..."
+apt-get update && apt-get install -y certbot python3-certbot-nginx
+
+echo "Obtaining Let's Encrypt certificate for $DOMAIN..."
+certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email
+
+echo "Certificate installed successfully!"
+echo "Auto-renewal is configured via systemd timer"
+systemctl status certbot.timer --no-pager
+LETSENCRYPT_SCRIPT_EOF
+
+    chmod +x /usr/local/bin/karens-ips-letsencrypt
+    
+    success "Let's Encrypt helper installed: karens-ips-letsencrypt <domain>"
 }
 
 # ============================================================================
@@ -334,6 +464,8 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     export -f install_nginx
     export -f configure_ssl_certificate
     export -f configure_authentication
+    export -f create_custom_auth_page
     export -f create_nginx_config
+    export -f setup_letsencrypt_helper
     export -f enable_nginx_service
 fi
