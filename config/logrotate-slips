@@ -1,0 +1,23 @@
+/var/log/slips/*.log {
+    daily
+    rotate 7
+    maxage 7
+    missingok
+    notifempty
+    compress
+    delaycompress
+    maxsize 500M
+    size 250M
+}
+
+/opt/StratosphereLinuxIPS/output/*/*.log {
+    daily
+    rotate 3
+    maxage 3
+    missingok
+    notifempty
+    compress
+    delaycompress
+    maxsize 200M
+    size 100M
+}

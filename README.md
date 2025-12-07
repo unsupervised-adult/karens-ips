@@ -637,6 +637,30 @@ nano scripts/setup-log-images.sh
 # ["/var/log/suricata"]="30G"  # Increase if needed
 ```
 
+**Setup aggressive log rotation:**
+```bash
+# Install stringent logrotate policies
+sudo ./scripts/setup-logrotate.sh
+```
+
+**Log rotation policies:**
+- **Suricata logs**: Daily rotation, 7 days retention, 1GB max per file
+- **EVE JSON**: Hourly rotation, 2 days retention, 2GB max (high volume)
+- **SLIPS logs**: Daily rotation, 7 days retention, 500MB max
+- **SLIPS output**: Daily rotation, 3 days retention, 200MB max
+- **Compression**: Enabled with 1-day delay
+- **Frequency**: Hourly cron job monitors all logs
+
+**Manual rotation:**
+```bash
+# Force immediate rotation
+logrotate -f /etc/logrotate.d/suricata
+logrotate -f /etc/logrotate.d/slips
+
+# Test configuration
+logrotate -d /etc/logrotate.d/suricata
+```
+
 ## Troubleshooting
 
 ### Services not starting
