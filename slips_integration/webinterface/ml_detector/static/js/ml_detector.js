@@ -260,37 +260,24 @@ function initializeTables() {
             console.log("ML Detector: Alerts tab shown event fired!");
             if (!window.alertsTable && $('#table_alerts').length > 0) {
                 console.log("ML Detector: Initializing alerts table...");
-                console.log("ML Detector: #ml-alerts visible:", $('#ml-alerts').is(':visible'));
-                console.log("ML Detector: #ml-alerts classes:", $('#ml-alerts').attr('class'));
-                console.log("ML Detector: #ml-alerts display:", $('#ml-alerts').css('display'));
-                console.log("ML Detector: #table_alerts visible:", $('#table_alerts').is(':visible'));
-                console.log("ML Detector: #table_alerts parent visible:", $('#table_alerts').parent().is(':visible'));
                 
-                // Force show the alerts tab if it's hidden
-                if (!$('#ml-alerts').hasClass('show') || !$('#ml-alerts').hasClass('active')) {
-                    console.warn("ML Detector: #ml-alerts tab not properly shown, forcing visibility...");
-                    $('#ml-alerts').addClass('show active').css('display', 'block');
-                }
-                
-                // Retry logic with increasing delays
-                var attempts = 0;
-                var maxAttempts = 5;
-                var tryInit = function() {
-                    attempts++;
+                // Wait for Bootstrap tab transition to complete (300ms default)
+                setTimeout(function() {
                     try {
-                        // Check if table is visible before initializing
-                        if (!$('#table_alerts').is(':visible')) {
-                            console.warn("ML Detector: table_alerts not visible (attempt " + attempts + "/" + maxAttempts + ")");
-                            if (attempts < maxAttempts) {
-                                setTimeout(tryInit, 100 * attempts);
-                                return;
-                            } else {
-                                console.error("ML Detector: Failed to initialize after " + maxAttempts + " attempts");
-                                return;
-                            }
+                        // Force visibility check
+                        var $table = $('#table_alerts');
+                        var $tabPane = $('#ml-alerts');
+                        
+                        console.log("ML Detector: After transition - table exists:", $table.length);
+                        console.log("ML Detector: After transition - tab-pane display:", $tabPane.css('display'));
+                        
+                        // Ensure parent tab pane is visible
+                        if ($tabPane.css('display') === 'none' || !$tabPane.hasClass('show')) {
+                            console.warn("ML Detector: Forcing tab visibility");
+                            $tabPane.addClass('show active').css('display', 'block');
                         }
                         
-                        console.log("ML Detector: Table is visible, proceeding with initialization");
+                        console.log("ML Detector: Initializing DataTable...");
                         window.alertsTable = $('#table_alerts').DataTable({
                             columns: [
                                 { data: 'timestamp_formatted', defaultContent: 'N/A' },
@@ -322,6 +309,7 @@ function initializeTables() {
                             lengthChange: true,
                             deferRender: true,
                             autoWidth: false,
+                            scrollX: true,
                             columnDefs: [
                                 { width: '15%', targets: 0 },
                                 { width: '12%', targets: 1 },
@@ -336,10 +324,7 @@ function initializeTables() {
                     } catch (error) {
                         console.error("ML Detector: Error initializing alerts table:", error);
                     }
-                };
-                
-                // Start trying
-                tryInit();
+                }, 350);
             } else {
                 console.log("ML Detector: Alerts table already initialized or element not found. alertsTable:", !!window.alertsTable, ", element exists:", $('#table_alerts').length);
             }
