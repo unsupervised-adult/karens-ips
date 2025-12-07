@@ -29,10 +29,12 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 **System Performance:**
 
 - Load Average: 5.91 (normal for ML processing)
-- Services: All critical services active (suricata, slips, redis, ml-detector-bridge)
+- Services: All critical services active (suricata, slips, redis, ml-detector-bridge, nginx)
 - Memory Usage: ~6GB total across all components
-- Traffic Processing: Real-time NFQUEUE packet processing
-- ML Analysis: 12% ad detection rate with 94.2% accuracy
+- Traffic Processing: Real-time NFQUEUE packet processing (2.4M+ packets)
+- ML Analysis: 253 detections, 45.59% detection rate, 85% accuracy
+- QUIC Detection: Active for YouTube/streaming video ads
+- Log Storage: 40GB contained (20GB Suricata, 10GB SLIPS, 5GB Redis, 5GB output)
 
 ## Key Features
 
@@ -59,20 +61,32 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 ### ML Ad Detector Dashboard
 
 - ✅ Real-time ad detection visualization
+- ✅ QUIC/HTTP3 protocol detection (YouTube, streaming video ads)
 - ✅ Detection timeline charts (ads vs legitimate traffic)
-- ✅ Feature importance analysis
-- ✅ Model performance metrics
-- ✅ Searchable/sortable detection tables
+- ✅ Feature importance analysis with timing/size patterns
+- ✅ Model performance metrics (45.59% detection rate, 85% accuracy)
+- ✅ Searchable/sortable detection tables with confidence scores
 - ✅ Auto-refresh every 5 seconds
 - ✅ Fully integrated with SLIPS Web UI
 
 ### Monitoring & Management
 
 - ✅ SLIPS Web UI (browser-based dashboard)
+- ✅ Nginx reverse proxy with TLS 1.2/1.3 + authentication
+- ✅ Custom auth page with modern design
+- ✅ Let's Encrypt support for production certificates
 - ✅ Kalipso CLI (terminal interface)
 - ✅ SystemD service management
 - ✅ Comprehensive logging (Suricata, SLIPS, system)
 - ✅ Redis-based data backend
+
+### Log & Disk Protection
+
+- ✅ 40GB contained loop-mounted images for logs
+- ✅ Aggressive logrotate (hourly EVE JSON, daily logs)
+- ✅ Protection against disk exhaustion
+- ✅ Automatic compression and retention policies
+- ✅ Logs isolated from system disk
 
 ## Quick Start
 
@@ -87,13 +101,18 @@ sudo ./karens-ips-installer.sh
 1. Base system dependencies and Zeek
 2. Kernel tuning and nftables firewall
 3. Suricata IPS (NFQUEUE bridge mode)
-4. Community blocklists (300K+ domains)
-5. SLIPS (Stratosphere Linux IPS) with ML
-6. ML Detector Dashboard (auto-integrated)
-7. Node.js and Kalipso CLI
-8. Network bridge configuration
-9. Redis database
-10. SystemD services for all components
+4. **Log disk protection** (40GB contained images)
+5. Suricata rules and datasets
+6. Community blocklists (338K+ domains)
+7. SLIPS (Stratosphere Linux IPS) with ML
+8. ML Detector Dashboard with QUIC detection
+9. Node.js and Kalipso CLI
+10. Network bridge configuration
+11. Redis database (persistent DB 1)
+12. SystemD services for all components
+13. **Aggressive logrotate** (hourly monitoring)
+14. **Nginx reverse proxy** (TLS + auth)
+15. MOTD and verification
 
 **Installation time:** 15-30 minutes (depending on network speed)
 
@@ -101,8 +120,10 @@ sudo ./karens-ips-installer.sh
 
 **Access the dashboards:**
 
-- **SLIPS Web UI**: `http://[SERVER-IP]:55000`
-- **ML Detector**: Click "ML Detector" tab in SLIPS Web UI
+- **SLIPS Web UI**: `https://[SERVER-IP]` (Nginx reverse proxy with TLS + auth)
+  - Default credentials: `/root/.karens-ips-credentials`
+  - Direct access (localhost only): `http://127.0.0.1:55000`
+- **ML Detector**: Click "ML Detector" tab - QUIC detection, 253 detections visible
 - **Suricata Config**: Click "Suricata Config" tab for rules, datasets, TLS SNI management
 - **Kalipso CLI**: `sudo kalipso` (terminal interface)
 
