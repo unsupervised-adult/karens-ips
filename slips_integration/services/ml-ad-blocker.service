@@ -1,0 +1,30 @@
+[Unit]
+Description=ML Stream Ad Blocker
+Documentation=https://github.com/unsupervised-adult/karens-ips
+After=network.target redis-server.service slips.service
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/StratosphereLinuxIPS/webinterface/ml_detector
+ExecStart=/opt/StratosphereLinuxIPS/venv/bin/python3 /opt/StratosphereLinuxIPS/webinterface/ml_detector/stream_ad_blocker.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ml-ad-blocker
+Environment="PYTHONPATH=/opt/StratosphereLinuxIPS"
+
+# Security settings
+PrivateTmp=yes
+NoNewPrivileges=false
+ProtectSystem=full
+ProtectHome=yes
+
+# Resource limits
+MemoryMax=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
