@@ -268,6 +268,19 @@
                     <button onclick="whitelistManualIP()" class="btn-primary">Whitelist IP</button>
                 </div>
             </div>
+
+            <div class="action-card">
+                <h3>Generate TLS SNI Blocking Rules</h3>
+                <p>Generate Suricata drop rules from blocked domains database for true IPS inline blocking.</p>
+                <div id="tls-rules-status" style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em;">
+                    <div style="margin-bottom: 5px;"><strong>Domains in Database:</strong> <span id="tls-domains-count">-</span></div>
+                    <div style="margin-bottom: 5px;"><strong>Rules Generated:</strong> <span id="tls-rules-count">-</span></div>
+                    <div style="margin-bottom: 5px;"><strong>Last Updated:</strong> <span id="tls-rules-updated">Never</span></div>
+                    <div><strong>Status:</strong> <span id="tls-rules-sync-status">-</span></div>
+                </div>
+                <button onclick="generateTlsSniRules()" class="btn-primary">Generate TLS SNI Rules</button>
+                <button onclick="checkTlsRulesStatus()" class="btn-secondary" style="margin-left: 10px;">Check Status</button>
+            </div>
         </div>
 
         <div id="database" class="tab-content">

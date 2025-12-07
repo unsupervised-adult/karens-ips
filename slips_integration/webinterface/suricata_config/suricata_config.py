@@ -819,23 +819,142 @@ def sync_database_to_suricata():
     try:
         if not os.path.exists(IPS_FILTER_DB):
             return jsonify({'error': 'Blocklist manager not installed'}), 500
-        
+
         result = subprocess.run([
             IPS_FILTER_DB,
             '--db-path', DB_PATH,
             '--sync'
         ], capture_output=True, text=True, timeout=60)
-        
+
         if result.returncode == 0:
             reload_suricata()
             return jsonify({
-                'success': True, 
+                'success': True,
                 'message': 'Database synced to Suricata rules and reloaded',
                 'output': result.stdout
             })
         else:
             return jsonify({'error': result.stderr}), 500
-            
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/tls-sni/generate-rules', methods=['POST'])
+def generate_tls_sni_rules():
+    """
+    Generate Suricata drop rules from blocked domains database
+    This creates true IPS inline blocking based on TLS SNI
+    """
+    try:
+        import sqlite3
+
+        # Path to the generation script
+        script_path = '/opt/StratosphereLinuxIPS/generate_suricata_rules.py'
+        rules_file = '/var/lib/suricata/rules/ml-detector-blocking.rules'
+
+        # Check if database exists
+        if not os.path.exists(DB_PATH):
+            return jsonify({'error': f'Blocklist database not found: {DB_PATH}'}), 404
+
+        # Get current domain count
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM blocked_domains")
+        domain_count = cursor.fetchone()[0]
+        conn.close()
+
+        if domain_count == 0:
+            return jsonify({'error': 'No domains in blocklist database. Import blocklists first.'}), 400
+
+        # Check if script exists, if not return error with instruction
+        if not os.path.exists(script_path):
+            return jsonify({
+                'error': 'Rule generation script not found',
+                'message': 'Please deploy the generate_suricata_rules.py script to /opt/StratosphereLinuxIPS/'
+            }), 500
+
+        # Execute the generation script
+        result = subprocess.run(
+            ['sudo', 'python3', script_path],
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minutes timeout for large rulesets
+        )
+
+        if result.returncode == 0:
+            # Get generated rules count
+            rules_count = 0
+            if os.path.exists(rules_file):
+                with open(rules_file, 'r') as f:
+                    rules_count = sum(1 for line in f if line.strip() and not line.startswith('#'))
+
+            return jsonify({
+                'success': True,
+                'message': f'Generated {rules_count} TLS SNI blocking rules from {domain_count} domains',
+                'details': {
+                    'domains_in_db': domain_count,
+                    'rules_generated': rules_count,
+                    'rules_file': rules_file,
+                    'output': result.stdout
+                }
+            })
+        else:
+            return jsonify({
+                'error': 'Rule generation failed',
+                'details': result.stderr,
+                'stdout': result.stdout
+            }), 500
+
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Rule generation timed out (too many domains)'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/tls-sni/rules-status')
+def get_tls_sni_rules_status():
+    """
+    Get status of TLS SNI blocking rules
+    """
+    try:
+        import sqlite3
+
+        rules_file = '/var/lib/suricata/rules/ml-detector-blocking.rules'
+
+        # Get domain count from database
+        domain_count = 0
+        if os.path.exists(DB_PATH):
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM blocked_domains")
+            domain_count = cursor.fetchone()[0]
+            conn.close()
+
+        # Get rules count
+        rules_count = 0
+        rules_file_size = 0
+        rules_last_updated = None
+
+        if os.path.exists(rules_file):
+            with open(rules_file, 'r') as f:
+                rules_count = sum(1 for line in f if line.strip() and not line.startswith('#'))
+            rules_file_size = os.path.getsize(rules_file)
+            rules_last_updated = datetime.fromtimestamp(os.path.getmtime(rules_file)).strftime('%Y-%m-%d %H:%M:%S')
+
+        # Check if rules are up to date
+        rules_up_to_date = rules_count > 0 and rules_count == domain_count
+
+        return jsonify({
+            'success': True,
+            'status': {
+                'domains_in_database': domain_count,
+                'rules_generated': rules_count,
+                'rules_file_size_mb': round(rules_file_size / (1024 * 1024), 2),
+                'rules_last_updated': rules_last_updated,
+                'rules_up_to_date': rules_up_to_date,
+                'rules_file_exists': os.path.exists(rules_file),
+                'needs_regeneration': not rules_up_to_date
+            }
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

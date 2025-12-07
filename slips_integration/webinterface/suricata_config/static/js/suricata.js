@@ -1065,3 +1065,86 @@ async function removeTlsDomain(domain) {
         showNotification('Remove failed: ' + error.message, 'error');
     }
 }
+
+// TLS SNI Rule Generation Functions
+async function generateTlsSniRules() {
+    if (!confirm('Generate Suricata TLS SNI blocking rules from the blocked domains database?\n\nThis will create drop rules for all domains in the database and reload Suricata.\n\nThis may take several minutes for large databases.')) {
+        return;
+    }
+
+    showNotification('Generating TLS SNI rules... This may take a few minutes.', 'info');
+
+    try {
+        const response = await fetch('/suricata/api/tls-sni/generate-rules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            showNotification(data.message, 'success');
+            checkTlsRulesStatus(); // Refresh status
+
+            // Show details
+            if (data.details) {
+                console.log('Rule generation details:', data.details);
+            }
+        } else {
+            showNotification('Failed: ' + (data.error || 'Unknown error'), 'error');
+            if (data.details) {
+                console.error('Error details:', data.details);
+            }
+        }
+    } catch (error) {
+        showNotification('Rule generation failed: ' + error.message, 'error');
+    }
+}
+
+async function checkTlsRulesStatus() {
+    try {
+        const response = await fetch('/suricata/api/tls-sni/rules-status');
+        const data = await response.json();
+
+        if (data.success && data.status) {
+            const status = data.status;
+
+            // Update status display
+            document.getElementById('tls-domains-count').textContent = status.domains_in_database.toLocaleString();
+            document.getElementById('tls-rules-count').textContent = status.rules_generated.toLocaleString();
+            document.getElementById('tls-rules-updated').textContent = status.rules_last_updated || 'Never';
+
+            // Set status color
+            const statusEl = document.getElementById('tls-rules-sync-status');
+            if (!status.rules_file_exists) {
+                statusEl.textContent = 'Not Generated';
+                statusEl.style.color = '#dc3545';
+            } else if (status.rules_up_to_date) {
+                statusEl.textContent = `Up to Date (${status.rules_file_size_mb} MB)`;
+                statusEl.style.color = '#28a745';
+            } else if (status.needs_regeneration) {
+                statusEl.textContent = 'Needs Regeneration';
+                statusEl.style.color = '#ffc107';
+            } else {
+                statusEl.textContent = `${status.rules_file_size_mb} MB`;
+                statusEl.style.color = '#666';
+            }
+        }
+    } catch (error) {
+        console.error('Failed to check TLS rules status:', error);
+    }
+}
+
+// Auto-check TLS rules status when Actions tab is opened
+document.addEventListener('DOMContentLoaded', function() {
+    const actionsTab = document.querySelector('[data-tab="actions"]');
+    if (actionsTab) {
+        actionsTab.addEventListener('click', function() {
+            setTimeout(checkTlsRulesStatus, 100);
+        });
+    }
+
+    // Also check on page load if Actions tab is active
+    if (document.getElementById('actions').classList.contains('active')) {
+        checkTlsRulesStatus();
+    }
+});
