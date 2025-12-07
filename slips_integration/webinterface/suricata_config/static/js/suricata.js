@@ -24,16 +24,31 @@ function initTabs() {
             button.classList.add('active');
             document.getElementById(tabName).classList.add('active');
             
-            if (tabName === 'alerts') loadAlerts();
+            console.log('Suricata: Tab switched to', tabName);
+            
+            if (tabName === 'alerts') {
+                console.log('Suricata: Loading alerts...');
+                loadAlerts();
+            }
             if (tabName === 'rules') {
+                console.log('Suricata: Loading rules...');
                 loadRules();
                 loadRuleSources();
                 loadSeverityClassifications();
                 loadTlsSniRules();
             }
-            if (tabName === 'config') loadConfig();
-            if (tabName === 'blocklists') loadBlocklists();
-            if (tabName === 'database') loadDatabaseStats();
+            if (tabName === 'config') {
+                console.log('Suricata: Loading config...');
+                loadConfig();
+            }
+            if (tabName === 'blocklists') {
+                console.log('Suricata: Loading blocklists...');
+                loadBlocklists();
+            }
+            if (tabName === 'database') {
+                console.log('Suricata: Loading database stats...');
+                loadDatabaseStats();
+            }
         });
     });
 }
