@@ -383,6 +383,28 @@ install_karens_ips_ml_modules() {
     else
         warn "Pre-modified app.html not found at $source_webinterface_dir/templates/app.html"
     fi
+    
+    # Install nftables blocking module (replaces iptables)
+    local nftables_blocking_dir="$PROJECT_ROOT/slips_integration/nftables_blocking"
+    if [[ -d "$nftables_blocking_dir" ]]; then
+        log "Installing nftables blocking module..."
+        
+        # Backup original blocking module
+        if [[ -d "$modules_dir/blocking" ]]; then
+            mv "$modules_dir/blocking" "$modules_dir/blocking.iptables.backup" || true
+        fi
+        
+        # Copy nftables blocking module
+        cp -r "$nftables_blocking_dir" "$modules_dir/blocking"
+        chown -R root:root "$modules_dir/blocking"
+        chmod 755 "$modules_dir/blocking"
+        find "$modules_dir/blocking" -type f -name "*.py" -exec chmod 644 {} \;
+        
+        success "nftables blocking module installed (replaces iptables)"
+    else
+        warn "nftables blocking module not found at $nftables_blocking_dir"
+        log "SLIPS will use default iptables blocking module"
+    fi
 
     success "Karen's IPS ML integration modules installed"
 }
