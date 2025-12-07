@@ -722,3 +722,33 @@ function displaySources(sources) {
     html += '</tbody></table>';
     sourcesEl.innerHTML = html;
 }
+
+async function syncDatabaseToSuricata() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Syncing...';
+    
+    try {
+        const response = await fetch('/suricata/api/database/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('✓ Database synced to Suricata and rules reloaded', 'success');
+            const lastSync = document.getElementById('last-sync');
+            if (lastSync) {
+                lastSync.textContent = `Last synced: ${new Date().toLocaleTimeString()}`;
+            }
+        } else {
+            showNotification('Sync failed: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Sync failed: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}

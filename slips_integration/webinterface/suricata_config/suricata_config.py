@@ -578,6 +578,31 @@ def get_database_counts():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@suricata_bp.route('/api/database/sync', methods=['POST'])
+def sync_database_to_suricata():
+    try:
+        if not os.path.exists(IPS_FILTER_DB):
+            return jsonify({'error': 'Blocklist manager not installed'}), 500
+        
+        result = subprocess.run([
+            IPS_FILTER_DB,
+            '--db-path', DB_PATH,
+            '--sync'
+        ], capture_output=True, text=True, timeout=60)
+        
+        if result.returncode == 0:
+            reload_suricata()
+            return jsonify({
+                'success': True, 
+                'message': 'Database synced to Suricata rules and reloaded',
+                'output': result.stdout
+            })
+        else:
+            return jsonify({'error': result.stderr}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 def reload_suricata():
     try:
         subprocess.run(['sudo', 'systemctl', 'reload', 'suricata'], 

@@ -196,6 +196,16 @@
         <div id="database" class="tab-content">
             <h2>Database Manager</h2>
             
+            <div class="alert-box" style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px;">
+                <strong>⚠️ Important:</strong> After whitelisting or deleting domains, click <strong>"Sync to Suricata"</strong> to apply changes to the IPS engine.
+                <div style="margin-top: 10px;">
+                    <button onclick="syncDatabaseToSuricata()" class="btn-primary" style="padding: 10px 20px; font-weight: bold;">
+                        🔄 Sync to Suricata
+                    </button>
+                    <span id="last-sync" style="margin-left: 15px; color: #666;"></span>
+                </div>
+            </div>
+
             <div class="stats-grid" style="margin-bottom: 20px;">
                 <div class="stat-card">
                     <h3>Blocklist Sources</h3>
