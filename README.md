@@ -326,14 +326,23 @@ Edit `/etc/karens-ips/blocklists.yaml` to customize:
 - **Feature Importance**: ML model feature weights visualization
 - **Recent Detections**: Searchable, sortable table with confidence scores
 - **Alerts**: High-priority ML detector alerts
-Limit reached · resets 7pm (Pacific/Auckland) · /upgrade to Max or add funds to continue with extra usage
+- **Suricata Stats**: Real-time packet counts, alerts, blocked IPs
+- **Auto-refresh**: Live updates every 5 seconds
 
 ### Technical Details
 
 - **Backend**: Flask Blueprint integrated into SLIPS
 - **Frontend**: Chart.js for charts, DataTables for tables
-- **Data Storage**: Redis (auto-refresh every 5 seconds)
+- **Data Storage**: Redis database 1 (persistent SLIPS data)
 - **Security**: Input validation, error handling, no info disclosure
+- **TLS SNI Blocking**: Integrated with DNS blocklist infrastructure (338K+ domains)
+
+### Redis Architecture
+
+```
+Database 0: Ephemeral cache
+Database 1: Persistent SLIPS data (webui connects here)
+```
 
 ### Redis Keys
 
@@ -345,6 +354,16 @@ ml_detector:model_info          # Model metadata (hash)
 ml_detector:feature_importance  # Feature weights (hash)
 ml_detector:alerts              # Alerts (list, max 50)
 ```
+
+### Custom Patches
+
+The following SLIPS files have been patched for correct operation:
+
+- **database.py**: Modified to connect to Redis database 1 instead of 0
+  - Location: `StratosphereLinuxIPS/slips_files/core/database/redis_db/database.py`
+  - Patch file: `patches/slips-redis-db1-connection.patch`
+  - Change: Line ~353 modified from `db=0` to `db=1`
+  - Required for webui to read persistent SLIPS detection data
 
 ## Project Structure
 
