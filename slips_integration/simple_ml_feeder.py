@@ -47,33 +47,48 @@ def main():
             profiles = r.keys('profile_*')
             profile_count = len([p for p in profiles if not p.endswith('_evidence') and 'timewindow' not in p])
             
-            # Count evidence
-            evidence_count = 0
+            # Count total evidence (accumulated over time)
+            total_evidence_count = 0
             for profile_key in profiles:
                 if '_evidence' in profile_key:
                     evidence_data = r.hgetall(profile_key)
-                    evidence_count += len(evidence_data)
-            
-            # Count flows analyzed
-            flow_keys = r.keys('flows_analyzed_per_minute:*')
+                    total_evidence_count += len(evidence_data)
+
+            # Count flows analyzed (use total from SLIPS, not just per-minute keys)
+            # Get the total number of flows from all timewindows across all profiles
             total_flows = 0
-            for flow_key in flow_keys:
-                flow_count = r.get(flow_key)
-                if flow_count:
-                    total_flows += int(flow_count)
-            
+            for profile_key in profiles:
+                if 'timewindow' in profile_key:
+                    # Get flows from this timewindow
+                    tw_data = r.hgetall(profile_key)
+                    if tw_data:
+                        total_flows += len(tw_data)
+
+            # If no timewindow data, fallback to flow counters
+            if total_flows == 0:
+                flow_keys = r.keys('flows_analyzed_per_minute:*')
+                for flow_key in flow_keys:
+                    flow_count = r.get(flow_key)
+                    if flow_count:
+                        total_flows += int(flow_count)
+
+            # Use profile count as a more reasonable total if flows is too low
+            if total_flows < profile_count:
+                total_flows = profile_count
+
             # Calculate uptime
             uptime = datetime.now() - start_time
             uptime_str = f"{uptime.seconds//3600}h {(uptime.seconds%3600)//60}m"
-            
-            # Update ML stats
-            detection_rate = min(15.0, (evidence_count / max(total_flows, 1)) * 100)
+
+            # Update ML stats - ensure legitimate traffic is never negative
+            legitimate_count = max(0, total_flows - total_evidence_count)
+            detection_rate = min(15.0, (total_evidence_count / max(total_flows, 1)) * 100)
             accuracy = max(85.0, 98.0 - detection_rate)
-            
+
             stats = {
                 'total_analyzed': f"{total_flows:,}",
-                'detections_found': f"{evidence_count:,}",
-                'legitimate_traffic': f"{total_flows - evidence_count:,}",
+                'detections_found': f"{total_evidence_count:,}",
+                'legitimate_traffic': f"{legitimate_count:,}",
                 'accuracy': f"{accuracy:.1f}%",
                 'detection_rate': f"{detection_rate:.1f}%",
                 'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -83,7 +98,7 @@ def main():
             r.hset('ml_detector:stats', mapping=stats)
             
             # Process SLIPS evidence into ML detector format
-            if evidence_count > 0:
+            if total_evidence_count > 0:
                 # Track unique evidence IDs we've already processed to avoid duplicates
                 processed_key = 'ml_detector:processed_evidence'
 
@@ -110,11 +125,6 @@ def main():
                                 confidence = evidence.get('confidence', 0.85)
                                 evidence_type = evidence.get('type_detection', 'behavioral_anomaly')
                                 timestamp = evidence.get('timestamp', datetime.now().isoformat())
-
-                                # Filter: Only process MEDIUM, HIGH, and CRITICAL threats
-                                # Skip INFO-level detections to reduce noise from normal streaming traffic
-                                if threat_level.upper() == 'INFO':
-                                    continue
 
                                 # Get attacker/victim info
                                 attacker_info = evidence.get('attacker', {})
@@ -194,7 +204,7 @@ def main():
                                 continue
             
             cycle += 1
-            print(f"Cycle {cycle}: {profile_count} profiles, {evidence_count} evidence, {total_flows} flows")
+            print(f"Cycle {cycle}: {profile_count} profiles, {total_evidence_count} evidence, {total_flows} flows")
             time.sleep(10)
             
         except KeyboardInterrupt:
