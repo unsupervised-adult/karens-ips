@@ -182,23 +182,23 @@ SLIPS_CONFIG_EOF
 # Format: URL,threat_level,tags
 # threat_level: info, low, medium, high, critical
 # tags: optional comma-separated tags
-https://rules.emergingthreats.net/blockrules/compromised-ips.txt,high,
-https://cinsscore.com/list/ci-badguys.txt,medium,
-https://www.spamhaus.org/drop/drop.txt,high,
+https://rules.emergingthreats.net/blockrules/compromised-ips.txt,high
+https://cinsscore.com/list/ci-badguys.txt,medium
+https://www.spamhaus.org/drop/drop.txt,high
 TI_FEEDS_EOF
 
     # Create JA3 feeds file
     cat > config/JA3_feeds.csv << 'JA3_FEEDS_EOF'
 # JA3 Threat Intelligence Feeds
 # Format: URL,threat_level,tags
-https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv,high,
+https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv,high
 JA3_FEEDS_EOF
 
     # Create SSL feeds file
     cat > config/SSL_feeds.csv << 'SSL_FEEDS_EOF'
 # SSL Certificate Threat Intelligence Feeds
 # Format: URL,threat_level,tags
-https://sslbl.abuse.ch/blacklist/sslblacklist.csv,high,
+https://sslbl.abuse.ch/blacklist/sslblacklist.csv,high
 SSL_FEEDS_EOF
 
     # Create JARM feeds file (empty but required)
@@ -352,29 +352,36 @@ install_karens_ips_ml_modules() {
     local source_webinterface_dir="$PROJECT_ROOT/slips_integration/webinterface"
     
     if [[ -d "$source_webinterface_dir/ml_detector" ]]; then
-        log "Installing ML detector web interface..."
+        log "Installing ML detector web interface blueprint..."
         cp -r "$source_webinterface_dir/ml_detector" "$webinterface_dir/"
         chown -R root:root "$webinterface_dir/ml_detector"
         chmod 755 "$webinterface_dir/ml_detector"
-        chmod 644 "$webinterface_dir/ml_detector"/*.py
-        
-        # Update webinterface app.py to include ML detector blueprint
-        if [[ -f "$webinterface_dir/app.py" ]] && ! grep -q "ml_detector" "$webinterface_dir/app.py"; then
-            log "Integrating ML detector into SLIPS web interface..."
-            
-            # Backup original app.py
-            cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.backup"
-            
-            # Add ML detector import and blueprint registration
-            sed -i '/^from .*database import db$/a from .ml_detector.ml_detector import ml_detector' "$webinterface_dir/app.py"
-            sed -i '/app\.register_blueprint.*url_prefix/a app.register_blueprint(ml_detector, url_prefix="/ml_detector")' "$webinterface_dir/app.py"
-            
-            success "ML detector integrated into SLIPS web interface"
-        fi
-        
-        success "ML detector web interface installed"
+        find "$webinterface_dir/ml_detector" -type f -name "*.py" -exec chmod 644 {} \;
+        success "ML detector blueprint installed"
     else
-        warn "ML detector web interface not found at $source_webinterface_dir/ml_detector"
+        warn "ML detector blueprint not found at $source_webinterface_dir/ml_detector"
+    fi
+    
+    # Install pre-modified app.py with ML detector integration
+    if [[ -f "$source_webinterface_dir/app.py" ]]; then
+        log "Installing ML detector integrated app.py..."
+        cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.backup" 2>/dev/null || true
+        cp "$source_webinterface_dir/app.py" "$webinterface_dir/app.py"
+        chmod 644 "$webinterface_dir/app.py"
+        success "ML detector integrated app.py installed"
+    else
+        warn "Pre-modified app.py not found at $source_webinterface_dir/app.py"
+    fi
+    
+    # Install pre-modified app.html template with ML detector tab
+    if [[ -f "$source_webinterface_dir/templates/app.html" ]]; then
+        log "Installing ML detector integrated app.html template..."
+        cp "$webinterface_dir/templates/app.html" "$webinterface_dir/templates/app.html.backup" 2>/dev/null || true
+        cp "$source_webinterface_dir/templates/app.html" "$webinterface_dir/templates/app.html"
+        chmod 644 "$webinterface_dir/templates/app.html"
+        success "ML detector integrated app.html installed"
+    else
+        warn "Pre-modified app.html not found at $source_webinterface_dir/templates/app.html"
     fi
 
     success "Karen's IPS ML integration modules installed"
@@ -474,31 +481,8 @@ patch_slips_bridge_support() {
         return 1
     fi
 
-    log "Installing Bootstrap 5 compatible app.js..."
-    local app_js_source="$karens_ips_dir/slips_integration/webinterface/static/app.js"
-    local app_js_dest="$SLIPS_DIR/webinterface/static/app.js"
-    
-    if [[ -f "$app_js_source" ]]; then
-        cp "$app_js_dest" "${app_js_dest}.backup" 2>/dev/null || true
-        if cp "$app_js_source" "$app_js_dest"; then
-            success "✓ Bootstrap 5 app.js installed"
-        else
-            warn "Failed to copy app.js"
-        fi
-    fi
-
-    log "Installing Bootstrap 5 compatible app.html..."
-    local app_html_source="$karens_ips_dir/slips_integration/webinterface/templates/app.html"
-    local app_html_dest="$SLIPS_DIR/webinterface/templates/app.html"
-    
-    if [[ -f "$app_html_source" ]]; then
-        cp "$app_html_dest" "${app_html_dest}.backup" 2>/dev/null || true
-        if cp "$app_html_source" "$app_html_dest"; then
-            success "✓ Bootstrap 5 app.html installed"
-        else
-            warn "Failed to copy app.html"
-        fi
-    fi
+    # TODO: Install Bootstrap 5 compatible files using proper patch or pre-tested versions
+    # Leaving SLIPS webinterface in default state for now
 
     log "═══════════════════════════════════════════════"
     return 0
