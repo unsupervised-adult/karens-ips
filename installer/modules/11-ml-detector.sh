@@ -29,6 +29,9 @@ install_ml_detector_service() {
     # Install stream monitor service
     install_stream_monitor_service
 
+    # Install stream ad blocker service
+    install_stream_ad_blocker_service
+
     success "ML Detector service installed successfully"
 }
 
@@ -84,6 +87,44 @@ install_stream_monitor_service() {
     fi
 }
 
+install_stream_ad_blocker_service() {
+    log "Installing stream-ad-blocker systemd service..."
+
+    local service_source="$PROJECT_ROOT/slips_integration/webinterface/ml_detector/stream-ad-blocker.service"
+    local service_dest="/etc/systemd/system/stream-ad-blocker.service"
+    local script_source="$PROJECT_ROOT/slips_integration/webinterface/ml_detector/stream_ad_blocker.py"
+    local script_dest="$SLIPS_DIR/webinterface/ml_detector/stream_ad_blocker.py"
+
+    # Copy Python script
+    if [[ -f "$script_source" ]]; then
+        cp "$script_source" "$script_dest"
+        chmod +x "$script_dest"
+        chown root:root "$script_dest"
+        log "stream_ad_blocker.py installed"
+    else
+        warn "stream_ad_blocker.py not found at: $script_source"
+        return 1
+    fi
+
+    # Copy service file
+    if [[ ! -f "$service_source" ]]; then
+        warn "stream-ad-blocker.service not found at: $service_source"
+        return 1
+    fi
+
+    cp "$service_source" "$service_dest"
+    chmod 644 "$service_dest"
+
+    # Reload systemd
+    systemctl daemon-reload
+
+    # Enable but don't start yet (let user enable blocking via web UI)
+    systemctl enable stream-ad-blocker.service
+
+    log "stream-ad-blocker service enabled (start via web UI)"
+    success "stream-ad-blocker service installed"
+}
+
 # ============================================================================
 # VERIFICATION
 # ============================================================================
@@ -126,4 +167,5 @@ verify_ml_detector() {
 export -f install_ml_detector_service
 export -f copy_ml_feeder_script
 export -f install_stream_monitor_service
+export -f install_stream_ad_blocker_service
 export -f verify_ml_detector

@@ -74,6 +74,22 @@ class StreamAdBlocker:
         # Key: IP address, Value: {'flows': [], 'classified_as_ad': bool, 'confidence': float}
         self.youtube_connection_cache = {}
 
+        # Track video session context for better ad detection
+        # Key: source_ip, Value: {'last_content_flow': timestamp, 'content_duration': seconds, 'ad_count': int}
+        self.video_sessions = {}
+
+        # YouTube 2025 ad pattern knowledge
+        # Based on May 2025 update: ads at "natural breakpoints"
+        self.youtube_ad_types = {
+            'bumper': {'min_dur': 0, 'max_dur': 6, 'skippable': False},
+            'skippable': {'min_dur': 5, 'max_dur': 180, 'forced_watch': 5},  # Can be long but skip after 5s
+            'non_skippable_standard': {'min_dur': 15, 'max_dur': 20, 'skippable': False},
+            'non_skippable_tv': {'min_dur': 20, 'max_dur': 30, 'skippable': False},
+            'mid_roll': {'min_dur': 5, 'max_dur': 120, 'location': 'during_video'},
+            'pre_roll': {'min_dur': 5, 'max_dur': 60, 'location': 'video_start'},
+            'post_roll': {'min_dur': 5, 'max_dur': 30, 'location': 'video_end'}
+        }
+
     def is_ad_domain(self, domain):
         """Check if domain matches ad patterns"""
         domain_lower = domain.lower()
@@ -103,35 +119,51 @@ class StreamAdBlocker:
             is_quic = (protocol == 'UDP' and dst_port == 443)
 
             # QUIC-specific detection (YouTube, modern streaming)
+            # Based on 2025 YouTube ad patterns research
             if is_quic:
                 # QUIC ads have distinct patterns vs content
 
-                # 1. Pre-roll ads: Short burst at video start (5-30s)
-                if 5 < duration < 30 and byte_rate > 100000:
-                    confidence += 0.3
-                    reasons.append(f"quic_preroll:{duration:.1f}s")
+                # 1. Bumper ads (≤6 seconds, non-skippable)
+                if duration <= 6 and bytes_sent > 50000:
+                    confidence += 0.35
+                    reasons.append(f"quic_bumper:{duration:.1f}s")
 
-                # 2. Mid-roll ads: Moderate duration with specific byte patterns
-                if 10 < duration < 60 and 500000 < bytes_sent < 20000000:
+                # 2. Skippable ads (forced 5s minimum view, total 15-30s)
+                if 5 <= duration <= 30 and byte_rate > 100000:
+                    confidence += 0.3
+                    reasons.append(f"quic_skippable:{duration:.1f}s")
+
+                # 3. Non-skippable ads (15-20s standard, 30s on TV)
+                if 15 <= duration <= 30 and 1000000 < bytes_sent < 15000000:
+                    confidence += 0.35
+                    reasons.append(f"quic_unskippable:{duration:.1f}s")
+
+                # 4. Long forced ads (30s+ on smart TVs)
+                if 30 < duration <= 60 and bytes_sent < 25000000:
+                    confidence += 0.3
+                    reasons.append(f"quic_long_ad:{duration:.1f}s")
+
+                # 5. Mid-roll ad breaks (multiple ads, variable duration)
+                if 10 < duration < 120 and 500000 < bytes_sent < 50000000:
                     confidence += 0.25
                     reasons.append(f"quic_midroll:{bytes_sent/1024/1024:.1f}MB")
 
-                # 3. QUIC ad connections have higher packet rates (more overhead)
-                if packet_rate > 50 and duration < 45:
+                # 6. Pre-roll ad sequences (may include multiple ads)
+                if duration < 180 and packet_rate > 50:
                     confidence += 0.2
-                    reasons.append(f"quic_high_pkt_rate:{packet_rate:.0f}pps")
+                    reasons.append(f"quic_preroll_seq:{packet_rate:.0f}pps")
 
-                # 4. Small QUIC flows are often ad beacons/tracking
+                # 7. Ad beacons & tracking (tiny flows for analytics)
                 if bytes_sent < 50000 and packets < 20:
                     confidence += 0.2
                     reasons.append(f"quic_beacon")
 
-                # 5. YouTube ads have characteristic packet size distribution
-                # Ads use lower bitrate encoding: avg packet ~1100-1300 bytes
-                # Content uses higher bitrate: avg packet ~1350-1500 bytes
-                if 1000 < avg_packet_size < 1300 and duration < 60:
+                # 8. Bitrate analysis: Ads use lower bitrate encoding
+                # Ads: ~1100-1300 bytes/packet (lower quality to save bandwidth)
+                # Content: ~1350-1500 bytes/packet (higher quality)
+                if 1000 < avg_packet_size < 1300 and duration <= 60:
                     confidence += 0.15
-                    reasons.append(f"quic_ad_bitrate")
+                    reasons.append(f"quic_ad_bitrate:{avg_packet_size:.0f}b/pkt")
 
             # Standard TCP/HTTP detection
             else:
@@ -175,13 +207,38 @@ class StreamAdBlocker:
             return enabled == '1'
         return False
 
+    def is_private_ip(self, ip):
+        """Check if IP is RFC1918 private or non-routable"""
+        try:
+            parts = [int(x) for x in ip.split('.')]
+            if len(parts) != 4:
+                return True
+            # RFC1918 private
+            if parts[0] == 10:
+                return True
+            if parts[0] == 172 and 16 <= parts[1] <= 31:
+                return True
+            if parts[0] == 192 and parts[1] == 168:
+                return True
+            # Loopback, link-local, multicast
+            if parts[0] in [127, 169] or parts[0] >= 224:
+                return True
+            return False
+        except (ValueError, IndexError):
+            return True
+
     def block_ip(self, ip, reason):
-        """Block IP using nftables"""
+        """Block IP using nftables (uses blocked4 set from main IPS config)"""
         if ip in self.blocked_ips:
             return True
 
+        # Skip private IPs
+        if self.is_private_ip(ip):
+            return False
+
         try:
-            cmd = f'sudo nft add element inet filter ml_detector_blacklist "{{ {ip} }}"'
+            # Use the main blocked4 set (not ml_detector_blacklist)
+            cmd = f'sudo nft add element inet home blocked4 "{{ {ip} }}"'
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
             if result.returncode == 0 or "already exists" in result.stderr.lower():
