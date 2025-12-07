@@ -29,6 +29,7 @@ function initTabs() {
                 loadRules();
                 loadRuleSources();
                 loadSeverityClassifications();
+                loadTlsSniRules();
             }
             if (tabName === 'config') loadConfig();
             if (tabName === 'blocklists') loadBlocklists();
@@ -882,4 +883,148 @@ async function loadSeverityClassifications() {
 function updateSeverityFilter() {
     const filterValue = document.getElementById('severity-filter').value;
     showNotification(`Alert filter set to priority ${filterValue} and above. Update custom rules or suricata.yaml action settings to apply blocking thresholds.`, 'info');
+}
+
+async function loadTlsSniRules() {
+    try {
+        const response = await fetch('/suricata/api/tls-sni/list');
+        const data = await response.json();
+        
+        const rulesEl = document.getElementById('tls-rules-list');
+        
+        if (!data.rules || data.rules.length === 0) {
+            rulesEl.innerHTML = '<p>No TLS SNI rules found. Add a domain above to create one automatically.</p>';
+        } else {
+            let html = '<table class="data-table"><thead><tr>';
+            html += '<th>Line</th><th>Rule</th><th>Status</th><th>Actions</th>';
+            html += '</tr></thead><tbody>';
+            
+            data.rules.forEach(rule => {
+                html += '<tr>';
+                html += `<td>${rule.line}</td>`;
+                html += `<td><code style="font-size: 0.85em;">${escapeHtml(rule.rule)}</code></td>`;
+                html += `<td>${rule.enabled ? '<span style="color: green;">✓ Enabled</span>' : '<span style="color: gray;">Disabled</span>'}</td>`;
+                html += `<td><button onclick="toggleRule(${rule.line})" class="btn-secondary">Toggle</button></td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            rulesEl.innerHTML = html;
+        }
+        
+        if (data.datasets && data.datasets.length > 0) {
+            const countEl = document.getElementById('tls-domain-count');
+            if (countEl) {
+                countEl.textContent = `(${data.datasets.length} dataset files)`;
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load TLS SNI rules:', error);
+    }
+}
+
+async function addTlsDomain() {
+    const domain = document.getElementById('tls-domain').value.trim();
+    const action = document.getElementById('tls-action').value;
+    
+    if (!domain) {
+        showNotification('Please enter a domain', 'error');
+        return;
+    }
+    
+    if (!confirm(`Add "${domain}" to TLS blocklist?\nAction: ${action}`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/suricata/api/tls-sni/add-domain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ domain: domain, action: action })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification(data.message, 'success');
+            document.getElementById('tls-domain').value = '';
+            loadTlsSniRules();
+            
+            if (document.getElementById('tls-dataset-view').style.display !== 'none') {
+                viewTlsDataset();
+            }
+        } else {
+            showNotification('Failed: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Add failed: ' + error.message, 'error');
+    }
+}
+
+async function viewTlsDataset() {
+    const viewEl = document.getElementById('tls-dataset-view');
+    const listEl = document.getElementById('tls-domains-list');
+    
+    if (viewEl.style.display === 'none') {
+        viewEl.style.display = 'block';
+        listEl.innerHTML = '<p>Loading...</p>';
+        
+        try {
+            const response = await fetch('/suricata/api/tls-sni/view-dataset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dataset: 'blocked-tls-domains.dat' })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                if (data.domains.length === 0) {
+                    listEl.innerHTML = '<p>No domains in blocklist yet.</p>';
+                } else {
+                    let html = `<p><strong>${data.count} domains blocked</strong></p><ul style="list-style: none; padding: 0;">`;
+                    data.domains.forEach(domain => {
+                        html += `<li style="padding: 5px; border-bottom: 1px solid #ddd;">`;
+                        html += `<span>${escapeHtml(domain)}</span>`;
+                        html += `<button onclick="removeTlsDomain('${escapeHtml(domain)}')" class="btn-danger" style="float: right; padding: 2px 8px; font-size: 0.85em;">Remove</button>`;
+                        html += `</li>`;
+                    });
+                    html += '</ul>';
+                    listEl.innerHTML = html;
+                }
+            } else {
+                listEl.innerHTML = '<p>Error loading dataset: ' + escapeHtml(data.error) + '</p>';
+            }
+        } catch (error) {
+            listEl.innerHTML = '<p>Error: ' + escapeHtml(error.message) + '</p>';
+        }
+    } else {
+        viewEl.style.display = 'none';
+    }
+}
+
+async function removeTlsDomain(domain) {
+    if (!confirm(`Remove "${domain}" from TLS blocklist?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/suricata/api/tls-sni/remove-domain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                domain: domain,
+                dataset: 'blocked-tls-domains.dat'
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification(data.message, 'success');
+            viewTlsDataset();
+            loadTlsSniRules();
+        } else {
+            showNotification('Failed: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Remove failed: ' + error.message, 'error');
+    }
 }

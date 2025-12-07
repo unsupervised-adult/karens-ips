@@ -111,6 +111,40 @@
             </div>
 
             <div class="config-section">
+                <h3>TLS/HTTPS Domain Blocking (SNI)</h3>
+                <p>Block domains via TLS Server Name Indication. Uses Suricata datasets for efficient matching.</p>
+                
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <input type="text" id="tls-domain" placeholder="example.com or ads.tracking.net" style="flex: 2;">
+                    <select id="tls-action" style="flex: 1;">
+                        <option value="drop">Drop (Block)</option>
+                        <option value="alert">Alert Only</option>
+                        <option value="reject">Reject (RST)</option>
+                    </select>
+                    <button onclick="addTlsDomain()" class="btn-primary">Add to Blocklist</button>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <button onclick="viewTlsDataset()" class="btn-secondary">View Blocked Domains</button>
+                    <span id="tls-domain-count" style="margin-left: 10px; color: #666;"></span>
+                </div>
+
+                <div id="tls-dataset-view" style="display: none; margin-top: 15px;">
+                    <h4>Blocked TLS Domains</h4>
+                    <div id="tls-domains-list" style="max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px;">
+                        <p>Loading...</p>
+                    </div>
+                </div>
+
+                <div id="tls-sni-rules" style="margin-top: 20px;">
+                    <h4>TLS SNI Rules</h4>
+                    <div id="tls-rules-list">
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-section">
                 <h3>Custom Rules Editor</h3>
                 <div class="rule-editor">
                     <textarea id="new-rule" placeholder="alert tcp any any -> $HOME_NET any (msg:&quot;Example Rule&quot;; sid:1000001; rev:1;)" rows="3"></textarea>

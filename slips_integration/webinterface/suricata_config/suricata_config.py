@@ -671,6 +671,133 @@ def get_severity_levels():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@suricata_bp.route('/api/tls-sni/list')
+def get_tls_sni_rules():
+    try:
+        rules = []
+        datasets = []
+        
+        if os.path.exists(CUSTOM_RULES):
+            result = subprocess.run(['sudo', 'cat', CUSTOM_RULES],
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                for line_num, line in enumerate(result.stdout.split('\n'), 1):
+                    if 'tls.sni' in line or 'tls_sni' in line:
+                        rules.append({
+                            'line': line_num,
+                            'rule': line.strip(),
+                            'enabled': not line.strip().startswith('#')
+                        })
+        
+        dataset_dir = '/var/lib/suricata/datasets'
+        if os.path.exists(dataset_dir):
+            result = subprocess.run(['sudo', 'ls', '-1', dataset_dir],
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                for filename in result.stdout.split('\n'):
+                    if filename.endswith('.dat'):
+                        datasets.append(filename)
+        
+        return jsonify({'rules': rules, 'datasets': datasets})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/tls-sni/add-domain', methods=['POST'])
+def add_tls_sni_domain():
+    try:
+        data = request.get_json()
+        domain = data.get('domain', '').strip()
+        action = data.get('action', 'drop')
+        
+        if not domain:
+            return jsonify({'error': 'Domain cannot be empty'}), 400
+        
+        domain = domain.lower().replace('http://', '').replace('https://', '').split('/')[0]
+        
+        if not re.match(r'^[a-z0-9.-]+$', domain):
+            return jsonify({'error': 'Invalid domain format'}), 400
+        
+        dataset_file = '/var/lib/suricata/datasets/blocked-tls-domains.dat'
+        
+        result = subprocess.run(['sudo', 'mkdir', '-p', '/var/lib/suricata/datasets'],
+                              capture_output=True, text=True, timeout=10)
+        
+        check_result = subprocess.run(['sudo', 'test', '-f', dataset_file],
+                                     capture_output=True, timeout=10)
+        
+        if check_result.returncode != 0:
+            subprocess.run(['sudo', 'touch', dataset_file],
+                         capture_output=True, text=True, timeout=10)
+            subprocess.run(['sudo', 'chmod', '644', dataset_file],
+                         capture_output=True, text=True, timeout=10)
+        
+        append_result = subprocess.run(['sudo', 'bash', '-c', f'echo "{domain}" >> {dataset_file}'],
+                                      capture_output=True, text=True, timeout=10)
+        
+        if append_result.returncode != 0:
+            return jsonify({'error': 'Failed to add domain to dataset'}), 500
+        
+        rule_exists = False
+        if os.path.exists(CUSTOM_RULES):
+            check = subprocess.run(['sudo', 'grep', '-q', 'dataset:blocked-tls-domains', CUSTOM_RULES],
+                                 capture_output=True, timeout=10)
+            rule_exists = check.returncode == 0
+        
+        if not rule_exists:
+            rule = f'{action} tls any any -> any any (msg:"Blocked TLS SNI Domain"; tls.sni; dataset:blocked-tls-domains,type string,load /var/lib/suricata/datasets/blocked-tls-domains.dat; classtype:policy-violation; sid:9000100; rev:1;)\n'
+            subprocess.run(['sudo', 'bash', '-c', f'echo \'{rule}\' >> {CUSTOM_RULES}'],
+                         capture_output=True, text=True, timeout=10)
+        
+        reload_suricata()
+        
+        return jsonify({'success': True, 'message': f'Domain {domain} added to TLS blocklist'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/tls-sni/view-dataset', methods=['POST'])
+def view_tls_dataset():
+    try:
+        data = request.get_json()
+        dataset = data.get('dataset', 'blocked-tls-domains.dat')
+        
+        dataset_path = f'/var/lib/suricata/datasets/{dataset}'
+        
+        result = subprocess.run(['sudo', 'cat', dataset_path],
+                              capture_output=True, text=True, timeout=10)
+        
+        if result.returncode == 0:
+            domains = [line.strip() for line in result.stdout.split('\n') if line.strip()]
+            return jsonify({'success': True, 'domains': domains, 'count': len(domains)})
+        else:
+            return jsonify({'error': 'Dataset not found'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/tls-sni/remove-domain', methods=['POST'])
+def remove_tls_sni_domain():
+    try:
+        data = request.get_json()
+        domain = data.get('domain', '').strip()
+        dataset = data.get('dataset', 'blocked-tls-domains.dat')
+        
+        if not domain:
+            return jsonify({'error': 'Domain cannot be empty'}), 400
+        
+        dataset_path = f'/var/lib/suricata/datasets/{dataset}'
+        
+        result = subprocess.run(['sudo', 'sed', '-i', f'/^{re.escape(domain)}$/d', dataset_path],
+                              capture_output=True, text=True, timeout=10)
+        
+        if result.returncode == 0:
+            reload_suricata()
+            return jsonify({'success': True, 'message': f'Domain {domain} removed'})
+        else:
+            return jsonify({'error': 'Failed to remove domain'}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @suricata_bp.route('/api/database/sync', methods=['POST'])
 def sync_database_to_suricata():
     try:
