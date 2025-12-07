@@ -168,6 +168,31 @@ ml:
   ml_models_folder: modules/ml/models/
 SLIPS_CONFIG_EOF
 
+    # Create empty feed files to prevent "Bad file descriptor" errors
+    log "Creating feed configuration files..."
+    
+    # Create JA3 feeds file
+    cat > config/JA3_feeds.csv << 'JA3_FEEDS_EOF'
+# JA3 Threat Intelligence Feeds
+# Format: URL,Description
+https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv,Abuse.ch SSL Blacklist JA3 Fingerprints
+JA3_FEEDS_EOF
+
+    # Create SSL feeds file
+    cat > config/SSL_feeds.csv << 'SSL_FEEDS_EOF'
+# SSL Certificate Threat Intelligence Feeds
+# Format: URL,Description
+https://sslbl.abuse.ch/blacklist/sslblacklist.csv,Abuse.ch SSL Blacklist
+SSL_FEEDS_EOF
+
+    # Create JARM feeds file
+    cat > config/JARM_feeds.csv << 'JARM_FEEDS_EOF'
+# JARM Threat Intelligence Feeds
+# Format: URL,Description
+JARM_FEEDS_EOF
+
+    chmod 644 config/*.csv
+
     success "SLIPS configuration created at config/slips.yaml"
 }
 
