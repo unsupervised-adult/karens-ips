@@ -1134,17 +1134,17 @@ async function checkTlsRulesStatus() {
     }
 }
 
-// Auto-check TLS rules status when Actions tab is opened
+// Auto-check TLS rules status when Config tab is opened
 document.addEventListener('DOMContentLoaded', function() {
-    const actionsTab = document.querySelector('[data-tab="actions"]');
-    if (actionsTab) {
-        actionsTab.addEventListener('click', function() {
+    const configTab = document.querySelector('[data-tab="config"]');
+    if (configTab) {
+        configTab.addEventListener('click', function() {
             setTimeout(checkTlsRulesStatus, 100);
         });
     }
 
-    // Also check on page load if Actions tab is active
-    if (document.getElementById('actions').classList.contains('active')) {
+    // Also check on page load if Config tab is active
+    if (document.getElementById('config').classList.contains('active')) {
         checkTlsRulesStatus();
     }
 });
