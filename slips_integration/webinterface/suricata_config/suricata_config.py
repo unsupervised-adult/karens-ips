@@ -65,13 +65,16 @@ def get_suricata_stats():
             dropped = 0
             
             if 'message' in data:
-                for key, value in data['message'].items():
-                    if 'packets' in key.lower():
-                        packets += value
-                    elif 'alert' in key.lower():
-                        alerts += value
-                    elif 'drop' in key.lower():
-                        dropped += value
+                msg = data['message']
+                
+                if 'decoder' in msg and 'pkts' in msg['decoder']:
+                    packets = msg['decoder']['pkts']
+                
+                if 'detect' in msg and 'alert' in msg['detect']:
+                    alerts = msg['detect']['alert']
+                
+                if 'ips' in msg and 'blocked' in msg['ips']:
+                    dropped = msg['ips']['blocked']
             
             return {
                 'packets': packets,

@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadStats();
     loadAlerts();
     loadRules();
-    loadConfig();
     
     setInterval(loadStatus, 10000);
     setInterval(loadStats, 5000);
@@ -208,8 +207,11 @@ async function loadBlocklists() {
     statsDiv.innerHTML = '<p>Loading...</p>';
     
     try {
+        console.log('Suricata: Fetching /suricata/api/blocklists...');
         const response = await fetch('/suricata/api/blocklists');
+        console.log('Suricata: Blocklists response status:', response.status);
         const data = await response.json();
+        console.log('Suricata: Blocklists data:', data);
         
         if (data.blocklists && data.blocklists.length > 0) {
             reposDiv.innerHTML = data.blocklists.map(repo => `
@@ -319,8 +321,11 @@ async function loadRules() {
 
 async function loadConfig() {
     try {
+        console.log('Suricata: Fetching /suricata/api/config...');
         const response = await fetch('/suricata/api/config');
+        console.log('Suricata: Config response status:', response.status);
         const data = await response.json();
+        console.log('Suricata: Config data:', data);
         
         document.getElementById('home-net').value = data.home_net || '';
         document.getElementById('external-net').value = data.external_net || '';
@@ -333,8 +338,10 @@ async function loadConfig() {
         } else {
             interfacesInfo.innerHTML = 'No interfaces configured';
         }
+        console.log('Suricata: Config loaded successfully');
     } catch (error) {
-        console.error('Failed to load config:', error);
+        console.error('Suricata: Failed to load config:', error);
+        document.getElementById('interfaces-info').innerHTML = '<p style="color:red;">Error loading configuration</p>';
     }
 }
 
@@ -552,18 +559,22 @@ function escapeHtml(text) {
 
 async function loadDatabaseStats() {
     try {
+        console.log('Suricata: Fetching /suricata/api/database/count...');
         const response = await fetch('/suricata/api/database/count');
+        console.log('Suricata: Database count response status:', response.status);
         const data = await response.json();
+        console.log('Suricata: Database count data:', data);
         
         if (data.success) {
             document.getElementById('db-sources-count').textContent = formatNumber(data.counts.sources);
             document.getElementById('db-domains-count').textContent = formatNumber(data.counts.domains);
             document.getElementById('db-active-sources').textContent = formatNumber(data.counts.active_sources);
+            console.log('Suricata: Database stats loaded successfully');
         }
         
         loadSources();
     } catch (error) {
-        console.error('Failed to load database stats:', error);
+        console.error('Suricata: Failed to load database stats:', error);
     }
 }
 
