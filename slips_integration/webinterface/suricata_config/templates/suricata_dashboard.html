@@ -52,7 +52,7 @@
             <div class="controls">
                 <label>
                     Severity:
-                    <select id="severity-filter">
+                    <select id="alert-severity-filter">
                         <option value="">All</option>
                         <option value="1">High (1)</option>
                         <option value="2">Medium (2)</option>
@@ -98,7 +98,7 @@
                 <p>Suricata uses priority levels: <strong>1 (Critical)</strong>, <strong>2 (High)</strong>, <strong>3 (Medium)</strong>, <strong>4 (Low)</strong></p>
                 <div class="form-group" style="margin-bottom: 15px;">
                     <label>Filter alerts by minimum priority:</label>
-                    <select id="severity-filter" onchange="updateSeverityFilter()" title="Filter alerts by minimum priority level">
+                    <select id="classification-priority-filter" onchange="updateSeverityFilter()" title="Filter alerts by minimum priority level">
                         <option value="4">All Alerts (Priority 1-4)</option>
                         <option value="3">Medium+ (Priority 1-3)</option>
                         <option value="2" selected>High+ (Priority 1-2)</option>

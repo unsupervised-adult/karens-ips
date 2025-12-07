@@ -71,7 +71,7 @@ async function loadStats() {
 }
 
 async function loadAlerts() {
-    const severity = document.getElementById('severity-filter')?.value || '';
+    const severity = document.getElementById('alert-severity-filter')?.value || '';
     const tbody = document.getElementById('alerts-body');
     
     tbody.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
@@ -881,7 +881,7 @@ async function loadSeverityClassifications() {
 }
 
 function updateSeverityFilter() {
-    const filterValue = document.getElementById('severity-filter').value;
+    const filterValue = document.getElementById('classification-priority-filter').value;
     showNotification(`Alert filter set to priority ${filterValue} and above. Update custom rules or suricata.yaml action settings to apply blocking thresholds.`, 'info');
 }
 
