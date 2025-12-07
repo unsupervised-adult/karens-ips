@@ -21,12 +21,13 @@ ml_detector = Blueprint(
 )
 
 def get_redis_connection():
-    """Get direct Redis connection"""
+    """Get direct Redis connection (SLIPS uses DB 1)"""
     try:
-        r = redis.Redis(host='localhost', port=6379, decode_responses=True, db=0)
+        r = redis.Redis(host='localhost', port=6379, decode_responses=True, db=1)
         r.ping()
         return r
-    except:
+    except Exception as e:
+        logger.error(f"Redis connection failed: {e}")
         return None
 
 def get_live_traffic_stats():

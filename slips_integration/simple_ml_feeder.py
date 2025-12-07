@@ -10,7 +10,7 @@ from datetime import datetime
 
 def main():
     # Connect to Redis
-    r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    r = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
     
     print("Starting ML data feeder...")
     

@@ -16,7 +16,7 @@ import os
 
 class AdDetectorTrainer:
     def __init__(self, config_file='/opt/StratosphereLinuxIPS/webinterface/ml_detector/detector_config.json'):
-        self.r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+        self.r = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
         self.config_file = config_file
         self.config = self.load_config()
         

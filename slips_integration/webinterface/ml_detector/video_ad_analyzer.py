@@ -29,7 +29,7 @@ STREAMING_DOMAINS = [
 ]
 
 def analyze_video_ads():
-    r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    r = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
     
     print("🔍 Analyzing SLIPS data with ML + pattern matching...")
     print("🎓 Initializing ML classifier...")

@@ -14,7 +14,7 @@ import numpy as np
 
 class StreamInterruptionDetector:
     def __init__(self):
-        self.r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+        self.r = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
         
         self.streaming_threshold_bytes = 15000
         self.streaming_threshold_packets = 20

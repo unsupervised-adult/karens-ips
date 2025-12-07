@@ -7,7 +7,7 @@ import redis
 import json
 from datetime import datetime
 
-r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+r = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
 
 def analyze_profile(profile_key):
     """Show flow details for a profile"""

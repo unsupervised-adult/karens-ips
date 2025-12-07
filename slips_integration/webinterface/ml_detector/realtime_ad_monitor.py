@@ -33,7 +33,7 @@ def is_streaming_domain(domain):
     return any(x in domain_lower for x in ['googlevideo.com', 'youtube.com', 'youtu.be', 'twitch.tv', 'netflix.com', 'nflxvideo.net'])
 
 def monitor_realtime():
-    r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    r = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
     
     print("🎯 Starting real-time ad monitoring...")
     print("   Watching for new DNS queries...")
