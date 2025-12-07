@@ -1,0 +1,12 @@
+--- a/slips_files/core/database/redis_db/database.py
++++ b/slips_files/core/database/redis_db/database.py
+@@ -350,7 +350,7 @@ class RedisDB(IoCHandler, AlertHandler, ProfileHandler, P2PHandler):
+         Returns a tuple of (bool, error message).
+         """
+         try:
+-            # db 0 changes everytime we run slips
+-            cls.r = cls._connect(cls.redis_port, 0)
++            # db 1 is where SLIPS stores persistent data like ml_detector:stats
++            cls.r = cls._connect(cls.redis_port, 1)
+             # port 6379 db 0 is cache, delete it using -cc flag
+             cls.rcache = cls._connect(6379, 1)
