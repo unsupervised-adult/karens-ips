@@ -103,6 +103,7 @@ sudo ./karens-ips-installer.sh
 
 - **SLIPS Web UI**: `http://[SERVER-IP]:55000`
 - **ML Detector**: Click "ML Detector" tab in SLIPS Web UI
+- **Suricata Config**: Click "Suricata Config" tab for rules, datasets, TLS SNI management
 - **Kalipso CLI**: `sudo kalipso` (terminal interface)
 
 **Service management:**
@@ -118,6 +119,151 @@ systemctl restart suricata slips
 journalctl -fu slips                        # SLIPS behavioral analysis
 tail -f /var/log/suricata/fast.log          # Suricata alerts
 tail -f /var/log/suricata/eve.json | jq    # Detailed EVE JSON logs
+```
+
+## Usage
+
+### Daily Operations
+
+**Check system health:**
+```bash
+# View all service status
+systemctl status redis-server suricata slips slips-webui zeek
+
+# Check detection stats (shows real-time counts)
+redis-cli -n 1 hgetall ml_detector:stats
+
+# View Suricata alerts
+tail -f /var/log/suricata/fast.log
+
+# Monitor SLIPS detections
+journalctl -fu slips | grep -i "detected\|alert"
+```
+
+**Monitor traffic:**
+```bash
+# Real-time Suricata stats
+suricatasc -c "dump-counters" | jq '.message.decoder.pkts'
+
+# View blocked IPs
+cat /var/log/suricata/fast.log | grep "DROP\|REJECT" | awk '{print $NF}' | sort -u
+
+# Check dataset stats (DNS blocklist, TLS SNI)
+suricatasc -c "dataset-list"
+```
+
+### Web Interface Usage
+
+**SLIPS Web UI (http://[SERVER-IP]:55000):**
+
+1. **Overview Tab**: System status, active flows, network statistics
+2. **ML Detector Tab**: 
+   - View detection statistics (253 detections, 45.59% detection rate)
+   - Monitor ad blocking effectiveness
+   - Review confidence scores and feature importance
+   - Browse recent detections with search/filter
+3. **Suricata Config Tab**:
+   - View/reload Suricata rules
+   - Manage DNS blocklists (338K+ domains)
+   - Configure TLS SNI blocking
+   - Monitor dataset statistics
+   - Real-time packet/alert counts
+
+### Blocklist Management
+
+**Add custom blocks:**
+```bash
+# Block specific domain
+ips-filter add malicious-site.com malware
+
+# Import domain list
+ips-filter import-list /path/to/domains.txt ads
+
+# Sync to Suricata (happens automatically)
+ips-filter sync
+```
+
+**Whitelist false positives:**
+```bash
+# Whitelist domain
+ips-filter exception add domain trusted-site.com "Business application"
+
+# Whitelist IP
+ips-filter exception add ip 192.168.1.100 "Internal server"
+
+# List all exceptions
+ips-filter exception list
+```
+
+**Update blocklists:**
+```bash
+# Manual update (normally runs weekly via systemd timer)
+ips-filter update-blocklists
+
+# View blocklist sources and counts
+ips-filter stats
+
+# Check update schedule
+systemctl list-timers blocklist-update.timer
+```
+
+### TLS SNI Blocking
+
+Block domains at TLS handshake level (bypasses DNS):
+
+**Via Web UI:**
+1. Navigate to "Suricata Config" tab
+2. Click "TLS SNI Management" section
+3. Add domains or import lists
+4. Domains automatically added to unified DNS blocklist
+
+**Via API:**
+```bash
+# Add domain via curl
+curl -X POST http://[SERVER-IP]:55000/suricata_config/tls_sni/add \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "tracker.example.com"}'
+
+# View TLS dataset
+curl http://[SERVER-IP]:55000/suricata_config/tls_sni/view
+```
+
+### Troubleshooting
+
+**No detections showing:**
+```bash
+# Verify Redis has data
+redis-cli -n 1 hgetall ml_detector:stats
+
+# Check SLIPS is analyzing traffic
+journalctl -fu slips
+
+# Verify Suricata is processing
+tail -f /var/log/suricata/fast.log
+```
+
+**Dashboard shows zeros:**
+```bash
+# Verify webui connects to Redis DB 1
+grep "db=1" StratosphereLinuxIPS/slips_files/core/database/redis_db/database.py
+
+# Restart services
+systemctl restart slips slips-webui
+
+# Check for errors
+journalctl -xeu slips-webui
+```
+
+**Blocklists not working:**
+```bash
+# Verify dataset loaded
+suricatasc -c "dataset-list"
+
+# Check database
+sqlite3 /var/lib/suricata/ips_filter.db "SELECT COUNT(*) FROM blocklist_entries;"
+
+# Reload Suricata
+systemctl reload suricata
 ```
 
 ## Architecture
