@@ -273,35 +273,86 @@
                   </div>
                 </div>
 
+                <!-- Duration Thresholds -->
+                <div class="row mb-4">
+                  <div class="col-12">
+                    <h6 class="text-primary border-bottom pb-2">⏱️ Duration Thresholds (seconds)</h6>
+                  </div>
+                  <div class="col-md-4">
+                    <label for="streaming_min_duration" class="form-label">
+                      Content Minimum Duration
+                      <small class="text-muted">(videos shorter than this ignored)</small>
+                    </label>
+                    <input type="number" class="form-control" id="streaming_min_duration" min="10" max="600" step="10" value="30">
+                  </div>
+                  <div class="col-md-4">
+                    <label for="ad_duration_min" class="form-label">
+                      Ad Minimum Duration
+                      <small class="text-muted">(flows shorter ignored)</small>
+                    </label>
+                    <input type="number" class="form-control" id="ad_duration_min" min="1" max="30" step="1" value="3">
+                  </div>
+                  <div class="col-md-4">
+                    <label for="ad_duration_max" class="form-label">
+                      Ad Maximum Duration
+                      <small class="text-muted">(ads longer = false positive)</small>
+                    </label>
+                    <input type="number" class="form-control" id="ad_duration_max" min="10" max="300" step="10" value="60">
+                  </div>
+                </div>
+
+                <!-- Size Thresholds -->
+                <div class="row mb-4">
+                  <div class="col-12">
+                    <h6 class="text-primary border-bottom pb-2">📦 Size Thresholds (bytes)</h6>
+                  </div>
+                  <div class="col-md-4">
+                    <label for="streaming_min_bytes" class="form-label">
+                      Content Minimum Bytes
+                    </label>
+                    <input type="number" class="form-control" id="streaming_min_bytes" min="1000" max="100000" step="1000" value="10000">
+                  </div>
+                  <div class="col-md-4">
+                    <label for="streaming_min_packets" class="form-label">
+                      Content Minimum Packets
+                    </label>
+                    <input type="number" class="form-control" id="streaming_min_packets" min="10" max="200" step="10" value="50">
+                  </div>
+                  <div class="col-md-4">
+                    <label for="ad_min_bytes" class="form-label">
+                      Ad Minimum Bytes
+                    </label>
+                    <input type="number" class="form-control" id="ad_min_bytes" min="1000" max="50000" step="1000" value="5000">
+                  </div>
+                </div>
+
                 <!-- Detection Sensitivity -->
                 <div class="row mb-4">
                   <div class="col-12">
-                    <h6 class="text-primary border-bottom pb-2">Detection Sensitivity</h6>
+                    <h6 class="text-primary border-bottom pb-2">🎯 Detection Sensitivity</h6>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="duration_ratio_threshold" class="form-label">
+                      Duration Ratio Threshold
+                      <small class="text-muted">(ad must be &lt; X% of content)</small>
+                    </label>
+                    <input type="range" class="form-range" id="duration_ratio_threshold" min="0.1" max="0.5" step="0.05" value="0.3">
+                    <div class="text-center" id="duration_ratio_value">30%</div>
                   </div>
                   <div class="col-md-6">
                     <label for="confidence_threshold" class="form-label">
-                      Confidence Threshold <small class="text-muted">(minimum to report)</small>
+                      Confidence Threshold
+                      <small class="text-muted">(minimum to report)</small>
                     </label>
                     <input type="range" class="form-range" id="confidence_threshold" min="0.5" max="0.95" step="0.05" value="0.75">
                     <div class="text-center" id="confidence_value">75%</div>
-                  </div>
-                  <div class="col-md-6">
-                    <label for="threat_level_filter" class="form-label">
-                      Minimum Threat Level
-                    </label>
-                    <select class="form-select" id="threat_level_filter">
-                      <option value="INFO">INFO</option>
-                      <option value="MEDIUM" selected>MEDIUM</option>
-                      <option value="HIGH">HIGH</option>
-                      <option value="CRITICAL">CRITICAL</option>
-                    </select>
                   </div>
                 </div>
 
                 <!-- Protocol Settings -->
                 <div class="row mb-4">
                   <div class="col-12">
-                    <h6 class="text-primary border-bottom pb-2">Protocol & Analysis</h6>
+                    <h6 class="text-primary border-bottom pb-2">🔐 Protocol & Analysis</h6>
                   </div>
                   <div class="col-md-3">
                     <div class="form-check form-switch">
@@ -337,22 +388,106 @@
                   </div>
                 </div>
 
-                <!-- Update Frequency -->
+                <!-- ML Parameters -->
                 <div class="row mb-4">
                   <div class="col-12">
-                    <h6 class="text-primary border-bottom pb-2">Monitoring</h6>
+                    <h6 class="text-primary border-bottom pb-2">🤖 ML Model Parameters</h6>
                   </div>
-                  <div class="col-md-6">
-                    <label for="update_frequency" class="form-label">
-                      Dashboard Update Frequency (seconds)
+                  <div class="col-md-3">
+                    <label for="n_estimators" class="form-label">
+                      Number of Estimators
+                      <small class="text-muted">(trees in forest)</small>
                     </label>
-                    <input type="number" class="form-control" id="update_frequency" min="1" max="60" value="5">
+                    <input type="number" class="form-control" id="n_estimators" min="50" max="200" step="10" value="100">
                   </div>
-                  <div class="col-md-6">
-                    <label for="max_detections_display" class="form-label">
-                      Maximum Detections to Display
+                  <div class="col-md-3">
+                    <label for="max_depth" class="form-label">
+                      Maximum Tree Depth
                     </label>
-                    <input type="number" class="form-control" id="max_detections_display" min="10" max="1000" value="100">
+                    <input type="number" class="form-control" id="max_depth" min="5" max="30" step="5" value="15">
+                  </div>
+                  <div class="col-md-3">
+                    <label for="model_type_select" class="form-label">
+                      Model Type
+                    </label>
+                    <select class="form-select" id="model_type_select">
+                      <option value="random_forest" selected>Random Forest</option>
+                      <option value="gradient_boosting">Gradient Boosting</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label for="cpu_cores" class="form-label">
+                      CPU Cores
+                      <small class="text-muted">(-1 = all)</small>
+                    </label>
+                    <input type="number" class="form-control" id="cpu_cores" min="-1" max="64" step="1" value="-1">
+                  </div>
+                </div>
+
+                <!-- Training Settings -->
+                <div class="row mb-4">
+                  <div class="col-12">
+                    <h6 class="text-primary border-bottom pb-2">📚 Training Configuration</h6>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="auto_retrain" checked>
+                      <label class="form-check-label" for="auto_retrain">
+                        Auto Retrain
+                      </label>
+                    </div>
+                    <small class="text-muted">Periodically retrain model</small>
+                  </div>
+                  <div class="col-md-3">
+                    <label for="retrain_interval" class="form-label">
+                      Retrain Interval (hours)
+                    </label>
+                    <input type="number" class="form-control" id="retrain_interval" min="1" max="168" step="1" value="24">
+                  </div>
+                  <div class="col-md-3">
+                    <label for="min_training_samples" class="form-label">
+                      Min Training Samples
+                    </label>
+                    <input type="number" class="form-control" id="min_training_samples" min="50" max="1000" step="50" value="100">
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-check form-switch mt-4">
+                      <input class="form-check-input" type="checkbox" id="cache_predictions" checked>
+                      <label class="form-check-label" for="cache_predictions">
+                        Cache Predictions
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Quick Presets -->
+                <div class="row">
+                  <div class="col-12">
+                    <h6 class="text-primary border-bottom pb-2">⚡ Quick Presets</h6>
+                  </div>
+                  <div class="col-md-3">
+                    <button class="btn btn-outline-primary w-100 mb-2" id="preset_aggressive">
+                      More Sensitive
+                    </button>
+                    <small class="text-muted">Catch more ads (more false positives)</small>
+                  </div>
+                  <div class="col-md-3">
+                    <button class="btn btn-outline-success w-100 mb-2" id="preset_conservative">
+                      Less Sensitive
+                    </button>
+                    <small class="text-muted">Fewer false positives (miss some ads)</small>
+                  </div>
+                  <div class="col-md-3">
+                    <button class="btn btn-outline-info w-100 mb-2" id="preset_balanced">
+                      Balanced
+                    </button>
+                    <small class="text-muted">Recommended default settings</small>
+                  </div>
+                  <div class="col-md-3">
+                    <button class="btn btn-outline-warning w-100 mb-2" id="preset_performance">
+                      Performance
+                    </button>
+                    <small class="text-muted">Lower CPU usage, faster</small>
                   </div>
                 </div>
               </div>
@@ -528,17 +663,44 @@
         $('#confidence_value').text(($(this).val() * 100).toFixed(0) + '%');
       });
 
+      $('#duration_ratio_threshold').on('input', function() {
+        $('#duration_ratio_value').text(($(this).val() * 100).toFixed(0) + '%');
+      });
+
       // Save configuration
       $('#btn_save_config').on('click', function() {
         const config = {
+          // Duration thresholds
+          streaming_min_duration: parseInt($('#streaming_min_duration').val()),
+          ad_duration_min: parseInt($('#ad_duration_min').val()),
+          ad_duration_max: parseInt($('#ad_duration_max').val()),
+
+          // Size thresholds
+          streaming_min_bytes: parseInt($('#streaming_min_bytes').val()),
+          streaming_min_packets: parseInt($('#streaming_min_packets').val()),
+          ad_min_bytes: parseInt($('#ad_min_bytes').val()),
+
+          // Detection sensitivity
+          duration_ratio_threshold: parseFloat($('#duration_ratio_threshold').val()),
           confidence_threshold: parseFloat($('#confidence_threshold').val()),
-          threat_level_filter: $('#threat_level_filter').val(),
+
+          // Protocol settings
           enable_quic_detection: $('#enable_quic_detection').is(':checked'),
           enable_encrypted_analysis: $('#enable_encrypted_analysis').is(':checked'),
           analyze_timing_patterns: $('#analyze_timing_patterns').is(':checked'),
           analyze_packet_sizes: $('#analyze_packet_sizes').is(':checked'),
-          update_frequency: parseInt($('#update_frequency').val()),
-          max_detections_display: parseInt($('#max_detections_display').val())
+
+          // ML parameters
+          n_estimators: parseInt($('#n_estimators').val()),
+          max_depth: parseInt($('#max_depth').val()),
+          model_type: $('#model_type_select').val(),
+          cpu_cores: parseInt($('#cpu_cores').val()),
+
+          // Training settings
+          auto_retrain: $('#auto_retrain').is(':checked'),
+          retrain_interval: parseInt($('#retrain_interval').val()),
+          min_training_samples: parseInt($('#min_training_samples').val()),
+          cache_predictions: $('#cache_predictions').is(':checked')
         };
 
         $.ajax({
@@ -556,21 +718,87 @@
         });
       });
 
-      // Reset configuration
+      // Reset configuration to defaults
+      function resetToDefaults() {
+        // Duration thresholds
+        $('#streaming_min_duration').val(30);
+        $('#ad_duration_min').val(3);
+        $('#ad_duration_max').val(60);
+
+        // Size thresholds
+        $('#streaming_min_bytes').val(10000);
+        $('#streaming_min_packets').val(50);
+        $('#ad_min_bytes').val(5000);
+
+        // Detection sensitivity
+        $('#duration_ratio_threshold').val(0.3);
+        $('#duration_ratio_value').text('30%');
+        $('#confidence_threshold').val(0.75);
+        $('#confidence_value').text('75%');
+
+        // Protocol settings
+        $('#enable_quic_detection').prop('checked', true);
+        $('#enable_encrypted_analysis').prop('checked', true);
+        $('#analyze_timing_patterns').prop('checked', true);
+        $('#analyze_packet_sizes').prop('checked', true);
+
+        // ML parameters
+        $('#n_estimators').val(100);
+        $('#max_depth').val(15);
+        $('#model_type_select').val('random_forest');
+        $('#cpu_cores').val(-1);
+
+        // Training settings
+        $('#auto_retrain').prop('checked', true);
+        $('#retrain_interval').val(24);
+        $('#min_training_samples').val(100);
+        $('#cache_predictions').prop('checked', true);
+      }
+
       $('#btn_reset_config').on('click', function() {
         if (confirm('Reset all settings to defaults?')) {
-          $('#confidence_threshold').val(0.75);
-          $('#confidence_value').text('75%');
-          $('#threat_level_filter').val('MEDIUM');
-          $('#enable_quic_detection').prop('checked', true);
-          $('#enable_encrypted_analysis').prop('checked', true);
-          $('#analyze_timing_patterns').prop('checked', true);
-          $('#analyze_packet_sizes').prop('checked', true);
-          $('#update_frequency').val(5);
-          $('#max_detections_display').val(100);
+          resetToDefaults();
           $('#config_status').html('<div class="alert alert-info">Settings reset to defaults</div>');
           setTimeout(() => $('#config_status').html(''), 3000);
         }
+      });
+
+      // Preset buttons
+      $('#preset_aggressive').on('click', function() {
+        $('#confidence_threshold').val(0.6);
+        $('#confidence_value').text('60%');
+        $('#duration_ratio_threshold').val(0.4);
+        $('#duration_ratio_value').text('40%');
+        $('#ad_duration_min').val(2);
+        $('#ad_duration_max').val(90);
+        $('#config_status').html('<div class="alert alert-info">Applied "More Sensitive" preset</div>');
+        setTimeout(() => $('#config_status').html(''), 3000);
+      });
+
+      $('#preset_conservative').on('click', function() {
+        $('#confidence_threshold').val(0.85);
+        $('#confidence_value').text('85%');
+        $('#duration_ratio_threshold').val(0.2);
+        $('#duration_ratio_value').text('20%');
+        $('#ad_duration_min').val(5);
+        $('#ad_duration_max').val(45);
+        $('#config_status').html('<div class="alert alert-info">Applied "Less Sensitive" preset</div>');
+        setTimeout(() => $('#config_status').html(''), 3000);
+      });
+
+      $('#preset_balanced').on('click', function() {
+        resetToDefaults();
+        $('#config_status').html('<div class="alert alert-info">Applied "Balanced" preset</div>');
+        setTimeout(() => $('#config_status').html(''), 3000);
+      });
+
+      $('#preset_performance').on('click', function() {
+        $('#n_estimators').val(50);
+        $('#max_depth').val(10);
+        $('#cpu_cores').val(2);
+        $('#cache_predictions').prop('checked', true);
+        $('#config_status').html('<div class="alert alert-info">Applied "Performance" preset</div>');
+        setTimeout(() => $('#config_status').html(''), 3000);
       });
 
       // Restart service
