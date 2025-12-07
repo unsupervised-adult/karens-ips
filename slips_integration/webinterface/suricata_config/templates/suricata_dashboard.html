@@ -70,10 +70,11 @@
                             <th>Signature</th>
                             <th>Severity</th>
                             <th>Category</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="alerts-body">
-                        <tr><td colspan="7">Loading...</td></tr>
+                        <tr><td colspan="8">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -136,6 +137,15 @@
                 <h3>Restart Suricata</h3>
                 <p>Fully restart the Suricata service (causes brief downtime).</p>
                 <button onclick="restartSuricata()" class="btn-danger">Restart Service</button>
+            </div>
+
+            <div class="action-card">
+                <h3>Manual Whitelist Entry</h3>
+                <p>Add IP address or CIDR range to whitelist (prevents alerts/blocks).</p>
+                <div class="form-group">
+                    <input type="text" id="manual-whitelist-ip" placeholder="192.168.1.100 or 10.0.0.0/24" style="flex: 2;">
+                    <button onclick="whitelistManualIP()" class="btn-primary">Whitelist IP</button>
+                </div>
             </div>
         </div>
     </div>

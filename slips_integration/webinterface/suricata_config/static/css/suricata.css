@@ -230,6 +230,38 @@ tbody tr:hover {
 .severity-2 { color: #d29922; }
 .severity-3 { color: #58a6ff; }
 
+.action-buttons {
+    white-space: nowrap;
+}
+
+.btn-small {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    margin: 2px;
+}
+
+.action-buttons .btn-small:first-child {
+    background: #238636;
+    border-color: #238636;
+    color: #fff;
+}
+
+.action-buttons .btn-small:first-child:hover {
+    background: #2ea043;
+    border-color: #2ea043;
+}
+
+.action-buttons .btn-small:last-child {
+    background: #6e7681;
+    border-color: #6e7681;
+    color: #fff;
+}
+
+.action-buttons .btn-small:last-child:hover {
+    background: #8b949e;
+    border-color: #8b949e;
+}
+
 .rule-editor {
     background: #161b22;
     border: 1px solid #30363d;

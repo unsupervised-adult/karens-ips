@@ -84,14 +84,97 @@ async function loadAlerts() {
                     <td>${alert.signature}</td>
                     <td class="severity-${alert.severity}">${alert.severity}</td>
                     <td>${alert.category}</td>
+                    <td class="action-buttons">
+                        <button onclick="whitelistIP('${alert.src_ip}')" class="btn-small" title="Allow source IP">Allow IP</button>
+                        <button onclick="suppressSignature(${alert.signature_id}, '${escapeHtml(alert.signature)}')" class="btn-small" title="Suppress this signature">Suppress</button>
+                    </td>
                 </tr>
             `).join('');
         } else {
-            tbody.innerHTML = '<tr><td colspan="7">No alerts found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8">No alerts found</td></tr>';
         }
     } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="7">Error loading alerts</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8">Error loading alerts</td></tr>';
         console.error('Failed to load alerts:', error);
+    }
+}
+
+async function whitelistIP(ip) {
+    if (!confirm(`Allow all traffic from ${ip}? This will add a pass rule.`)) return;
+    
+    try {
+        const response = await fetch('/suricata/api/actions/whitelist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'ip', value: ip })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showNotification(`IP ${ip} whitelisted`, 'success');
+            loadAlerts();
+        } else {
+            showNotification(data.error || 'Failed to whitelist IP', 'error');
+        }
+    } catch (error) {
+        showNotification('Error whitelisting IP', 'error');
+        console.error(error);
+    }
+}
+
+async function suppressSignature(sid, signature) {
+    if (!confirm(`Suppress signature "${signature}" (SID: ${sid})? This will prevent future alerts.`)) return;
+    
+    try {
+        const response = await fetch('/suricata/api/actions/whitelist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'signature', signature_id: sid })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showNotification(`Signature ${sid} suppressed`, 'success');
+            loadAlerts();
+        } else {
+            showNotification(data.error || 'Failed to suppress signature', 'error');
+        }
+    } catch (error) {
+        showNotification('Error suppressing signature', 'error');
+        console.error(error);
+    }
+}
+
+async function whitelistManualIP() {
+    const ip = document.getElementById('manual-whitelist-ip').value.trim();
+    
+    if (!ip) {
+        showNotification('IP address cannot be empty', 'error');
+        return;
+    }
+    
+    if (!confirm(`Whitelist ${ip}? This will add a pass rule.`)) return;
+    
+    try {
+        const response = await fetch('/suricata/api/actions/whitelist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'ip', value: ip })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showNotification(`IP ${ip} whitelisted`, 'success');
+            document.getElementById('manual-whitelist-ip').value = '';
+        } else {
+            showNotification(data.error || 'Failed to whitelist IP', 'error');
+        }
+    } catch (error) {
+        showNotification('Error whitelisting IP', 'error');
+        console.error(error);
     }
 }
 

@@ -8,7 +8,8 @@ Cmnd_Alias SURICATA_CMDS = /usr/bin/systemctl status suricata, \
                            /usr/sbin/nft list set inet home blocked4
 
 Cmnd_Alias SLIPS_WEB_WRITE = /usr/bin/tee /etc/suricata/rules/custom.rules, \
-                             /usr/bin/tee /etc/suricata/suricata.yaml
+                             /usr/bin/tee /etc/suricata/suricata.yaml, \
+                             /usr/bin/tee /etc/suricata/threshold.config
 
 root ALL=(ALL) NOPASSWD: SURICATA_CMDS, SLIPS_WEB_WRITE
 www-data ALL=(ALL) NOPASSWD: SURICATA_CMDS

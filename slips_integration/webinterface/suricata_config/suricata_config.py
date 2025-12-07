@@ -104,6 +104,7 @@ def get_alerts():
                                 'dest_ip': entry.get('dest_ip'),
                                 'proto': entry.get('proto'),
                                 'signature': alert_data.get('signature'),
+                                'signature_id': alert_data.get('signature_id'),
                                 'severity': alert_data.get('severity'),
                                 'category': alert_data.get('category')
                             })
@@ -259,6 +260,45 @@ def update_home_net():
         reload_suricata()
         
         return jsonify({'success': True, 'message': 'HOME_NET updated'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/actions/whitelist', methods=['POST'])
+def add_to_whitelist():
+    try:
+        data = request.get_json()
+        whitelist_type = data.get('type')
+        value = data.get('value', '').strip()
+        
+        if not value:
+            return jsonify({'error': 'Value cannot be empty'}), 400
+        
+        if whitelist_type == 'ip':
+            rule = f"pass ip {value} any -> any any (msg:\"Whitelisted IP {value}\"; sid:9000001; rev:1;)"
+        elif whitelist_type == 'signature':
+            sid = data.get('signature_id')
+            if not sid:
+                return jsonify({'error': 'Signature ID required'}), 400
+            rule = f"# Suppressed signature {sid}"
+            
+            suppress_file = "/etc/suricata/threshold.config"
+            suppress_line = f"suppress gen_id 1, sig_id {sid}\n"
+            
+            os.makedirs(os.path.dirname(suppress_file), exist_ok=True)
+            with open(suppress_file, 'a') as f:
+                f.write(suppress_line)
+            
+            reload_suricata()
+            return jsonify({'success': True, 'message': f'Signature {sid} suppressed'})
+        else:
+            return jsonify({'error': 'Invalid whitelist type'}), 400
+        
+        with open(CUSTOM_RULES, 'a') as f:
+            f.write(rule + '\n')
+        
+        reload_suricata()
+        
+        return jsonify({'success': True, 'message': 'Whitelist rule added'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
