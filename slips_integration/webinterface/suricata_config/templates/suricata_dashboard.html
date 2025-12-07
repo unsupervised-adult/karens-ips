@@ -20,6 +20,7 @@
             <button class="tab-button" data-tab="alerts">Alerts</button>
             <button class="tab-button" data-tab="rules">Custom Rules</button>
             <button class="tab-button" data-tab="config">Configuration</button>
+            <button class="tab-button" data-tab="blocklists">DNS Blocklists</button>
             <button class="tab-button" data-tab="actions">Actions</button>
         </div>
 
@@ -114,6 +115,48 @@
                 <h3>Interface Configuration</h3>
                 <div id="interfaces-info">
                     <p>Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="blocklists" class="tab-content">
+            <h2>DNS Blocklist Management</h2>
+            
+            <div class="config-section">
+                <h3>Blocklist Statistics</h3>
+                <div id="blocklist-stats">
+                    <p>Loading...</p>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>Available Repositories</h3>
+                <div id="blocklist-repos">
+                    <p>Loading...</p>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>Import Lists (Perflyst)</h3>
+                <p>SmartTV tracking, Android tracking, FireTV, SessionReplay</p>
+                <div class="blocklist-grid">
+                    <button onclick="importBlocklist('perflyst', 'smarttv')" class="btn-primary">SmartTV</button>
+                    <button onclick="importBlocklist('perflyst', 'android')" class="btn-primary">Android</button>
+                    <button onclick="importBlocklist('perflyst', 'firetv')" class="btn-primary">FireTV</button>
+                    <button onclick="importBlocklist('perflyst', 'sessionreplay')" class="btn-primary">SessionReplay</button>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>Import Lists (hagezi) - Choose ONE main list</h3>
+                <p>📗 Light (low) | 📘 Normal (medium) | 📒 Pro (recommended) | 📙 Pro++ (aggressive) | 📕 Ultimate (max)</p>
+                <div class="blocklist-grid">
+                    <button onclick="importBlocklist('hagezi', 'light')" class="btn-primary">📗 Light</button>
+                    <button onclick="importBlocklist('hagezi', 'normal')" class="btn-primary">📘 Normal</button>
+                    <button onclick="importBlocklist('hagezi', 'pro')" class="btn-primary">📒 Pro</button>
+                    <button onclick="importBlocklist('hagezi', 'proplus')" class="btn-primary">📙 Pro++</button>
+                    <button onclick="importBlocklist('hagezi', 'ultimate')" class="btn-primary">📕 Ultimate</button>
+                    <button onclick="importBlocklist('hagezi', 'native')" class="btn-primary">Native Tracker</button>
                 </div>
             </div>
         </div>

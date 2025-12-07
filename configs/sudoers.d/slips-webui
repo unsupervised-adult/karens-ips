@@ -5,7 +5,10 @@ Cmnd_Alias SURICATA_CMDS = /usr/bin/systemctl status suricata, \
                            /usr/bin/systemctl restart suricata, \
                            /usr/bin/suricata-update, \
                            /usr/bin/suricatasc *, \
-                           /usr/sbin/nft list set inet home blocked4
+                           /usr/sbin/nft list set inet home blocked4, \
+                           /usr/bin/git clone *, \
+                           /usr/bin/git pull, \
+                           /opt/ips-filter-db.py *
 
 Cmnd_Alias SLIPS_WEB_WRITE = /usr/bin/tee /etc/suricata/rules/custom.rules, \
                              /usr/bin/tee /etc/suricata/suricata.yaml, \

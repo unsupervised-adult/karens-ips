@@ -27,6 +27,7 @@ function initTabs() {
             if (tabName === 'alerts') loadAlerts();
             if (tabName === 'rules') loadRules();
             if (tabName === 'config') loadConfig();
+            if (tabName === 'blocklists') loadBlocklists();
         });
     });
 }
@@ -174,6 +175,96 @@ async function whitelistManualIP() {
         }
     } catch (error) {
         showNotification('Error whitelisting IP', 'error');
+        console.error(error);
+    }
+}
+
+async function loadBlocklists() {
+    const reposDiv = document.getElementById('blocklist-repos');
+    const statsDiv = document.getElementById('blocklist-stats');
+    
+    reposDiv.innerHTML = '<p>Loading...</p>';
+    statsDiv.innerHTML = '<p>Loading...</p>';
+    
+    try {
+        const response = await fetch('/suricata/api/blocklists');
+        const data = await response.json();
+        
+        if (data.blocklists && data.blocklists.length > 0) {
+            reposDiv.innerHTML = data.blocklists.map(repo => `
+                <div class="repo-item">
+                    <div class="repo-info">
+                        <strong>${repo.name}</strong>
+                        <span class="status-badge ${repo.status}">${repo.status}</span>
+                    </div>
+                    <button onclick="updateBlocklistRepo('${repo.type}')" class="btn-primary">Update from GitHub</button>
+                </div>
+            `).join('');
+        } else {
+            reposDiv.innerHTML = '<p>No blocklists cloned yet. Use Update buttons below to clone repositories.</p>';
+        }
+        
+        const statsResponse = await fetch('/suricata/api/blocklists/stats');
+        const statsData = await statsResponse.json();
+        
+        if (statsData.stats) {
+            statsDiv.innerHTML = Object.entries(statsData.stats).map(([key, value]) => 
+                `<div><strong>${key}:</strong> ${value}</div>`
+            ).join('');
+        } else {
+            statsDiv.innerHTML = '<p>No statistics available</p>';
+        }
+    } catch (error) {
+        reposDiv.innerHTML = '<p>Error loading blocklists</p>';
+        console.error('Failed to load blocklists:', error);
+    }
+}
+
+async function updateBlocklistRepo(type) {
+    showNotification(`Updating ${type} repository from GitHub...`, 'success');
+    
+    try {
+        const response = await fetch('/suricata/api/blocklists/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showNotification(`${type} repository updated`, 'success');
+            loadBlocklists();
+        } else {
+            showNotification(data.error || 'Failed to update repository', 'error');
+        }
+    } catch (error) {
+        showNotification('Error updating repository', 'error');
+        console.error(error);
+    }
+}
+
+async function importBlocklist(type, list) {
+    const listName = `${type} ${list}`;
+    showNotification(`Importing ${listName}... (this may take several minutes)`, 'success');
+    
+    try {
+        const response = await fetch('/suricata/api/blocklists/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type, list: list })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showNotification(`${listName} imported and synced to Suricata`, 'success');
+            loadBlocklists();
+        } else {
+            showNotification(data.error || 'Failed to import blocklist', 'error');
+        }
+    } catch (error) {
+        showNotification('Error importing blocklist', 'error');
         console.error(error);
     }
 }

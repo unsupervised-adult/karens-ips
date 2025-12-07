@@ -15,6 +15,9 @@ SURICATA_YAML = "/etc/suricata/suricata.yaml"
 RULES_DIR = "/var/lib/suricata/rules"
 CUSTOM_RULES = "/etc/suricata/rules/custom.rules"
 EVE_JSON = "/var/log/suricata/eve.json"
+BLOCKLISTS_DIR = "/var/lib/suricata/blocklists"
+IPS_FILTER_DB = "/opt/ips-filter-db.py"
+DB_PATH = "/var/lib/suricata/ips_filter.db"
 
 @suricata_bp.route('/')
 def index():
@@ -334,6 +337,156 @@ def update_rulesets():
             return jsonify({'success': True, 'message': 'Rules updated from sources'})
         else:
             return jsonify({'error': result.stderr}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/blocklists')
+def get_blocklists():
+    try:
+        blocklists = []
+        
+        if os.path.exists(BLOCKLISTS_DIR):
+            if os.path.exists(os.path.join(BLOCKLISTS_DIR, 'PiHoleBlocklist')):
+                blocklists.append({
+                    'name': 'Perflyst/PiHoleBlocklist',
+                    'type': 'perflyst',
+                    'status': 'cloned',
+                    'path': 'PiHoleBlocklist'
+                })
+            
+            if os.path.exists(os.path.join(BLOCKLISTS_DIR, 'dns-blocklists')):
+                blocklists.append({
+                    'name': 'hagezi/dns-blocklists',
+                    'type': 'hagezi',
+                    'status': 'cloned',
+                    'path': 'dns-blocklists'
+                })
+        
+        return jsonify({'blocklists': blocklists})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/blocklists/update', methods=['POST'])
+def update_blocklists():
+    try:
+        data = request.get_json()
+        blocklist_type = data.get('type')
+        
+        os.makedirs(BLOCKLISTS_DIR, exist_ok=True)
+        os.chdir(BLOCKLISTS_DIR)
+        
+        if blocklist_type == 'perflyst':
+            if not os.path.exists('PiHoleBlocklist'):
+                result = subprocess.run(['git', 'clone', '--depth', '1', 
+                                       'https://github.com/Perflyst/PiHoleBlocklist.git'],
+                                      capture_output=True, text=True, timeout=300)
+            else:
+                os.chdir('PiHoleBlocklist')
+                result = subprocess.run(['git', 'pull'],
+                                      capture_output=True, text=True, timeout=60)
+                os.chdir('..')
+        
+        elif blocklist_type == 'hagezi':
+            if not os.path.exists('dns-blocklists'):
+                result = subprocess.run(['git', 'clone', '--depth', '1',
+                                       'https://github.com/hagezi/dns-blocklists.git'],
+                                      capture_output=True, text=True, timeout=300)
+            else:
+                os.chdir('dns-blocklists')
+                result = subprocess.run(['git', 'pull'],
+                                      capture_output=True, text=True, timeout=60)
+                os.chdir('..')
+        else:
+            return jsonify({'error': 'Invalid blocklist type'}), 400
+        
+        if result.returncode == 0:
+            return jsonify({'success': True, 'message': f'{blocklist_type} blocklist updated'})
+        else:
+            return jsonify({'error': result.stderr}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/blocklists/import', methods=['POST'])
+def import_blocklist():
+    try:
+        data = request.get_json()
+        blocklist_type = data.get('type')
+        list_name = data.get('list')
+        
+        if not os.path.exists(IPS_FILTER_DB):
+            return jsonify({'error': 'Blocklist manager not installed'}), 500
+        
+        file_map = {
+            'perflyst_smarttv': 'PiHoleBlocklist/SmartTV.txt',
+            'perflyst_android': 'PiHoleBlocklist/android-tracking.txt',
+            'perflyst_firetv': 'PiHoleBlocklist/AmazonFireTV.txt',
+            'perflyst_sessionreplay': 'PiHoleBlocklist/SessionReplay.txt',
+            'hagezi_light': 'dns-blocklists/domains/light.txt',
+            'hagezi_normal': 'dns-blocklists/domains/multi.txt',
+            'hagezi_pro': 'dns-blocklists/domains/pro.txt',
+            'hagezi_proplus': 'dns-blocklists/domains/pro.plus.txt',
+            'hagezi_ultimate': 'dns-blocklists/domains/ultimate.txt',
+            'hagezi_native': 'dns-blocklists/domains/native.txt'
+        }
+        
+        full_list_name = f"{blocklist_type}_{list_name}"
+        if full_list_name not in file_map:
+            return jsonify({'error': 'Invalid blocklist selection'}), 400
+        
+        file_path = os.path.join(BLOCKLISTS_DIR, file_map[full_list_name])
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Blocklist file not found'}), 404
+        
+        result = subprocess.run([
+            IPS_FILTER_DB,
+            '--db-path', DB_PATH,
+            '--import-file', file_path,
+            '--source-name', full_list_name,
+            '--source-description', f'{blocklist_type} {list_name}',
+            '--category', 'ads'
+        ], capture_output=True, text=True, timeout=600)
+        
+        if result.returncode == 0:
+            sync_result = subprocess.run([
+                IPS_FILTER_DB,
+                '--db-path', DB_PATH,
+                '--sync-to-suricata'
+            ], capture_output=True, text=True, timeout=300)
+            
+            if sync_result.returncode == 0:
+                reload_suricata()
+                return jsonify({'success': True, 'message': f'Imported {full_list_name} and synced to Suricata'})
+            else:
+                return jsonify({'warning': 'Import succeeded but sync failed', 'details': sync_result.stderr}), 500
+        else:
+            return jsonify({'error': result.stderr}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/blocklists/stats')
+def get_blocklist_stats():
+    try:
+        if not os.path.exists(IPS_FILTER_DB):
+            return jsonify({'error': 'Blocklist manager not installed'}), 500
+        
+        result = subprocess.run([
+            IPS_FILTER_DB,
+            '--db-path', DB_PATH,
+            '--stats'
+        ], capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            stats = {}
+            for line in result.stdout.split('\n'):
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    stats[key.strip()] = value.strip()
+            return jsonify({'stats': stats})
+        else:
+            return jsonify({'error': result.stderr}), 500
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

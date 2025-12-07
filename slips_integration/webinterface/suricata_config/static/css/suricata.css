@@ -262,6 +262,47 @@ tbody tr:hover {
     border-color: #8b949e;
 }
 
+.blocklist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.blocklist-grid button {
+    width: 100%;
+}
+
+.repo-item {
+    background: #0d1117;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.repo-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.status-badge.cloned {
+    background: #238636;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    display: inline-block;
+}
+
+#blocklist-stats div {
+    padding: 8px;
+    border-bottom: 1px solid #21262d;
+}
+
 .rule-editor {
     background: #161b22;
     border: 1px solid #30363d;
