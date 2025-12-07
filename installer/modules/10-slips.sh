@@ -35,6 +35,9 @@ install_slips() {
     # Configure SLIPS
     configure_slips
 
+    # Download GeoIP databases for enrichment
+    download_geoip_databases
+
     # Install Kalipso dependencies (Web UI)
     install_kalipso
 
@@ -171,6 +174,25 @@ threatintelligence:
   ti_files: config/TI_feeds.csv
   ja3_feeds: config/JA3_feeds.csv
   ssl_feeds: config/SSL_feeds.csv
+
+modules:
+  disable:
+    - template
+  enable:
+    - asn
+    - blocking
+    - flowalerts
+    - http_analyzer
+    - ip_info
+    - leak_detector
+    - riskiq
+    - threat_intelligence
+    - timeline
+    - virustotal
+    - update_manager
+
+update_manager:
+  update_period: 86400
 SLIPS_CONFIG_EOF
 
     # Create empty feed files to prevent "Bad file descriptor" errors
@@ -210,6 +232,47 @@ JARM_FEEDS_EOF
     chmod 644 config/*.csv
 
     success "SLIPS configuration created at config/slips.yaml"
+}
+
+download_geoip_databases() {
+    log "Downloading MaxMind GeoLite2 databases for IP enrichment..."
+
+    cd "$SLIPS_DIR" || error_exit "Failed to change to SLIPS directory"
+    
+    mkdir -p databases
+    cd databases
+
+    local asn_url="https://git.io/GeoLite2-ASN.mmdb"
+    local country_url="https://git.io/GeoLite2-Country.mmdb"
+    
+    if [[ ! -f GeoLite2-ASN.mmdb ]]; then
+        log "Downloading GeoLite2-ASN database..."
+        if wget -q -O GeoLite2-ASN.mmdb "$asn_url" 2>/dev/null || \
+           curl -sL -o GeoLite2-ASN.mmdb "$asn_url" 2>/dev/null; then
+            success "GeoLite2-ASN database downloaded"
+        else
+            warn "Failed to download GeoLite2-ASN database - ASN info will be unavailable"
+        fi
+    else
+        log "GeoLite2-ASN database already exists"
+    fi
+    
+    if [[ ! -f GeoLite2-Country.mmdb ]]; then
+        log "Downloading GeoLite2-Country database..."
+        if wget -q -O GeoLite2-Country.mmdb "$country_url" 2>/dev/null || \
+           curl -sL -o GeoLite2-Country.mmdb "$country_url" 2>/dev/null; then
+            success "GeoLite2-Country database downloaded"
+        else
+            warn "Failed to download GeoLite2-Country database - Country info will be unavailable"
+        fi
+    else
+        log "GeoLite2-Country database already exists"
+    fi
+    
+    chmod 644 *.mmdb 2>/dev/null || true
+    cd "$SLIPS_DIR"
+    
+    success "GeoIP databases configured"
 }
 
 install_kalipso() {
@@ -516,6 +579,7 @@ export -f check_zeek_availability
 export -f clone_slips_repository
 export -f setup_slips_venv
 export -f configure_slips
+export -f download_geoip_databases
 export -f install_kalipso
 export -f configure_zeek_integration
 export -f setup_slips_directories
