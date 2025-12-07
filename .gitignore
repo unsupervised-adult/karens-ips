@@ -53,4 +53,10 @@ config/secrets.yaml
 
 # External repositories (cloned for integration reference)
 StratosphereLinuxIPS/
+# Exception: Track our patched database.py file
+!StratosphereLinuxIPS/slips_files/
+!StratosphereLinuxIPS/slips_files/core/
+!StratosphereLinuxIPS/slips_files/core/database/
+!StratosphereLinuxIPS/slips_files/core/database/redis_db/
+!StratosphereLinuxIPS/slips_files/core/database/redis_db/database.py
 blocklists/
