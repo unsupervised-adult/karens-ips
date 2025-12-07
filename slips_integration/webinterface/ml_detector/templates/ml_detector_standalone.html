@@ -217,27 +217,147 @@
       </div>
     </div>
 
-    <!-- Recent Detections Table -->
+    <!-- Tabs Navigation -->
     <div class="row">
       <div class="col-12">
-        <div class="table-card">
-          <h5 class="mb-4">Recent Detections</h5>
-          <table id="detections_table" class="table table-striped table-hover">
-            <thead>
-              <tr>
-                <th>Timestamp</th>
-                <th>Source IP</th>
-                <th>Destination IP</th>
-                <th>Protocol</th>
-                <th>Port</th>
-                <th>Classification</th>
-                <th>Confidence</th>
-                <th>Threat Level</th>
-              </tr>
-            </thead>
-            <tbody>
-            </tbody>
-          </table>
+        <div class="card">
+          <div class="card-body">
+            <ul class="nav nav-tabs" id="mlTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="detections-tab" data-bs-toggle="tab" data-bs-target="#detections" type="button" role="tab">
+                  Recent Detections
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab">
+                  Settings
+                </button>
+              </li>
+            </ul>
+
+            <div class="tab-content mt-3" id="mlTabContent">
+              <!-- Recent Detections Tab -->
+              <div class="tab-pane fade show active" id="detections" role="tabpanel">
+                <table id="detections_table" class="table table-striped table-hover">
+                  <thead>
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>Source IP</th>
+                      <th>Destination IP</th>
+                      <th>Protocol</th>
+                      <th>Port</th>
+                      <th>Classification</th>
+                      <th>Confidence</th>
+                      <th>Threat Level</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Settings Tab -->
+              <div class="tab-pane fade" id="settings" role="tabpanel">
+                <div class="row mb-3">
+                  <div class="col-12">
+                    <button id="btn_save_config" class="btn btn-success me-2">
+                      Save Configuration
+                    </button>
+                    <button id="btn_reset_config" class="btn btn-warning me-2">
+                      Reset to Defaults
+                    </button>
+                    <button id="btn_restart_service" class="btn btn-info">
+                      Restart Monitor Service
+                    </button>
+                    <div id="config_status" class="mt-2"></div>
+                  </div>
+                </div>
+
+                <!-- Detection Sensitivity -->
+                <div class="row mb-4">
+                  <div class="col-12">
+                    <h6 class="text-primary border-bottom pb-2">Detection Sensitivity</h6>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="confidence_threshold" class="form-label">
+                      Confidence Threshold <small class="text-muted">(minimum to report)</small>
+                    </label>
+                    <input type="range" class="form-range" id="confidence_threshold" min="0.5" max="0.95" step="0.05" value="0.75">
+                    <div class="text-center" id="confidence_value">75%</div>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="threat_level_filter" class="form-label">
+                      Minimum Threat Level
+                    </label>
+                    <select class="form-select" id="threat_level_filter">
+                      <option value="INFO">INFO</option>
+                      <option value="MEDIUM" selected>MEDIUM</option>
+                      <option value="HIGH">HIGH</option>
+                      <option value="CRITICAL">CRITICAL</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Protocol Settings -->
+                <div class="row mb-4">
+                  <div class="col-12">
+                    <h6 class="text-primary border-bottom pb-2">Protocol & Analysis</h6>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="enable_quic_detection" checked>
+                      <label class="form-check-label" for="enable_quic_detection">
+                        QUIC Detection
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="enable_encrypted_analysis" checked>
+                      <label class="form-check-label" for="enable_encrypted_analysis">
+                        Encrypted Analysis
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="analyze_timing_patterns" checked>
+                      <label class="form-check-label" for="analyze_timing_patterns">
+                        Timing Patterns
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="analyze_packet_sizes" checked>
+                      <label class="form-check-label" for="analyze_packet_sizes">
+                        Packet Sizes
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Update Frequency -->
+                <div class="row mb-4">
+                  <div class="col-12">
+                    <h6 class="text-primary border-bottom pb-2">Monitoring</h6>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="update_frequency" class="form-label">
+                      Dashboard Update Frequency (seconds)
+                    </label>
+                    <input type="number" class="form-control" id="update_frequency" min="1" max="60" value="5">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="max_detections_display" class="form-label">
+                      Maximum Detections to Display
+                    </label>
+                    <input type="number" class="form-control" id="max_detections_display" min="10" max="1000" value="100">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -400,6 +520,76 @@
         }
       });
     }
+
+    // Settings handlers
+    $(document).ready(function() {
+      // Update slider value displays
+      $('#confidence_threshold').on('input', function() {
+        $('#confidence_value').text(($(this).val() * 100).toFixed(0) + '%');
+      });
+
+      // Save configuration
+      $('#btn_save_config').on('click', function() {
+        const config = {
+          confidence_threshold: parseFloat($('#confidence_threshold').val()),
+          threat_level_filter: $('#threat_level_filter').val(),
+          enable_quic_detection: $('#enable_quic_detection').is(':checked'),
+          enable_encrypted_analysis: $('#enable_encrypted_analysis').is(':checked'),
+          analyze_timing_patterns: $('#analyze_timing_patterns').is(':checked'),
+          analyze_packet_sizes: $('#analyze_packet_sizes').is(':checked'),
+          update_frequency: parseInt($('#update_frequency').val()),
+          max_detections_display: parseInt($('#max_detections_display').val())
+        };
+
+        $.ajax({
+          url: '/ml_detector/config',
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify(config),
+          success: function(response) {
+            $('#config_status').html('<div class="alert alert-success">Configuration saved successfully!</div>');
+            setTimeout(() => $('#config_status').html(''), 3000);
+          },
+          error: function(xhr, status, error) {
+            $('#config_status').html('<div class="alert alert-danger">Failed to save configuration: ' + error + '</div>');
+          }
+        });
+      });
+
+      // Reset configuration
+      $('#btn_reset_config').on('click', function() {
+        if (confirm('Reset all settings to defaults?')) {
+          $('#confidence_threshold').val(0.75);
+          $('#confidence_value').text('75%');
+          $('#threat_level_filter').val('MEDIUM');
+          $('#enable_quic_detection').prop('checked', true);
+          $('#enable_encrypted_analysis').prop('checked', true);
+          $('#analyze_timing_patterns').prop('checked', true);
+          $('#analyze_packet_sizes').prop('checked', true);
+          $('#update_frequency').val(5);
+          $('#max_detections_display').val(100);
+          $('#config_status').html('<div class="alert alert-info">Settings reset to defaults</div>');
+          setTimeout(() => $('#config_status').html(''), 3000);
+        }
+      });
+
+      // Restart service
+      $('#btn_restart_service').on('click', function() {
+        if (confirm('Restart the ML detector monitoring service?')) {
+          $.ajax({
+            url: '/ml_detector/service/restart',
+            method: 'POST',
+            success: function(response) {
+              $('#config_status').html('<div class="alert alert-success">Service restarted successfully!</div>');
+              setTimeout(() => $('#config_status').html(''), 3000);
+            },
+            error: function(xhr, status, error) {
+              $('#config_status').html('<div class="alert alert-danger">Failed to restart service: ' + error + '</div>');
+            }
+          });
+        }
+      });
+    });
   </script>
 </body>
 </html>
