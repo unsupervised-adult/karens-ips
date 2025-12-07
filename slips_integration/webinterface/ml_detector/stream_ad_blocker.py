@@ -70,6 +70,10 @@ class StreamAdBlocker:
             ('prime', ['primevideo.com', 'amazon.com/gp/video'])
         ]
 
+        # YouTube ad learning: Track connection patterns
+        # Key: IP address, Value: {'flows': [], 'classified_as_ad': bool, 'confidence': float}
+        self.youtube_connection_cache = {}
+
     def is_ad_domain(self, domain):
         """Check if domain matches ad patterns"""
         domain_lower = domain.lower()
@@ -78,12 +82,15 @@ class StreamAdBlocker:
     def analyze_flow_pattern(self, flow_data):
         """
         Analyze flow characteristics to detect in-stream ads
+        Includes QUIC-specific detection for YouTube/streaming ads
         Returns: (is_ad, confidence, reason)
         """
         try:
             packets = int(flow_data.get('pkts', 0))
             bytes_sent = int(flow_data.get('bytes', 0))
             duration = float(flow_data.get('dur', 0.1))
+            protocol = flow_data.get('proto', '').upper()
+            dst_port = int(flow_data.get('dport', 0))
 
             # Calculate flow characteristics
             avg_packet_size = bytes_sent / max(packets, 1)
@@ -93,21 +100,55 @@ class StreamAdBlocker:
             # Ad detection heuristics based on flow patterns
             reasons = []
             confidence = 0.0
+            is_quic = (protocol == 'UDP' and dst_port == 443)
 
-            # 1. Short duration flows (3-60 seconds) - typical for ads
-            if 3 < duration < 60:
-                confidence += 0.2
-                reasons.append(f"ad_duration:{duration:.1f}s")
+            # QUIC-specific detection (YouTube, modern streaming)
+            if is_quic:
+                # QUIC ads have distinct patterns vs content
 
-            # 2. Moderate data size (5KB - 50MB) - typical ad size
-            if 5000 < bytes_sent < 50000000:
-                confidence += 0.15
-                reasons.append(f"ad_size:{bytes_sent/1024:.1f}KB")
+                # 1. Pre-roll ads: Short burst at video start (5-30s)
+                if 5 < duration < 30 and byte_rate > 100000:
+                    confidence += 0.3
+                    reasons.append(f"quic_preroll:{duration:.1f}s")
 
-            # 3. High packet rate indicates streaming, but short = ad
-            if packet_rate > 10 and duration < 45:
-                confidence += 0.2
-                reasons.append(f"burst_pattern")
+                # 2. Mid-roll ads: Moderate duration with specific byte patterns
+                if 10 < duration < 60 and 500000 < bytes_sent < 20000000:
+                    confidence += 0.25
+                    reasons.append(f"quic_midroll:{bytes_sent/1024/1024:.1f}MB")
+
+                # 3. QUIC ad connections have higher packet rates (more overhead)
+                if packet_rate > 50 and duration < 45:
+                    confidence += 0.2
+                    reasons.append(f"quic_high_pkt_rate:{packet_rate:.0f}pps")
+
+                # 4. Small QUIC flows are often ad beacons/tracking
+                if bytes_sent < 50000 and packets < 20:
+                    confidence += 0.2
+                    reasons.append(f"quic_beacon")
+
+                # 5. YouTube ads have characteristic packet size distribution
+                # Ads use lower bitrate encoding: avg packet ~1100-1300 bytes
+                # Content uses higher bitrate: avg packet ~1350-1500 bytes
+                if 1000 < avg_packet_size < 1300 and duration < 60:
+                    confidence += 0.15
+                    reasons.append(f"quic_ad_bitrate")
+
+            # Standard TCP/HTTP detection
+            else:
+                # 1. Short duration flows (3-60 seconds) - typical for ads
+                if 3 < duration < 60:
+                    confidence += 0.2
+                    reasons.append(f"ad_duration:{duration:.1f}s")
+
+                # 2. Moderate data size (5KB - 50MB) - typical ad size
+                if 5000 < bytes_sent < 50000000:
+                    confidence += 0.15
+                    reasons.append(f"ad_size:{bytes_sent/1024:.1f}KB")
+
+                # 3. High packet rate indicates streaming, but short = ad
+                if packet_rate > 10 and duration < 45:
+                    confidence += 0.2
+                    reasons.append(f"burst_pattern")
 
             # 4. Small packet count but high data rate = preroll ad
             if packets < 100 and byte_rate > 10000:
@@ -213,6 +254,52 @@ class StreamAdBlocker:
         except Exception as e:
             print(f"❌ Error blocking {domain}: {e}")
             return False
+
+    def learn_youtube_pattern(self, dst_ip, flow_data, is_ad, confidence):
+        """
+        Learn YouTube ad patterns for future detection
+        Stores connection characteristics to improve QUIC ad detection
+        """
+        try:
+            # Only learn from YouTube/QUIC connections
+            protocol = flow_data.get('proto', '').upper()
+            dst_port = int(flow_data.get('dport', 0))
+
+            if protocol == 'UDP' and dst_port == 443:
+                # Extract features
+                pattern = {
+                    'ip': dst_ip,
+                    'duration': float(flow_data.get('dur', 0)),
+                    'bytes': int(flow_data.get('bytes', 0)),
+                    'packets': int(flow_data.get('pkts', 0)),
+                    'avg_pkt_size': int(flow_data.get('bytes', 0)) / max(int(flow_data.get('pkts', 1)), 1),
+                    'byte_rate': int(flow_data.get('bytes', 0)) / max(float(flow_data.get('dur', 0.1)), 0.1),
+                    'is_ad': is_ad,
+                    'confidence': confidence,
+                    'timestamp': datetime.now().isoformat()
+                }
+
+                # Store in Redis for ML retraining
+                self.r.lpush('ml_detector:youtube_quic_patterns', json.dumps(pattern))
+                self.r.ltrim('ml_detector:youtube_quic_patterns', 0, 9999)  # Keep last 10k patterns
+
+                # Cache locally for immediate use
+                if dst_ip not in self.youtube_connection_cache:
+                    self.youtube_connection_cache[dst_ip] = []
+
+                self.youtube_connection_cache[dst_ip].append(pattern)
+
+                # Keep cache size reasonable (max 100 IPs, 50 patterns each)
+                if len(self.youtube_connection_cache) > 100:
+                    # Remove oldest IP
+                    oldest_ip = list(self.youtube_connection_cache.keys())[0]
+                    del self.youtube_connection_cache[oldest_ip]
+
+                if len(self.youtube_connection_cache[dst_ip]) > 50:
+                    self.youtube_connection_cache[dst_ip] = self.youtube_connection_cache[dst_ip][-50:]
+
+        except Exception as e:
+            print(f"⚠️  Error learning pattern: {e}")
 
     def process_detection(self, domain, dst_ip, confidence, method, flow_data):
         """Process a detected ad and optionally block it"""
@@ -334,14 +421,26 @@ class StreamAdBlocker:
                             if is_ad_ml or is_ad_flow:
                                 combined_confidence = max(ml_confidence, flow_confidence)
                                 method = f"{ml_method}+flow:{flow_reason}" if is_ad_flow else ml_method
+
+                                # Learn from this detection (for YouTube/QUIC)
+                                if 'googlevideo' in domain or 'youtube' in domain:
+                                    self.learn_youtube_pattern(dst_ip, flow_data, True, combined_confidence)
+
                                 self.process_detection(domain, dst_ip, combined_confidence, method, flow_data)
                         else:
                             # Pattern-only mode
                             if is_ad_flow:
+                                # Learn from this detection (for YouTube/QUIC)
+                                if 'googlevideo' in domain or 'youtube' in domain:
+                                    self.learn_youtube_pattern(dst_ip, flow_data, True, flow_confidence)
+
                                 self.process_detection(domain, dst_ip, flow_confidence,
                                                      f"pattern+flow:{flow_reason}", flow_data)
                             else:
                                 # Just domain pattern match
+                                if 'googlevideo' in domain or 'youtube' in domain:
+                                    self.learn_youtube_pattern(dst_ip, flow_data, True, 0.85)
+
                                 self.process_detection(domain, dst_ip, 0.85,
                                                      "domain_pattern", flow_data)
 
