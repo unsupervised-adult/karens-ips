@@ -162,7 +162,7 @@ main:
 
 input:
   zeek_logs_input: /var/log/zeek/
-  process_zeek_logs: yes
+  process_zeek_logs: no
 
 redis:
   redis_host: 127.0.0.1
@@ -182,6 +182,8 @@ modules:
   disable:
     - template
   enable:
+    - flowmldetection
+    - ml_dashboard_feeder
     - asn
     - blocking
     - flowalerts

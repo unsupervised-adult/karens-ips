@@ -77,20 +77,40 @@ canvas {
 }
 
 /* Tables */
+.table-responsive {
+    overflow-x: auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
 #table_detections,
 #table_alerts,
 #feedback_table {
     font-size: 0.9rem;
     width: 100%;
+    border-collapse: collapse;
+    margin: 0;
 }
 
 #table_detections thead th,
 #table_alerts thead th,
 #feedback_table thead th {
-    background-color: #0d6efd;
+    background-color: #495057;
     color: white;
     font-weight: 600;
     border: none;
+    white-space: nowrap;
+    padding: 12px 16px;
+    text-align: left;
+}
+
+#table_detections tbody td,
+#table_alerts tbody td,
+#feedback_table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e9ecef;
+    white-space: nowrap;
 }
 
 #table_detections tbody tr:hover,
@@ -99,10 +119,10 @@ canvas {
     background-color: #f8f9fa;
 }
 
-#table_detections tbody td,
-#table_alerts tbody td,
-#feedback_table tbody td {
-    border-bottom: 1px solid #e9ecef;
+#table_detections tbody tr:last-child td,
+#table_alerts tbody tr:last-child td,
+#feedback_table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 /* Badges */

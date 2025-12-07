@@ -244,6 +244,14 @@ import_community_blocklists() {
     show_blocklist_stats
 
     log ""
+    log "Creating symlinks for web interface..."
+    # Create symlinks so web interface can access blocklists
+    mkdir -p /var/lib/suricata/blocklists
+    ln -sf "$BLOCKLISTS_DIR/PiHoleBlocklist" /var/lib/suricata/blocklists/PiHoleBlocklist
+    ln -sf "$BLOCKLISTS_DIR/dns-blocklists" /var/lib/suricata/blocklists/dns-blocklists
+    success "Symlinks created"
+
+    log ""
     success "Blocklist import complete!"
     log "Database: /var/lib/suricata/ips_filter.db"
     log "Blocklists: $BLOCKLISTS_DIR"

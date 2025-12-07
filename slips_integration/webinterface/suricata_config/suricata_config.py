@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, make_response
 import subprocess
 import json
 import os
@@ -21,7 +21,11 @@ DB_PATH = "/var/lib/suricata/ips_filter.db"
 
 @suricata_bp.route('/')
 def index():
-    return render_template('suricata_dashboard.html')
+    response = make_response(render_template('suricata_dashboard.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @suricata_bp.route('/api/status')
 def get_status():
@@ -53,37 +57,43 @@ def get_stats():
         return jsonify({'error': str(e)}), 500
 
 def get_suricata_stats():
+    """Get REAL packet statistics from Suricata stats.log"""
     try:
-        result = subprocess.run(['sudo', 'suricatasc', '-c', 'dump-counters'],
-                              capture_output=True, text=True, timeout=10)
-        
-        if result.returncode == 0:
-            data = json.loads(result.stdout)
-            
-            packets = 0
-            alerts = 0
-            dropped = 0
-            
-            if 'message' in data:
-                msg = data['message']
-                
-                if 'decoder' in msg and 'pkts' in msg['decoder']:
-                    packets = msg['decoder']['pkts']
-                
-                if 'detect' in msg and 'alert' in msg['detect']:
-                    alerts = msg['detect']['alert']
-                
-                if 'ips' in msg and 'blocked' in msg['ips']:
-                    dropped = msg['ips']['blocked']
-            
-            return {
-                'packets': packets,
-                'alerts': alerts,
-                'dropped': dropped
-            }
-        else:
-            return {'packets': 0, 'alerts': 0, 'dropped': 0}
-    except Exception:
+        packets = 0
+        alerts = 0
+        dropped = 0
+
+        # Read from stats.log for real packet counts
+        stats_log = '/var/log/suricata/stats.log'
+        if os.path.exists(stats_log):
+            # Get the last occurrence of each counter
+            with open(stats_log, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    # Format: "decoder.pkts                                                 | Total                     | 1653860"
+                    if '| Total |' in line or '| Total                     |' in line:
+                        parts = line.split('|')
+                        if len(parts) >= 3:
+                            counter_name = parts[0].strip()
+                            value_str = parts[2].strip()
+                            try:
+                                value = int(value_str)
+                                if counter_name == 'decoder.pkts':
+                                    packets = value
+                                elif counter_name == 'detect.alert':
+                                    alerts = value
+                                elif counter_name == 'ips.blocked':
+                                    dropped = value
+                            except ValueError:
+                                continue
+
+        return {
+            'packets': packets,
+            'alerts': alerts,
+            'dropped': dropped
+        }
+    except Exception as e:
+        print(f"Error reading Suricata stats: {e}")
         return {'packets': 0, 'alerts': 0, 'dropped': 0}
 
 @suricata_bp.route('/api/alerts')
@@ -224,19 +234,27 @@ def get_config():
     try:
         if not os.path.exists(SURICATA_YAML):
             return jsonify({'error': 'Config file not found'}), 404
-        
+
         with open(SURICATA_YAML, 'r') as f:
             config = yaml.safe_load(f)
-        
+
+        # Determine operating mode by checking systemd service description
+        try:
+            mode_result = subprocess.run(['systemctl', 'show', 'suricata', '-p', 'Description'],
+                                       capture_output=True, text=True, timeout=5)
+            mode = 'NFQUEUE (Inline IPS)' if 'NFQUEUE' in mode_result.stdout else 'IDS Mode'
+        except:
+            mode = 'Unknown'
+
         simplified = {
             'home_net': config.get('vars', {}).get('address-groups', {}).get('HOME_NET', 'Not set'),
             'external_net': config.get('vars', {}).get('address-groups', {}).get('EXTERNAL_NET', 'Not set'),
-            'interfaces': config.get('af-packet', []),
+            'mode': mode,
             'logging': {
                 'eve': config.get('outputs', [{}])[0].get('eve-log', {}).get('enabled', False) if config.get('outputs') else False
             }
         }
-        
+
         return jsonify(simplified)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -454,7 +472,7 @@ def import_blocklist():
             sync_result = subprocess.run([
                 IPS_FILTER_DB,
                 '--db-path', DB_PATH,
-                '--sync-to-suricata'
+                '--sync'
             ], capture_output=True, text=True, timeout=300)
             
             if sync_result.returncode == 0:

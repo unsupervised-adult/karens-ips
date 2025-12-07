@@ -281,9 +281,19 @@ main_install() {
         warn "Module create_motd not found, skipping..."
     fi
 
-    # Phase 18: Verification
+    # Phase 18: Nginx Reverse Proxy
+    if [[ "${ENABLE_NGINX:-true}" == "true" ]]; then
+        if command -v configure_nginx_proxy &>/dev/null; then
+            log "Phase 18: Configuring Nginx reverse proxy..."
+            configure_nginx_proxy
+        else
+            warn "Module configure_nginx_proxy not found, skipping..."
+        fi
+    fi
+
+    # Phase 19: Verification
     if command -v verify_installation &>/dev/null; then
-        log "Phase 18: Verifying installation..."
+        log "Phase 19: Verifying installation..."
         verify_installation
     else
         warn "Module verify_installation not found, skipping..."

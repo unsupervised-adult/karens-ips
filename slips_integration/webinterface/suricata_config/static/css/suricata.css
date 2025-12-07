@@ -92,12 +92,19 @@ h3 {
 }
 
 .tab-content {
-    display: none;
+    display: none !important;
     animation: fadeIn 0.3s;
 }
 
 .tab-content.active {
-    display: block;
+    display: block !important;
+    background: #f8f9fa !important;
+    min-height: 200px !important;
+    padding: 20px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 1 !important;
 }
 
 @keyframes fadeIn {

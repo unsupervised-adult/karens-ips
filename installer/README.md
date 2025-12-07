@@ -4,7 +4,7 @@ This directory contains the modular installer architecture for Karen's IPS.
 
 ## Directory Structure
 
-```
+```bash
 installer/
 ├── main.sh                     # Main orchestrator script
 ├── config/
@@ -402,3 +402,134 @@ When adding new modules:
 ## License
 
 GPL-2.0-only - See LICENSE file for details
+
+## Security: Nginx Reverse Proxy
+
+The installer automatically configures Nginx as a reverse proxy with multiple security layers:
+
+### Features
+
+- **HTTPS/TLS Encryption**: All traffic encrypted with TLS 1.2/1.3
+- **HTTP Basic Authentication**: Username/password protection
+- **Rate Limiting**:
+  - General requests: 30 requests/minute
+  - API endpoints: 5 requests/minute
+  - Login attempts: 5 requests/minute
+- **Security Headers**:
+  - Strict-Transport-Security (HSTS)
+  - X-Frame-Options
+  - X-Content-Type-Options
+  - X-XSS-Protection
+  - Referrer-Policy
+- **Auto HTTP→HTTPS Redirect**: Forces secure connections
+
+### Access
+
+After installation:
+
+```bash
+# View credentials
+sudo cat /root/.karens-ips-credentials
+
+# Access web interface
+https://YOUR_SERVER_IP
+```
+
+### Certificate Management
+
+#### Self-Signed Certificate (Default)
+
+The installer generates a self-signed certificate. Your browser will show a security warning - this is expected.
+
+**To accept**:
+
+1. Click "Advanced" or "Show Details"
+2. Click "Proceed" or "Accept the Risk"
+
+#### Let's Encrypt (Recommended for Production)
+
+Replace the self-signed certificate with a free Let's Encrypt certificate:
+
+```bash
+# Install certbot
+apt-get install certbot python3-certbot-nginx
+
+# Obtain certificate (replace example.com with your domain)
+certbot --nginx -d your-domain.com
+
+# Auto-renewal is configured automatically
+systemctl status certbot.timer
+```
+
+### Configuration Files
+
+- **Nginx Config**: `/etc/nginx/sites-available/karens-ips`
+- **SSL Certificate**: `/etc/nginx/ssl/karens-ips.crt`
+- **SSL Key**: `/etc/nginx/ssl/karens-ips.key`
+- **Credentials**: `/root/.karens-ips-credentials`
+- **Auth File**: `/etc/nginx/.htpasswd`
+
+### Adding Users
+
+```bash
+# Add a new user
+sudo htpasswd /etc/nginx/.htpasswd username
+
+# Remove a user
+sudo htpasswd -D /etc/nginx/.htpasswd username
+
+# Reload nginx
+sudo systemctl reload nginx
+```
+
+### IP Whitelisting (Optional)
+
+Restrict access to specific IPs:
+
+```bash
+# Edit nginx config
+sudo nano /etc/nginx/sites-available/karens-ips
+
+# Add inside the server block:
+# allow 192.168.1.0/24;
+# allow 10.0.0.0/8;
+# deny all;
+
+# Reload nginx
+sudo systemctl reload nginx
+```
+
+### Disabling Authentication
+
+If you want to disable authentication (not recommended):
+
+```bash
+# Edit nginx config
+sudo nano /etc/nginx/sites-available/karens-ips
+
+# Comment out these lines:
+# auth_basic "Karen's IPS - Authentication Required";
+# auth_basic_user_file /etc/nginx/.htpasswd;
+
+# Reload nginx
+sudo systemctl reload nginx
+```
+
+### Troubleshooting
+
+```bash
+# Check nginx status
+sudo systemctl status nginx
+
+# Test configuration
+sudo nginx -t
+
+# View error logs
+sudo tail -f /var/log/nginx/karens-ips-error.log
+
+# View access logs
+sudo tail -f /var/log/nginx/karens-ips-access.log
+
+# Restart nginx
+sudo systemctl restart nginx
+```

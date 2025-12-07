@@ -12,19 +12,29 @@ document.addEventListener('DOMContentLoaded', function() {
 function initTabs() {
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
-    
+
+    console.log('Suricata: initTabs() called - found', tabButtons.length, 'tab buttons and', tabContents.length, 'tab contents');
+
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
             const tabName = button.getAttribute('data-tab');
-            
+
+            console.log('Suricata: Tab button clicked:', tabName);
+
             tabButtons.forEach(btn => btn.classList.remove('active'));
             tabContents.forEach(content => content.classList.remove('active'));
-            
+
             button.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
-            
-            console.log('Suricata: Tab switched to', tabName);
-            
+            const tabElement = document.getElementById(tabName);
+            if (tabElement) {
+                tabElement.classList.add('active');
+                console.log('Suricata: Tab switched to', tabName, '- active class added');
+                console.log('Suricata: Tab element classes:', tabElement.className);
+                console.log('Suricata: Tab element display style:', window.getComputedStyle(tabElement).display);
+            } else {
+                console.error('Suricata: Tab element not found:', tabName);
+            }
+
             if (tabName === 'alerts') {
                 console.log('Suricata: Loading alerts...');
                 loadAlerts();
@@ -47,6 +57,9 @@ function initTabs() {
             if (tabName === 'database') {
                 console.log('Suricata: Loading database stats...');
                 loadDatabaseStats();
+            }
+            if (tabName === 'actions') {
+                console.log('Suricata: Actions tab loaded (static content)');
             }
         });
     });
@@ -326,17 +339,15 @@ async function loadConfig() {
         console.log('Suricata: Config response status:', response.status);
         const data = await response.json();
         console.log('Suricata: Config data:', data);
-        
+
         document.getElementById('home-net').value = data.home_net || '';
         document.getElementById('external-net').value = data.external_net || '';
-        
+
         const interfacesInfo = document.getElementById('interfaces-info');
-        if (data.interfaces && data.interfaces.length > 0) {
-            interfacesInfo.innerHTML = data.interfaces.map(iface => 
-                `Interface: ${iface.interface || 'Unknown'}`
-            ).join('<br>');
+        if (data.mode) {
+            interfacesInfo.innerHTML = `<strong>Mode:</strong> ${data.mode}<br><strong>Method:</strong> iptables NFQUEUE on bridge interface (br0)`;
         } else {
-            interfacesInfo.innerHTML = 'No interfaces configured';
+            interfacesInfo.innerHTML = 'Configuration information not available';
         }
         console.log('Suricata: Config loaded successfully');
     } catch (error) {

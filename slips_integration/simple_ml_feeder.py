@@ -6,6 +6,8 @@ Populates ML detector Redis keys with data from SLIPS flows and evidence
 import redis
 import json
 import time
+import os
+import glob
 from datetime import datetime
 
 def main():
@@ -46,16 +48,29 @@ def main():
             # Use SLIPS' own statistics instead of counting every profile
             # This gives us realistic real-time numbers, not accumulated historical data
 
-            # Get analyzed flows from SLIPS stats
-            analyzed_ips = r.get('analyzed_ips') or '0'
-            total_flows = int(analyzed_ips)
+            # Get REAL flow count from Zeek conn.log (not estimates!)
+            # SLIPS running with -i creates zeek_files_<interface>/ directory
+            total_flows = 0
 
-            # If SLIPS stat not available, estimate based on recent evidence activity
-            # Don't count all historical profiles - that's unrealistic for "current" stats
+            # Find SLIPS Zeek directories (zeek_files_*)
+            zeek_dirs = glob.glob('/opt/StratosphereLinuxIPS/zeek_files_*/')
+
+            for zeek_dir in zeek_dirs:
+                conn_log = os.path.join(zeek_dir, 'conn.log')
+                if os.path.exists(conn_log):
+                    try:
+                        # Count lines in conn.log (each line = 1 flow)
+                        # Skip header lines that start with #
+                        with open(conn_log, 'r') as f:
+                            flow_count = sum(1 for line in f if not line.startswith('#'))
+                        total_flows += flow_count
+                    except Exception as e:
+                        print(f"Error reading {conn_log}: {e}")
+
+            # Fallback: if no Zeek logs found, try analyzed_ips counter
             if total_flows == 0:
-                # We'll estimate based on recent evidence count
-                # A realistic ratio is about 100-200 flows per detection for normal traffic
-                total_flows = 0  # Will be calculated after evidence count
+                analyzed_ips = r.get('analyzed_ips') or '0'
+                total_flows = int(analyzed_ips)
 
             # Count evidence from the last hour only (not all accumulated evidence)
             evidence_keys = r.keys('profile_*_evidence')

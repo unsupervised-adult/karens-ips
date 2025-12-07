@@ -3,8 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Suricata Configuration - Karen's IPS</title>
-    <link rel="stylesheet" href="{{ url_for('suricata.static', filename='css/suricata.css') }}?v=20251208">
+    <link rel="stylesheet" href="{{ url_for('suricata.static', filename='css/suricata.css') }}?v={{ range(1, 9999999) | random }}">
+    <style>
+        /* Force tab visibility - inline override */
+        .tab-content {
+            display: none !important;
+        }
+        .tab-content.active {
+            display: block !important;
+            background: #f8f9fa !important;
+            min-height: 200px !important;
+            padding: 20px !important;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -149,8 +164,9 @@
                 <div class="rule-editor">
                     <textarea id="new-rule" placeholder="alert tcp any any -> $HOME_NET any (msg:&quot;Example Rule&quot;; sid:1000001; rev:1;)" rows="3"></textarea>
                     <button onclick="addRule()" class="btn-primary">Add Custom Rule</button>
+                </div>
             </div>
-            
+
             <h3>Active Custom Rules</h3>
             <div id="rules-list">
                 <p>Loading rules...</p>
@@ -174,7 +190,7 @@
             </div>
 
             <div class="config-section">
-                <h3>Interface Configuration</h3>
+                <h3>Operating Mode</h3>
                 <div id="interfaces-info">
                     <p>Loading...</p>
                 </div>
@@ -306,6 +322,6 @@
 
     <div id="notification" class="notification hidden"></div>
 
-    <script src="{{ url_for('suricata.static', filename='js/suricata.js') }}?v=20251208d"></script>
+    <script src="{{ url_for('suricata.static', filename='js/suricata.js') }}?v={{ range(1, 9999999) | random }}"></script>
 </body>
 </html>
