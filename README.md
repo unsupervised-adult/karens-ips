@@ -147,6 +147,7 @@ tail -f /var/log/suricata/eve.json | jq    # Detailed EVE JSON logs
 ### Daily Operations
 
 **Check system health:**
+
 ```bash
 # View all service status
 systemctl status redis-server suricata slips slips-webui zeek
@@ -162,6 +163,7 @@ journalctl -fu slips | grep -i "detected\|alert"
 ```
 
 **Monitor traffic:**
+
 ```bash
 # Real-time Suricata stats
 suricatasc -c "dump-counters" | jq '.message.decoder.pkts'
@@ -178,7 +180,7 @@ suricatasc -c "dataset-list"
 **SLIPS Web UI (http://[SERVER-IP]:55000):**
 
 1. **Overview Tab**: System status, active flows, network statistics
-2. **ML Detector Tab**: 
+2. **ML Detector Tab**:
    - View detection statistics (253 detections, 45.59% detection rate)
    - Monitor ad blocking effectiveness
    - Review confidence scores and feature importance
@@ -193,6 +195,7 @@ suricatasc -c "dataset-list"
 ### Blocklist Management
 
 **Add custom blocks:**
+
 ```bash
 # Block specific domain
 ips-filter add malicious-site.com malware
@@ -205,6 +208,7 @@ ips-filter sync
 ```
 
 **Whitelist false positives:**
+
 ```bash
 # Whitelist domain
 ips-filter exception add domain trusted-site.com "Business application"
@@ -217,6 +221,7 @@ ips-filter exception list
 ```
 
 **Update blocklists:**
+
 ```bash
 # Manual update (normally runs weekly via systemd timer)
 ips-filter update-blocklists
@@ -233,12 +238,14 @@ systemctl list-timers blocklist-update.timer
 Block domains at TLS handshake level (bypasses DNS):
 
 **Via Web UI:**
+
 1. Navigate to "Suricata Config" tab
 2. Click "TLS SNI Management" section
 3. Add domains or import lists
 4. Domains automatically added to unified DNS blocklist
 
 **Via API:**
+
 ```bash
 # Add domain via curl
 curl -X POST http://[SERVER-IP]:55000/suricata_config/tls_sni/add \
@@ -252,6 +259,7 @@ curl http://[SERVER-IP]:55000/suricata_config/tls_sni/view
 ### Troubleshooting
 
 **No detections showing:**
+
 ```bash
 # Verify Redis has data
 redis-cli -n 1 hgetall ml_detector:stats
@@ -264,6 +272,7 @@ tail -f /var/log/suricata/fast.log
 ```
 
 **Dashboard shows zeros:**
+
 ```bash
 # Verify webui connects to Redis DB 1
 grep "db=1" StratosphereLinuxIPS/slips_files/core/database/redis_db/database.py
@@ -276,6 +285,7 @@ journalctl -xeu slips-webui
 ```
 
 **Blocklists not working:**
+
 ```bash
 # Verify dataset loaded
 suricatasc -c "dataset-list"
@@ -621,12 +631,14 @@ karens-ips/
 Logs grow rapidly in high-traffic environments. To prevent disk exhaustion, use contained loop-mounted images:
 
 **Setup protected log directories:**
+
 ```bash
 # Run the log protection script (creates 40GB of contained log space)
 sudo ./scripts/setup-log-images.sh
 ```
 
 **What it does:**
+
 - Creates loop-mounted images for high-growth directories:
   - `/var/log/suricata` - 20GB (EVE JSON, fast.log, stats.log)
   - `/var/log/slips` - 10GB (SLIPS analysis logs)
@@ -638,6 +650,7 @@ sudo ./scripts/setup-log-images.sh
 - Logs can fill to capacity without affecting system
 
 **Monitor image usage:**
+
 ```bash
 # Check disk usage of contained logs
 df -h /var/log/suricata /var/log/slips /var/lib/redis
@@ -650,6 +663,7 @@ grep "/srv/images" /etc/fstab
 ```
 
 **Adjust sizes if needed:**
+
 ```bash
 # Edit the script before running
 nano scripts/setup-log-images.sh
@@ -659,12 +673,14 @@ nano scripts/setup-log-images.sh
 ```
 
 **Setup aggressive log rotation:**
+
 ```bash
 # Install stringent logrotate policies
 sudo ./scripts/setup-logrotate.sh
 ```
 
 **Log rotation policies:**
+
 - **Suricata logs**: Daily rotation, 7 days retention, 1GB max per file
 - **EVE JSON**: Hourly rotation, 2 days retention, 2GB max (high volume)
 - **SLIPS logs**: Daily rotation, 7 days retention, 500MB max
@@ -673,6 +689,7 @@ sudo ./scripts/setup-logrotate.sh
 - **Frequency**: Hourly cron job monitors all logs
 
 **Manual rotation:**
+
 ```bash
 # Force immediate rotation
 logrotate -f /etc/logrotate.d/suricata
