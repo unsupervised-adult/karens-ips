@@ -49,6 +49,9 @@ install_slips() {
 
     # Configure SLIPS web interface
     configure_slips_webui
+    
+    # Configure Suricata web UI permissions
+    configure_suricata_webui_permissions
 
     # Install Karen's IPS ML integration modules
     install_karens_ips_ml_modules
@@ -425,6 +428,21 @@ install_karens_ips_ml_modules() {
         warn "ML detector blueprint not found at $source_webinterface_dir/ml_detector"
     fi
     
+    # Copy Suricata config webinterface integration
+    if [[ -d "$source_webinterface_dir/suricata_config" ]]; then
+        log "Installing Suricata configuration web interface blueprint..."
+        cp -r "$source_webinterface_dir/suricata_config" "$webinterface_dir/"
+        chown -R root:root "$webinterface_dir/suricata_config"
+        chmod 755 "$webinterface_dir/suricata_config"
+        find "$webinterface_dir/suricata_config" -type f -name "*.py" -exec chmod 644 {} \;
+        find "$webinterface_dir/suricata_config" -type f -name "*.html" -exec chmod 644 {} \;
+        find "$webinterface_dir/suricata_config" -type f -name "*.css" -exec chmod 644 {} \;
+        find "$webinterface_dir/suricata_config" -type f -name "*.js" -exec chmod 644 {} \;
+        success "Suricata configuration blueprint installed"
+    else
+        warn "Suricata configuration blueprint not found at $source_webinterface_dir/suricata_config"
+    fi
+    
     # Install pre-modified app.py with ML detector integration
     if [[ -f "$source_webinterface_dir/app.py" ]]; then
         log "Installing ML detector integrated app.py..."
@@ -573,6 +591,39 @@ patch_slips_bridge_support() {
     return 0
 }
 
+configure_suricata_webui_permissions() {
+    log "Configuring web interface permissions for Suricata management..."
+    
+    local sudoers_file="/etc/sudoers.d/slips-webui"
+    local source_file="$PROJECT_ROOT/configs/sudoers.d/slips-webui"
+    
+    if [[ -f "$source_file" ]]; then
+        log "Installing sudoers configuration..."
+        cp "$source_file" "$sudoers_file"
+        chmod 0440 "$sudoers_file"
+        chown root:root "$sudoers_file"
+        
+        # Validate sudoers file
+        if visudo -c -f "$sudoers_file" >/dev/null 2>&1; then
+            success "Suricata web UI permissions configured"
+        else
+            warn "Sudoers file validation failed, removing..."
+            rm -f "$sudoers_file"
+            return 1
+        fi
+    else
+        warn "Sudoers configuration not found at $source_file"
+        return 1
+    fi
+    
+    # Ensure custom rules directory exists with proper permissions
+    mkdir -p /etc/suricata/rules
+    touch /etc/suricata/rules/custom.rules
+    chmod 644 /etc/suricata/rules/custom.rules
+    
+    success "Suricata web UI configuration complete"
+}
+
 # Export functions
 export -f install_slips
 export -f check_zeek_availability
@@ -587,3 +638,4 @@ export -f configure_slips_webui
 export -f install_karens_ips_ml_modules
 export -f patch_slips_bridge_support
 export -f verify_slips
+export -f configure_suricata_webui_permissions

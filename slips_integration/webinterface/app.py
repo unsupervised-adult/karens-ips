@@ -5,6 +5,7 @@ from flask import Flask, render_template, redirect, url_for
 from slips_files.common.parsers.config_parser import ConfigParser
 from .database.database import db
 from .ml_detector.ml_detector import ml_detector
+from .suricata_config.suricata_config import suricata_bp
 from .database.signals import message_sent
 from .analysis.analysis import analysis
 from .general.general import general
@@ -26,6 +27,7 @@ app.register_blueprint(analysis, url_prefix="/analysis")
 app.register_blueprint(general, url_prefix="/general")
 app.register_blueprint(documentation, url_prefix="/documentation")
 app.register_blueprint(ml_detector, url_prefix="/ml_detector")
+app.register_blueprint(suricata_bp, url_prefix="/suricata")
 
 
 @app.route("/redis")

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suricata Configuration - Karen's IPS</title>
+    <link rel="stylesheet" href="{{ url_for('suricata.static', filename='css/suricata.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Suricata IPS Configuration</h1>
+            <div id="status-indicator" class="status-badge">
+                <span id="status-text">Checking...</span>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-button active" data-tab="overview">Overview</button>
+            <button class="tab-button" data-tab="alerts">Alerts</button>
+            <button class="tab-button" data-tab="rules">Custom Rules</button>
+            <button class="tab-button" data-tab="config">Configuration</button>
+            <button class="tab-button" data-tab="actions">Actions</button>
+        </div>
+
+        <div id="overview" class="tab-content active">
+            <h2>System Overview</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Packets Processed</h3>
+                    <div id="stat-packets" class="stat-value">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Alerts Triggered</h3>
+                    <div id="stat-alerts" class="stat-value">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Packets Dropped</h3>
+                    <div id="stat-dropped" class="stat-value">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Uptime</h3>
+                    <div id="stat-uptime" class="stat-value">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="alerts" class="tab-content">
+            <h2>Recent Alerts</h2>
+            <div class="controls">
+                <label>
+                    Severity:
+                    <select id="severity-filter">
+                        <option value="">All</option>
+                        <option value="1">High (1)</option>
+                        <option value="2">Medium (2)</option>
+                        <option value="3">Low (3)</option>
+                    </select>
+                </label>
+                <button onclick="loadAlerts()" class="btn-refresh">Refresh</button>
+            </div>
+            <div id="alerts-table-container">
+                <table id="alerts-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Source IP</th>
+                            <th>Dest IP</th>
+                            <th>Protocol</th>
+                            <th>Signature</th>
+                            <th>Severity</th>
+                            <th>Category</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-body">
+                        <tr><td colspan="7">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="rules" class="tab-content">
+            <h2>Custom Rules Management</h2>
+            <div class="rule-editor">
+                <h3>Add New Rule</h3>
+                <textarea id="new-rule" placeholder="alert tcp any any -> $HOME_NET any (msg:&quot;Example Rule&quot;; sid:1000001; rev:1;)" rows="3"></textarea>
+                <button onclick="addRule()" class="btn-primary">Add Rule</button>
+            </div>
+            
+            <h3>Active Custom Rules</h3>
+            <div id="rules-list">
+                <p>Loading rules...</p>
+            </div>
+        </div>
+
+        <div id="config" class="tab-content">
+            <h2>Configuration Settings</h2>
+            
+            <div class="config-section">
+                <h3>Network Variables</h3>
+                <div class="form-group">
+                    <label for="home-net">HOME_NET:</label>
+                    <input type="text" id="home-net" placeholder="[10.0.0.0/8, 192.168.0.0/16]">
+                    <button onclick="updateHomeNet()" class="btn-primary">Update</button>
+                </div>
+                <div class="form-group">
+                    <label>EXTERNAL_NET:</label>
+                    <input type="text" id="external-net" disabled>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>Interface Configuration</h3>
+                <div id="interfaces-info">
+                    <p>Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="actions" class="tab-content">
+            <h2>System Actions</h2>
+            
+            <div class="action-card">
+                <h3>Reload Rules</h3>
+                <p>Reload Suricata rules without restarting the service.</p>
+                <button onclick="reloadRules()" class="btn-primary">Reload Rules</button>
+            </div>
+
+            <div class="action-card">
+                <h3>Update Rule Sources</h3>
+                <p>Download latest rules from configured sources (ET Open, etc.).</p>
+                <button onclick="updateRuleSources()" class="btn-primary">Update Sources</button>
+            </div>
+
+            <div class="action-card">
+                <h3>Restart Suricata</h3>
+                <p>Fully restart the Suricata service (causes brief downtime).</p>
+                <button onclick="restartSuricata()" class="btn-danger">Restart Service</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification hidden"></div>
+
+    <script src="{{ url_for('suricata.static', filename='js/suricata.js') }}"></script>
+</body>
+</html>
