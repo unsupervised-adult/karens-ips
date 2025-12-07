@@ -54,23 +54,29 @@ def main():
 
             # Find SLIPS Zeek directories (zeek_files_*)
             zeek_dirs = glob.glob('/opt/StratosphereLinuxIPS/zeek_files_*/')
+            print(f"[DEBUG] Found {len(zeek_dirs)} zeek directories: {zeek_dirs}")
 
             for zeek_dir in zeek_dirs:
                 conn_log = os.path.join(zeek_dir, 'conn.log')
+                print(f"[DEBUG] Checking {conn_log}, exists: {os.path.exists(conn_log)}")
                 if os.path.exists(conn_log):
                     try:
                         # Count lines in conn.log (each line = 1 flow)
                         # Skip header lines that start with #
                         with open(conn_log, 'r') as f:
                             flow_count = sum(1 for line in f if not line.startswith('#'))
+                        print(f"[DEBUG] Counted {flow_count} flows in {conn_log}")
                         total_flows += flow_count
                     except Exception as e:
                         print(f"Error reading {conn_log}: {e}")
+
+            print(f"[DEBUG] Total flows after counting: {total_flows}")
 
             # Fallback: if no Zeek logs found, try analyzed_ips counter
             if total_flows == 0:
                 analyzed_ips = r.get('analyzed_ips') or '0'
                 total_flows = int(analyzed_ips)
+                print(f"[DEBUG] Using fallback analyzed_ips: {total_flows}")
 
             # Count evidence from the last hour only (not all accumulated evidence)
             evidence_keys = r.keys('profile_*_evidence')
@@ -108,6 +114,8 @@ def main():
             detection_rate = (recent_evidence_count / max(total_flows, 1)) * 100
             accuracy = max(85.0, min(99.0, 98.0 - (detection_rate * 0.5)))
 
+            print(f"[DEBUG] Writing to Redis - total_flows={total_flows}, recent_evidence={recent_evidence_count}")
+
             stats = {
                 'total_analyzed': f"{total_flows:,}",
                 'detections_found': f"{recent_evidence_count:,}",
@@ -119,6 +127,7 @@ def main():
                 'status': 'Active - Live Network Analysis'
             }
             r.hset('ml_detector:stats', mapping=stats)
+            print(f"[DEBUG] Redis write complete - stats={stats}")
             
             # Process SLIPS evidence into ML detector format
             if recent_evidence_count > 0:

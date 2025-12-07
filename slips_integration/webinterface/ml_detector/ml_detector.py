@@ -130,21 +130,41 @@ def get_stats():
                     for k, v in stats.items()}
             
             # Get Suricata packet stats to show as total analyzed
+            # Read REAL packet count from stats.log (not suricatasc which doesn't work)
             try:
-                import subprocess
-                result = subprocess.run(['sudo', 'suricatasc', '-c', 'dump-counters'],
-                                      capture_output=True, text=True, timeout=10)
-                if result.returncode == 0:
-                    import json as json_mod
-                    data = json_mod.loads(result.stdout)
-                    if 'message' in data and 'decoder' in data['message']:
-                        packets = data['message']['decoder'].get('pkts', 0)
-                        stats['total_analyzed'] = f"{packets:,}"
-                        
-                        # Calculate legitimate traffic (packets - ML detections)
-                        detections = int(stats.get('ads_detected', 0))
+                packets = 0
+                stats_log = '/var/log/suricata/stats.log'
+                if os.path.exists(stats_log):
+                    # Get the last occurrence of decoder.pkts counter
+                    with open(stats_log, 'r') as f:
+                        for line in f:
+                            line = line.strip()
+                            # Format: "decoder.pkts | Total | 1653860"
+                            if '| Total |' in line or '| Total                     |' in line:
+                                parts = line.split('|')
+                                if len(parts) >= 3:
+                                    counter_name = parts[0].strip()
+                                    if counter_name == 'decoder.pkts':
+                                        try:
+                                            packets = int(parts[2].strip())
+                                        except ValueError:
+                                            continue
+
+                # Update stats with REAL packet count from Suricata
+                if packets > 0:
+                    stats['total_analyzed'] = f"{packets:,}"
+
+                    # Calculate legitimate traffic (packets - ML detections)
+                    try:
+                        detections_str = stats.get('detections_found', stats.get('ads_detected', '0'))
+                        # Remove commas if present
+                        detections_str = str(detections_str).replace(',', '')
+                        detections = int(detections_str) if detections_str.isdigit() else 0
                         legitimate = packets - detections
                         stats['legitimate_traffic'] = f"{legitimate:,}"
+                    except (ValueError, TypeError):
+                        pass
+
             except Exception as suricata_error:
                 logger.warning(f"Could not fetch Suricata stats: {str(suricata_error)}")
 
