@@ -26,19 +26,6 @@ Karen's IPS is a comprehensive network security solution that combines:
 
 Built with Python, machine learning, and modern security tools, it offers enterprise-grade protection for home and family networks.
 
-## ✅ **VERIFIED OPERATIONAL STATUS (2025-11-29)**
-
-**Production Deployment Confirmed:**
-
-- **Hagezi Blocklists**: ✅ 338,844 domains loaded in SQLite database
-- **Suricata IPS**: ✅ 332,356 domains converted and active in datasets
-- **SLIPS ML Engine**: ✅ TensorFlow 2.16.1 with behavioral threat detection
-- **Network Bridge**: ✅ br0 monitoring 332+ packets through NFQUEUE
-- **Flow Blocking**: ✅ nftables integration with blocked4 IP set
-- **ML Detection**: ✅ Active flow analysis detecting malicious characteristics
-- **Web Dashboard**: ✅ SLIPS UI accessible at <http://10.10.254.39:55000>
-- **ML Dashboard**: ✅ **FULLY FUNCTIONAL** with live traffic analysis and real-time data
-
 **System Performance:**
 
 - Load Average: 5.91 (normal for ML processing)
@@ -347,6 +334,7 @@ Edit `/etc/karens-ips/blocklists.yaml` to customize:
 - **Feature Importance**: ML model feature weights visualization
 - **Recent Detections**: Searchable, sortable table with confidence scores
 - **Alerts**: High-priority ML detector alerts
+Limit reached · resets 7pm (Pacific/Auckland) · /upgrade to Max or add funds to continue with extra usage
 
 ### Technical Details
 

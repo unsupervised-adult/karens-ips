@@ -140,32 +140,35 @@ configure_slips() {
 
     cd "$SLIPS_DIR" || error_exit "Failed to change to SLIPS directory"
 
-    # Create SLIPS configuration
-    cat > slips.conf << 'SLIPS_CONFIG_EOF'
+    # Create config directory if it doesn't exist
+    mkdir -p config
+
+    # Create SLIPS configuration in YAML format
+    cat > config/slips.yaml << 'SLIPS_CONFIG_EOF'
 # SLIPS Configuration with Zeek Integration
-[main]
-output = /var/log/slips/
-zeek_folder = /opt/zeek
-zeek_logs = /var/log/zeek/
-store_zeek_files = True
-logfile = /var/log/slips/slips.log
-verbose = 2
+main:
+  output: /var/log/slips/
+  zeek_folder: /opt/zeek
+  zeek_logs: /var/log/zeek/
+  store_zeek_files: yes
+  logfile: /var/log/slips/slips.log
+  verbose: 2
 
-[input]
-zeek_logs_input = /var/log/zeek/
-process_zeek_logs = True
+input:
+  zeek_logs_input: /var/log/zeek/
+  process_zeek_logs: yes
 
-[redis]
-redis_host = 127.0.0.1
-redis_port = 6379
-redis_db = 1
+redis:
+  redis_host: 127.0.0.1
+  redis_port: 6379
+  redis_db: 1
 
-[ml]
-use_ml = True
-ml_models_folder = modules/ml/models/
+ml:
+  use_ml: yes
+  ml_models_folder: modules/ml/models/
 SLIPS_CONFIG_EOF
 
-    success "SLIPS configuration created"
+    success "SLIPS configuration created at config/slips.yaml"
 }
 
 install_kalipso() {
@@ -256,9 +259,14 @@ configure_slips_webui() {
     fi
 
     # Update SLIPS config for web interface
-    if [ -f config/slips.conf ]; then
-        sed -i "s/web_interface_ip = .*/web_interface_ip = $mgmt_ip/" config/slips.conf || true
-        sed -i 's/web_interface_port = .*/web_interface_port = 55000/' config/slips.conf || true
+    if [ -f config/slips.yaml ]; then
+        # Add web interface configuration to YAML
+        cat >> config/slips.yaml << EOF
+
+webinterface:
+  web_interface_ip: $mgmt_ip
+  web_interface_port: 55000
+EOF
         log "SLIPS web interface configured for $mgmt_ip:55000"
     fi
 

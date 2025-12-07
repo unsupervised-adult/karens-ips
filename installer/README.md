@@ -42,26 +42,31 @@ installer/
 ## Benefits of Modular Architecture
 
 ### 1. **Maintainability**
+
 - Each installation phase in its own file
 - Easy to locate and update specific functionality
 - Clear separation of concerns
 
 ### 2. **Testability**
+
 - Individual modules can be tested independently
 - Mock dependencies for unit testing
 - Easier to debug specific phases
 
 ### 3. **Reusability**
+
 - Modules can be used in different contexts
 - Easy to create custom installation profiles
 - Share common functionality via libraries
 
 ### 4. **Readability**
+
 - Smaller files are easier to review
 - Clear module naming shows purpose
 - Better code organization
 
 ### 5. **Flexibility**
+
 - Skip or customize specific phases
 - Easy to add new installation phases
 - Configuration-driven installation
@@ -77,12 +82,14 @@ sudo ./installer/main.sh
 ### Custom Configuration
 
 1. Copy and edit configuration:
+
 ```bash
 cp installer/config/installer.conf installer/config/custom.conf
 nano installer/config/custom.conf
 ```
 
 2. Run with custom config:
+
 ```bash
 sudo CONFIG_FILE=installer/config/custom.conf ./installer/main.sh
 ```
@@ -174,6 +181,7 @@ export -f install_<name>
 ### Adding a New Module
 
 1. Create module file:
+
 ```bash
 touch installer/modules/18-my-module.sh
 chmod +x installer/modules/18-my-module.sh
@@ -182,6 +190,7 @@ chmod +x installer/modules/18-my-module.sh
 2. Implement using template above
 
 3. Add to main.sh:
+
 ```bash
 # In main.sh
 if [[ "${INSTALL_MY_MODULE:-true}" == "true" ]]; then
@@ -191,6 +200,7 @@ fi
 ```
 
 4. Add configuration:
+
 ```bash
 # In installer.conf
 INSTALL_MY_MODULE=true
@@ -245,19 +255,23 @@ get_interface_ip "eth0"         # Get IP of interface
 All configurable options are in `installer/config/installer.conf`:
 
 ### Network Configuration
+
 - Management interface
 - Bridge interfaces
 - Home network CIDR
 
 ### System Configuration
+
 - Timezone
 - Minimum requirements
 
 ### Feature Flags
+
 - Enable/disable specific components
 - Installation options
 
 ### Paths
+
 - Installation directories
 - Log locations
 - Service names
@@ -378,6 +392,7 @@ install_blocklists
 ## Contributing
 
 When adding new modules:
+
 1. Follow the module template
 2. Document all configuration options
 3. Add error handling
