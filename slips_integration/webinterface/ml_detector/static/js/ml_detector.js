@@ -713,66 +713,110 @@ function toggleBlocking() {
 
 function loadWhitelist() {
     $.getJSON('/ml_detector/whitelist', function(response) {
-        if (response.data && response.data.length > 0) {
-            const html = response.data.map(ip =>
-                '<div class="list-group-item d-flex justify-content-between align-items-center">' +
-                '<span><i class="fa fa-shield text-success"></i> ' + ip + '</span>' +
-                '<button class="btn btn-sm btn-outline-danger remove-whitelist" data-ip="' + ip + '">' +
-                '<i class="fa fa-times"></i> Remove</button>' +
-                '</div>'
-            ).join('');
+        if (response.data) {
+            const ips = response.data.ips || [];
+            const urls = response.data.urls || [];
+
+            if (ips.length === 0 && urls.length === 0) {
+                $('#whitelist_items').html('<div class="text-muted small">No whitelisted IPs or URLs</div>');
+                return;
+            }
+
+            let html = '';
+
+            // Display IPs
+            ips.forEach(ip => {
+                html += '<div class="list-group-item d-flex justify-content-between align-items-center">' +
+                    '<span><i class="fa fa-shield text-success"></i> <strong>IP:</strong> ' + ip + '</span>' +
+                    '<button class="btn btn-sm btn-outline-danger remove-whitelist" data-value="' + ip + '" data-type="ip">' +
+                    '<i class="fa fa-times"></i> Remove</button>' +
+                    '</div>';
+            });
+
+            // Display URLs
+            urls.forEach(url => {
+                html += '<div class="list-group-item d-flex justify-content-between align-items-center">' +
+                    '<span><i class="fa fa-shield text-success"></i> <strong>URL:</strong> ' + url + '</span>' +
+                    '<button class="btn btn-sm btn-outline-danger remove-whitelist" data-value="' + url + '" data-type="url">' +
+                    '<i class="fa fa-times"></i> Remove</button>' +
+                    '</div>';
+            });
+
             $('#whitelist_items').html(html);
         } else {
-            $('#whitelist_items').html('<div class="text-muted small">No whitelisted IPs</div>');
+            $('#whitelist_items').html('<div class="text-muted small">No whitelisted IPs or URLs</div>');
         }
     });
 }
 
 function addWhitelist() {
     const ip = $('#whitelist_ip').val().trim();
-    if (!ip) {
-        alert('Please enter an IP address');
+    const url = $('#whitelist_url').val().trim();
+
+    if (!ip && !url) {
+        alert('Please enter an IP address or URL');
         return;
     }
 
-    // Basic IP validation
-    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
-    if (!ipPattern.test(ip)) {
-        alert('Invalid IP address format');
-        return;
+    let data = {};
+    let entryLabel = '';
+    let entryType = '';
+
+    if (ip) {
+        // Basic IP validation
+        const ipPattern = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
+        if (!ipPattern.test(ip)) {
+            alert('Invalid IP address format');
+            return;
+        }
+        data = { ip: ip, type: 'ip' };
+        entryLabel = 'IP ' + ip;
+        entryType = 'ip';
+    } else if (url) {
+        // Basic URL validation
+        if (url.length < 3 || url.includes(' ')) {
+            alert('Invalid URL format');
+            return;
+        }
+        data = { url: url, type: 'url' };
+        entryLabel = 'URL ' + url;
+        entryType = 'url';
     }
 
     $.ajax({
         url: '/ml_detector/whitelist',
         method: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify({ ip: ip }),
+        data: JSON.stringify(data),
         success: function(response) {
             $('#whitelist_ip').val('');
+            $('#whitelist_url').val('');
             loadWhitelist();
-            $('#action_status').html('<div class="alert alert-success">Added ' + ip + ' to whitelist</div>');
+            $('#action_status').html('<div class="alert alert-success">Added ' + entryLabel + ' to whitelist</div>');
             setTimeout(() => $('#action_status').html(''), 3000);
         },
         error: function(xhr, status, error) {
-            alert('Failed to add IP to whitelist: ' + error);
+            alert('Failed to add to whitelist: ' + error);
         }
     });
 }
 
-function removeWhitelist(ip) {
-    if (confirm('Remove ' + ip + ' from whitelist?')) {
+function removeWhitelist(value, type) {
+    const entryLabel = type === 'url' ? 'URL ' + value : 'IP ' + value;
+    if (confirm('Remove ' + entryLabel + ' from whitelist?')) {
+        const data = type === 'url' ? { url: value, type: 'url' } : { ip: value, type: 'ip' };
         $.ajax({
             url: '/ml_detector/whitelist',
             method: 'DELETE',
             contentType: 'application/json',
-            data: JSON.stringify({ ip: ip }),
+            data: JSON.stringify(data),
             success: function(response) {
                 loadWhitelist();
-                $('#action_status').html('<div class="alert alert-info">Removed ' + ip + ' from whitelist</div>');
+                $('#action_status').html('<div class="alert alert-info">Removed ' + entryLabel + ' from whitelist</div>');
                 setTimeout(() => $('#action_status').html(''), 3000);
             },
             error: function(xhr, status, error) {
-                alert('Failed to remove IP from whitelist: ' + error);
+                alert('Failed to remove from whitelist: ' + error);
             }
         });
     }
@@ -780,68 +824,112 @@ function removeWhitelist(ip) {
 
 function loadBlacklist() {
     $.getJSON('/ml_detector/blacklist', function(response) {
-        if (response.data && response.data.length > 0) {
-            const html = response.data.map(ip =>
-                '<div class="list-group-item d-flex justify-content-between align-items-center">' +
-                '<span><i class="fa fa-ban text-danger"></i> ' + ip + '</span>' +
-                '<button class="btn btn-sm btn-outline-success remove-blacklist" data-ip="' + ip + '">' +
-                '<i class="fa fa-times"></i> Unblock</button>' +
-                '</div>'
-            ).join('');
+        if (response.data) {
+            const ips = response.data.ips || [];
+            const urls = response.data.urls || [];
+
+            if (ips.length === 0 && urls.length === 0) {
+                $('#blacklist_items').html('<div class="text-muted small">No blocked IPs or URLs</div>');
+                return;
+            }
+
+            let html = '';
+
+            // Display IPs
+            ips.forEach(ip => {
+                html += '<div class="list-group-item d-flex justify-content-between align-items-center">' +
+                    '<span><i class="fa fa-ban text-danger"></i> <strong>IP:</strong> ' + ip + '</span>' +
+                    '<button class="btn btn-sm btn-outline-success remove-blacklist" data-value="' + ip + '" data-type="ip">' +
+                    '<i class="fa fa-times"></i> Unblock</button>' +
+                    '</div>';
+            });
+
+            // Display URLs
+            urls.forEach(url => {
+                html += '<div class="list-group-item d-flex justify-content-between align-items-center">' +
+                    '<span><i class="fa fa-ban text-danger"></i> <strong>URL:</strong> ' + url + '</span>' +
+                    '<button class="btn btn-sm btn-outline-success remove-blacklist" data-value="' + url + '" data-type="url">' +
+                    '<i class="fa fa-times"></i> Unblock</button>' +
+                    '</div>';
+            });
+
             $('#blacklist_items').html(html);
         } else {
-            $('#blacklist_items').html('<div class="text-muted small">No blocked IPs</div>');
+            $('#blacklist_items').html('<div class="text-muted small">No blocked IPs or URLs</div>');
         }
     });
 }
 
 function addBlacklist() {
     const ip = $('#blacklist_ip').val().trim();
-    if (!ip) {
-        alert('Please enter an IP address');
+    const url = $('#blacklist_url').val().trim();
+
+    if (!ip && !url) {
+        alert('Please enter an IP address or URL');
         return;
     }
 
-    // Basic IP validation
-    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
-    if (!ipPattern.test(ip)) {
-        alert('Invalid IP address format');
-        return;
+    let data = {};
+    let entryLabel = '';
+    let entryType = '';
+
+    if (ip) {
+        // Basic IP validation
+        const ipPattern = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
+        if (!ipPattern.test(ip)) {
+            alert('Invalid IP address format');
+            return;
+        }
+        data = { ip: ip, type: 'ip' };
+        entryLabel = 'IP ' + ip;
+        entryType = 'ip';
+    } else if (url) {
+        // Basic URL validation
+        if (url.length < 3 || url.includes(' ')) {
+            alert('Invalid URL format');
+            return;
+        }
+        data = { url: url, type: 'url' };
+        entryLabel = 'URL ' + url;
+        entryType = 'url';
     }
 
-    if (confirm('Block all traffic from ' + ip + '?')) {
+    if (confirm('Block all traffic from ' + entryLabel + '?')) {
         $.ajax({
             url: '/ml_detector/blacklist',
             method: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify({ ip: ip }),
+            data: JSON.stringify(data),
             success: function(response) {
                 $('#blacklist_ip').val('');
+                $('#blacklist_url').val('');
                 loadBlacklist();
-                $('#action_status').html('<div class="alert alert-success">Blocked ' + ip + '</div>');
+                $('#action_status').html('<div class="alert alert-success">Blocked ' + entryLabel + '</div>');
                 setTimeout(() => $('#action_status').html(''), 3000);
             },
             error: function(xhr, status, error) {
-                alert('Failed to block IP: ' + error);
+                alert('Failed to block: ' + error);
             }
         });
     }
 }
 
-function removeBlacklist(ip) {
-    if (confirm('Unblock ' + ip + '?')) {
+function removeBlacklist(value, type) {
+    const entryLabel = type === 'url' ? 'URL ' + value : 'IP ' + value;
+    if (confirm('Unblock ' + entryLabel + '?')) {
+        const data = type === 'url' ? { url: value, type: 'url' } : { ip: value, type: 'ip' };
         $.ajax({
             url: '/ml_detector/blacklist',
             method: 'DELETE',
             contentType: 'application/json',
-            data: JSON.stringify({ ip: ip }),
+            data: JSON.stringify(data),
             success: function(response) {
                 loadBlacklist();
-                $('#action_status').html('<div class="alert alert-info">Unblocked ' + ip + '</div>');
+                $('#action_status').html('<div class="alert alert-info">Unblocked ' + entryLabel + '</div>');
                 setTimeout(() => $('#action_status').html(''), 3000);
             },
             error: function(xhr, status, error) {
-                alert('Failed to unblock IP: ' + error);
+                alert('Failed to unblock: ' + error);
             }
         });
     }
@@ -1024,10 +1112,10 @@ $(document).ready(function() {
     $('#btn_add_whitelist').on('click', addWhitelist);
     $('#btn_add_blacklist').on('click', addBlacklist);
     $(document).on('click', '.remove-whitelist', function() {
-        removeWhitelist($(this).data('ip'));
+        removeWhitelist($(this).data('value'), $(this).data('type'));
     });
     $(document).on('click', '.remove-blacklist', function() {
-        removeBlacklist($(this).data('ip'));
+        removeBlacklist($(this).data('value'), $(this).data('type'));
     });
     $(document).on('click', '.feedback-correct', function() {
         const detection = JSON.parse($(this).attr('data-detection'));

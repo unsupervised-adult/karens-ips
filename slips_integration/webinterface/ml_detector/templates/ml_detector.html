@@ -287,16 +287,21 @@
             <div class="col-md-6">
               <div class="card border-success">
                 <div class="card-header bg-success text-white">
-                  <h6 class="mb-0">✅ IP Whitelist</h6>
+                  <h6 class="mb-0">✅ Whitelist (IPs & URLs)</h6>
                 </div>
                 <div class="card-body">
-                  <p class="text-muted small">Trusted IPs that will never be blocked</p>
-                  <div class="input-group mb-3">
-                    <input type="text" class="form-control" id="whitelist_ip" placeholder="Enter IP address">
-                    <button class="btn btn-success" id="btn_add_whitelist">Add</button>
+                  <p class="text-muted small">Trusted IPs and URLs that will never be blocked</p>
+                  <div class="mb-2">
+                    <label for="whitelist_ip" class="form-label small">IP Address:</label>
+                    <input type="text" class="form-control form-control-sm" id="whitelist_ip" placeholder="e.g., 192.168.1.1">
                   </div>
+                  <div class="mb-3">
+                    <label for="whitelist_url" class="form-label small">URL/Domain:</label>
+                    <input type="text" class="form-control form-control-sm" id="whitelist_url" placeholder="e.g., example.com">
+                  </div>
+                  <button class="btn btn-success w-100 mb-3" id="btn_add_whitelist">Add to Whitelist</button>
                   <div class="list-group" id="whitelist_items">
-                    <div class="text-muted small">No whitelisted IPs</div>
+                    <div class="text-muted small">No whitelisted IPs or URLs</div>
                   </div>
                 </div>
               </div>
@@ -304,16 +309,21 @@
             <div class="col-md-6">
               <div class="card border-danger">
                 <div class="card-header bg-danger text-white">
-                  <h6 class="mb-0">🚫 IP Blacklist</h6>
+                  <h6 class="mb-0">🚫 Blacklist (IPs & URLs)</h6>
                 </div>
                 <div class="card-body">
-                  <p class="text-muted small">Manually blocked IPs</p>
-                  <div class="input-group mb-3">
-                    <input type="text" class="form-control" id="blacklist_ip" placeholder="Enter IP address">
-                    <button class="btn btn-danger" id="btn_add_blacklist">Block</button>
+                  <p class="text-muted small">Manually blocked IPs and URLs</p>
+                  <div class="mb-2">
+                    <label for="blacklist_ip" class="form-label small">IP Address:</label>
+                    <input type="text" class="form-control form-control-sm" id="blacklist_ip" placeholder="e.g., 10.0.0.1">
                   </div>
+                  <div class="mb-3">
+                    <label for="blacklist_url" class="form-label small">URL/Domain:</label>
+                    <input type="text" class="form-control form-control-sm" id="blacklist_url" placeholder="e.g., ads.example.com">
+                  </div>
+                  <button class="btn btn-danger w-100 mb-3" id="btn_add_blacklist">Add to Blacklist</button>
                   <div class="list-group" id="blacklist_items">
-                    <div class="text-muted small">No blocked IPs</div>
+                    <div class="text-muted small">No blocked IPs or URLs</div>
                   </div>
                 </div>
               </div>
