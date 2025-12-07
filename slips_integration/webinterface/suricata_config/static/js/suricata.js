@@ -28,6 +28,7 @@ function initTabs() {
             if (tabName === 'rules') loadRules();
             if (tabName === 'config') loadConfig();
             if (tabName === 'blocklists') loadBlocklists();
+            if (tabName === 'database') loadDatabaseStats();
         });
     });
 }
@@ -527,4 +528,197 @@ function escapeHtml(text) {
         "'": '&#039;'
     };
     return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+async function loadDatabaseStats() {
+    try {
+        const response = await fetch('/suricata/api/database/count');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('db-sources-count').textContent = formatNumber(data.counts.sources);
+            document.getElementById('db-domains-count').textContent = formatNumber(data.counts.domains);
+            document.getElementById('db-active-sources').textContent = formatNumber(data.counts.active_sources);
+        }
+        
+        loadSources();
+    } catch (error) {
+        console.error('Failed to load database stats:', error);
+    }
+}
+
+async function searchDomains() {
+    const searchTerm = document.getElementById('domain-search').value.trim();
+    
+    if (!searchTerm) {
+        showNotification('Please enter a search term', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/suricata/api/database/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                table: 'blocked_domains',
+                action: 'select',
+                filters: { domain: searchTerm },
+                limit: 100
+            })
+        });
+        
+        const data = await response.json();
+        displayDomains(data.data);
+    } catch (error) {
+        showNotification('Search failed: ' + error.message, 'error');
+    }
+}
+
+async function loadDomains() {
+    try {
+        const response = await fetch('/suricata/api/database/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                table: 'blocked_domains',
+                action: 'select',
+                limit: 100
+            })
+        });
+        
+        const data = await response.json();
+        displayDomains(data.data);
+    } catch (error) {
+        showNotification('Failed to load domains: ' + error.message, 'error');
+    }
+}
+
+function displayDomains(domains) {
+    const resultsEl = document.getElementById('domain-results');
+    
+    if (!domains || domains.length === 0) {
+        resultsEl.innerHTML = '<p>No domains found.</p>';
+        return;
+    }
+    
+    let html = '<table class="data-table"><thead><tr>';
+    html += '<th>ID</th><th>Domain</th><th>Category</th><th>Source ID</th><th>Confidence</th><th>Actions</th>';
+    html += '</tr></thead><tbody>';
+    
+    domains.forEach(domain => {
+        html += '<tr>';
+        html += `<td>${domain.id}</td>`;
+        html += `<td>${escapeHtml(domain.domain)}</td>`;
+        html += `<td>${domain.category || 'N/A'}</td>`;
+        html += `<td>${domain.source_id}</td>`;
+        html += `<td>${domain.confidence}</td>`;
+        html += `<td>`;
+        html += `<button onclick="whitelistDomain('${escapeHtml(domain.domain)}')" class="btn-secondary" style="margin-right: 5px;">Whitelist</button>`;
+        html += `<button onclick="deleteDomain(${domain.id})" class="btn-danger">Delete</button>`;
+        html += `</td>`;
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    resultsEl.innerHTML = html;
+}
+
+async function whitelistDomain(domain) {
+    if (!confirm(`Whitelist domain: ${domain}?`)) return;
+    
+    try {
+        const response = await fetch('/suricata/api/database/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                table: 'blocked_domains',
+                action: 'whitelist',
+                filters: { domain: domain }
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadDatabaseStats();
+            loadDomains();
+        } else {
+            showNotification('Failed to whitelist: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Whitelist failed: ' + error.message, 'error');
+    }
+}
+
+async function deleteDomain(id) {
+    if (!confirm(`Delete domain entry ID ${id}?`)) return;
+    
+    try {
+        const response = await fetch('/suricata/api/database/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                table: 'blocked_domains',
+                action: 'delete',
+                filters: { id: id }
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadDatabaseStats();
+            loadDomains();
+        } else {
+            showNotification('Failed to delete: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Delete failed: ' + error.message, 'error');
+    }
+}
+
+async function loadSources() {
+    try {
+        const response = await fetch('/suricata/api/database/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                table: 'blocklist_sources',
+                action: 'select',
+                limit: 100
+            })
+        });
+        
+        const data = await response.json();
+        displaySources(data.data);
+    } catch (error) {
+        console.error('Failed to load sources:', error);
+    }
+}
+
+function displaySources(sources) {
+    const sourcesEl = document.getElementById('sources-list');
+    
+    if (!sources || sources.length === 0) {
+        sourcesEl.innerHTML = '<p>No blocklist sources configured.</p>';
+        return;
+    }
+    
+    let html = '<table class="data-table"><thead><tr>';
+    html += '<th>ID</th><th>Name</th><th>Category</th><th>Entries</th><th>Enabled</th><th>Last Updated</th>';
+    html += '</tr></thead><tbody>';
+    
+    sources.forEach(source => {
+        html += '<tr>';
+        html += `<td>${source.id}</td>`;
+        html += `<td>${escapeHtml(source.name)}</td>`;
+        html += `<td>${source.category || 'N/A'}</td>`;
+        html += `<td>${formatNumber(source.entry_count || 0)}</td>`;
+        html += `<td>${source.enabled ? '✓' : '✗'}</td>`;
+        html += `<td>${formatTimestamp(source.last_updated)}</td>`;
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    sourcesEl.innerHTML = html;
 }

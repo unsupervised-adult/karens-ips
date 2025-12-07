@@ -21,6 +21,7 @@
             <button class="tab-button" data-tab="rules">Custom Rules</button>
             <button class="tab-button" data-tab="config">Configuration</button>
             <button class="tab-button" data-tab="blocklists">DNS Blocklists</button>
+            <button class="tab-button" data-tab="database">Database Manager</button>
             <button class="tab-button" data-tab="actions">Actions</button>
         </div>
 
@@ -106,7 +107,7 @@
                     <button onclick="updateHomeNet()" class="btn-primary">Update</button>
                 </div>
                 <div class="form-group">
-                    <label>EXTERNAL_NET:</label>
+                    <label for="external-net">EXTERNAL_NET:</label>
                     <input type="text" id="external-net" disabled>
                 </div>
             </div>
@@ -188,6 +189,45 @@
                 <div class="form-group">
                     <input type="text" id="manual-whitelist-ip" placeholder="192.168.1.100 or 10.0.0.0/24" style="flex: 2;">
                     <button onclick="whitelistManualIP()" class="btn-primary">Whitelist IP</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="database" class="tab-content">
+            <h2>Database Manager</h2>
+            
+            <div class="stats-grid" style="margin-bottom: 20px;">
+                <div class="stat-card">
+                    <h3>Blocklist Sources</h3>
+                    <div class="stat-value" id="db-sources-count">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Blocked Domains</h3>
+                    <div class="stat-value" id="db-domains-count">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Active Sources</h3>
+                    <div class="stat-value" id="db-active-sources">-</div>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>Query Blocked Domains</h3>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <input type="text" id="domain-search" placeholder="Search domains (e.g., example.com)">
+                    <button onclick="searchDomains()" class="btn-primary">Search</button>
+                    <button onclick="loadDomains()" class="btn-secondary">Show All (100)</button>
+                </div>
+                
+                <div id="domain-results" style="max-height: 400px; overflow-y: auto;">
+                    <p>Enter a search term or click "Show All" to view blocked domains.</p>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>Blocklist Sources</h3>
+                <div id="sources-list">
+                    <p>Loading sources...</p>
                 </div>
             </div>
         </div>

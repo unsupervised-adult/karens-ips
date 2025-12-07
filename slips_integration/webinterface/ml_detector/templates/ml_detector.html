@@ -1,4 +1,4 @@
-<div class="container-fluid mt-4">
+<div class="ml-detector-container">
 
   <!-- ML Detector Header -->
   <div class="row mb-4">
@@ -9,36 +9,36 @@
   </div>
 
   <!-- Statistics Cards -->
-  <div class="row mb-4">
+  <div class="row mb-4 g-3">
     <div class="col-md-3">
-      <div class="card bg-primary text-white">
-        <div class="card-body">
-          <h5 class="card-title">Total Analyzed</h5>
-          <h2 class="card-text" id="stat_total_analyzed">0</h2>
+      <div class="card h-100">
+        <div class="card-body text-center p-4">
+          <h3 class="text-muted text-uppercase mb-3" style="font-size: 0.75rem; font-weight: 600;">Packets Processed</h3>
+          <div class="text-primary" style="font-size: 2.5rem; font-weight: 700;" id="stat_total_analyzed">0</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="card bg-danger text-white">
-        <div class="card-body">
-          <h5 class="card-title">Ads Detected</h5>
-          <h2 class="card-text" id="stat_ads_detected">0</h2>
+      <div class="card h-100">
+        <div class="card-body text-center p-4">
+          <h3 class="text-muted text-uppercase mb-3" style="font-size: 0.75rem; font-weight: 600;">Ads Detected</h3>
+          <div class="text-danger" style="font-size: 2.5rem; font-weight: 700;" id="stat_ads_detected">0</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="card bg-success text-white">
-        <div class="card-body">
-          <h5 class="card-title">Legitimate Traffic</h5>
-          <h2 class="card-text" id="stat_legitimate">0</h2>
+      <div class="card h-100">
+        <div class="card-body text-center p-4">
+          <h3 class="text-muted text-uppercase mb-3" style="font-size: 0.75rem; font-weight: 600;">Legitimate Traffic</h3>
+          <div class="text-success" style="font-size: 2.5rem; font-weight: 700;" id="stat_legitimate">0</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="card bg-info text-white">
-        <div class="card-body">
-          <h5 class="card-title">Model Accuracy</h5>
-          <h2 class="card-text" id="stat_accuracy">0%</h2>
+      <div class="card h-100">
+        <div class="card-body text-center p-4">
+          <h3 class="text-muted text-uppercase mb-3" style="font-size: 0.75rem; font-weight: 600;">Model Accuracy</h3>
+          <div class="text-info" style="font-size: 2.5rem; font-weight: 700;" id="stat_accuracy">0%</div>
         </div>
       </div>
     </div>
@@ -184,7 +184,7 @@
         </li>
         <li class="nav-item" role="presentation">
           <button class="nav-link" id="alerts-tab" data-bs-toggle="tab"
-                  data-bs-target="#alerts" type="button" role="tab">
+                  data-bs-target="#ml-alerts" type="button" role="tab">
             Alerts & Actions
           </button>
         </li>
@@ -223,7 +223,7 @@
         </div>
 
         <!-- Alerts & Actions Tab -->
-        <div class="tab-pane fade" id="alerts" role="tabpanel">
+        <div class="tab-pane fade" id="ml-alerts" role="tabpanel">
 
           <!-- Live Blocking Control -->
           <div class="row mb-4 mt-3">
@@ -248,6 +248,34 @@
                     </div>
                   </div>
                   <div id="blocking_status_message" class="mt-3"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Alerts -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                  <h6 class="mb-0">🚨 Recent Alerts</h6>
+                </div>
+                <div class="card-body">
+                  <div class="table-responsive">
+                    <table id="table_alerts" class="table table-sm table-hover display nowrap" style="width:100%">
+                      <thead>
+                        <tr>
+                          <th>Timestamp</th>
+                          <th>Type</th>
+                          <th>Severity</th>
+                          <th>Source IP</th>
+                          <th>Description</th>
+                          <th>Confidence</th>
+                        </tr>
+                      </thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>

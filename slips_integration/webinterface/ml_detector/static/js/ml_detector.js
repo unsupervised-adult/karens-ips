@@ -254,47 +254,100 @@ function initializeTables() {
         console.log("ML Detector: Detections table initialized");
 
         // Initialize alerts table when its tab is shown
-        $('#alerts-tab').one('shown.bs.tab', function() {
-            if (!window.alertsTable && $('#table_alerts').is(':visible')) {
+        console.log("ML Detector: Setting up alerts tab listener, #alerts-tab exists:", $('#alerts-tab').length, ", #table_alerts exists:", $('#table_alerts').length);
+        
+        $('#alerts-tab').on('shown.bs.tab', function() {
+            console.log("ML Detector: Alerts tab shown event fired!");
+            if (!window.alertsTable && $('#table_alerts').length > 0) {
                 console.log("ML Detector: Initializing alerts table...");
-                try {
-                    window.alertsTable = $('#table_alerts').DataTable({
-                        columns: [
-                            { data: 'timestamp_formatted', defaultContent: 'N/A' },
-                            { data: 'alert_type', defaultContent: 'Unknown' },
-                            {
-                                data: 'severity',
-                                defaultContent: 'low',
-                                render: function(data) {
-                                    let badge = 'info';
-                                    if (data === 'high') badge = 'danger';
-                                    else if (data === 'medium') badge = 'warning';
-                                    return `<span class="badge bg-${badge}">${data}</span>`;
-                                }
-                            },
-                            { data: 'src_ip', defaultContent: 'N/A' },
-                            { data: 'description', defaultContent: 'No description' },
-                            {
-                                data: 'confidence',
-                                defaultContent: '0',
-                                render: function(data) {
-                                    const value = parseFloat(data);
-                                    return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
-                                }
-                            }
-                        ],
-                        order: [[0, 'desc']],
-                        pageLength: 25,
-                        searching: true,
-                        lengthChange: true,
-                        deferRender: true
-                    });
-                    console.log("ML Detector: Alerts table initialized");
-                    loadAlerts();
-                } catch (error) {
-                    console.error("ML Detector: Error initializing alerts table:", error);
+                console.log("ML Detector: #ml-alerts visible:", $('#ml-alerts').is(':visible'));
+                console.log("ML Detector: #ml-alerts classes:", $('#ml-alerts').attr('class'));
+                console.log("ML Detector: #ml-alerts display:", $('#ml-alerts').css('display'));
+                console.log("ML Detector: #table_alerts visible:", $('#table_alerts').is(':visible'));
+                console.log("ML Detector: #table_alerts parent visible:", $('#table_alerts').parent().is(':visible'));
+                
+                // Force show the alerts tab if it's hidden
+                if (!$('#ml-alerts').hasClass('show') || !$('#ml-alerts').hasClass('active')) {
+                    console.warn("ML Detector: #ml-alerts tab not properly shown, forcing visibility...");
+                    $('#ml-alerts').addClass('show active').css('display', 'block');
                 }
+                
+                // Retry logic with increasing delays
+                var attempts = 0;
+                var maxAttempts = 5;
+                var tryInit = function() {
+                    attempts++;
+                    try {
+                        // Check if table is visible before initializing
+                        if (!$('#table_alerts').is(':visible')) {
+                            console.warn("ML Detector: table_alerts not visible (attempt " + attempts + "/" + maxAttempts + ")");
+                            if (attempts < maxAttempts) {
+                                setTimeout(tryInit, 100 * attempts);
+                                return;
+                            } else {
+                                console.error("ML Detector: Failed to initialize after " + maxAttempts + " attempts");
+                                return;
+                            }
+                        }
+                        
+                        console.log("ML Detector: Table is visible, proceeding with initialization");
+                        window.alertsTable = $('#table_alerts').DataTable({
+                            columns: [
+                                { data: 'timestamp_formatted', defaultContent: 'N/A' },
+                                { data: 'alert_type', defaultContent: 'Unknown' },
+                                {
+                                    data: 'severity',
+                                    defaultContent: 'low',
+                                    render: function(data) {
+                                        let badge = 'info';
+                                        if (data === 'high') badge = 'danger';
+                                        else if (data === 'medium') badge = 'warning';
+                                        return `<span class="badge bg-${badge}">${data}</span>`;
+                                    }
+                                },
+                                { data: 'src_ip', defaultContent: 'N/A' },
+                                { data: 'description', defaultContent: 'No description' },
+                                {
+                                    data: 'confidence',
+                                    defaultContent: '0',
+                                    render: function(data) {
+                                        const value = parseFloat(data);
+                                        return (isNaN(value) ? 0 : value * 100).toFixed(2) + '%';
+                                    }
+                                }
+                            ],
+                            order: [[0, 'desc']],
+                            pageLength: 25,
+                            searching: true,
+                            lengthChange: true,
+                            deferRender: true,
+                            autoWidth: false,
+                            columnDefs: [
+                                { width: '15%', targets: 0 },
+                                { width: '12%', targets: 1 },
+                                { width: '10%', targets: 2 },
+                                { width: '15%', targets: 3 },
+                                { width: '38%', targets: 4 },
+                                { width: '10%', targets: 5 }
+                            ]
+                        });
+                        console.log("ML Detector: Alerts table initialized successfully");
+                        loadAlerts();
+                    } catch (error) {
+                        console.error("ML Detector: Error initializing alerts table:", error);
+                    }
+                };
+                
+                // Start trying
+                tryInit();
+            } else {
+                console.log("ML Detector: Alerts table already initialized or element not found. alertsTable:", !!window.alertsTable, ", element exists:", $('#table_alerts').length);
             }
+        });
+        
+        // Also try clicking event
+        $('#alerts-tab').on('click', function() {
+            console.log("ML Detector: Alerts tab clicked!");
         });
     } catch (error) {
         console.error("ML Detector: Error initializing tables:", error);

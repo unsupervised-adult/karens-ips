@@ -3,6 +3,19 @@
 
 /* ML Detector Specific Styles */
 
+/* Base styling for ML Detector when included in main app */
+#nav-ml-detector {
+    background: #f8f9fa;
+    min-height: calc(100vh - 120px);
+    padding: 20px 0;
+}
+
+.ml-detector-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
 /* Navbar toggler styles */
 .navbar-toggler {
     text-decoration: none;
@@ -21,39 +34,42 @@
 }
 
 .card {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    border: none;
+    background: white;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
 }
 
 .card-header {
     font-weight: 600;
-    border-bottom: 2px solid #dee2e6;
+    border-bottom: none;
+    background: white;
+    border-radius: 12px 12px 0 0 !important;
+    padding: 1.25rem;
+}
+
+.card-body {
+    padding: 1.25rem;
 }
 
 /* Statistics Cards */
-.card.bg-primary,
-.card.bg-danger,
-.card.bg-success,
-.card.bg-info {
-    transition: transform 0.2s;
-}
-
-.card.bg-primary:hover,
-.card.bg-danger:hover,
-.card.bg-success:hover,
-.card.bg-info:hover {
-    transform: translateY(-5px);
-}
-
-.card-title {
-    font-size: 0.9rem;
-    margin-bottom: 0.5rem;
-    opacity: 0.9;
+.card-title.text-muted {
+    font-size: 0.75rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
 .card-text {
-    font-size: 2rem;
+    font-size: 2.5rem;
     font-weight: 700;
+    margin: 0;
 }
 
 /* Charts */
@@ -63,15 +79,31 @@ canvas {
 
 /* Tables */
 #table_detections,
-#table_alerts {
+#table_alerts,
+#feedback_table {
     font-size: 0.9rem;
     width: 100%;
 }
 
 #table_detections thead th,
-#table_alerts thead th {
-    background-color: #f8f9fa;
+#table_alerts thead th,
+#feedback_table thead th {
+    background-color: #0d6efd;
+    color: white;
     font-weight: 600;
+    border: none;
+}
+
+#table_detections tbody tr:hover,
+#table_alerts tbody tr:hover,
+#feedback_table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+#table_detections tbody td,
+#table_alerts tbody td,
+#feedback_table tbody td {
+    border-bottom: 1px solid #e9ecef;
 }
 
 /* Badges */
@@ -80,17 +112,92 @@ canvas {
     padding: 0.35em 0.65em;
 }
 
-/* Tab styling */
-.nav-tabs .nav-link {
-    color: #495057;
+/* Tab styling - internal ML detector tabs */
+#mlDetectorTabs .nav-link {
+    color: #0d6efd;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px 6px 0 0;
+    transition: all 0.3s;
 }
 
-.nav-tabs .nav-link.active {
+#mlDetectorTabs .nav-link:hover {
+    background: #e9ecef;
+    border-color: #dee2e6;
+}
+
+#mlDetectorTabs .nav-link.active {
     font-weight: 600;
+    background: white;
+    border-color: #dee2e6;
+    border-bottom-color: white;
 }
 
 /* Model info table */
 .table-sm th {
     font-weight: 600;
     color: #495057;
+}
+
+/* Section headers in ML detector */
+#nav-ml-detector h2 {
+    color: #212529;
+    font-weight: 700;
+}
+
+#nav-ml-detector h3,
+#nav-ml-detector h5,
+#nav-ml-detector h6 {
+    color: #495057;
+}
+
+/* Card headers with specific colors */
+.card-header.bg-warning {
+    background-color: #ffc107 !important;
+    color: #000;
+}
+
+.card-header.bg-danger {
+    background-color: #dc3545 !important;
+    color: white;
+}
+
+.card-header.bg-info {
+    background-color: #0dcaf0 !important;
+    color: #000;
+}
+
+.card-header.bg-success {
+    background-color: #198754 !important;
+    color: white;
+}
+
+/* Input and button styling */
+#nav-ml-detector input[type="text"],
+#nav-ml-detector input[type="number"],
+#nav-ml-detector select,
+#nav-ml-detector textarea {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+#nav-ml-detector .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+#nav-ml-detector .btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0b5ed7;
+}
+
+#nav-ml-detector .btn-success {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+#nav-ml-detector .btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
 }

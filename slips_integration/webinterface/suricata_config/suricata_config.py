@@ -490,6 +490,94 @@ def get_blocklist_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@suricata_bp.route('/api/database/query', methods=['POST'])
+def query_database():
+    try:
+        import sqlite3
+        data = request.get_json()
+        table = data.get('table')
+        action = data.get('action')
+        filters = data.get('filters', {})
+        limit = data.get('limit', 100)
+        
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        if action == 'select':
+            query = f"SELECT * FROM {table}"
+            params = []
+            
+            if filters:
+                conditions = []
+                for key, value in filters.items():
+                    conditions.append(f"{key} LIKE ?")
+                    params.append(f"%{value}%")
+                query += " WHERE " + " AND ".join(conditions)
+            
+            query += f" ORDER BY id DESC LIMIT {limit}"
+            cursor.execute(query, params)
+            results = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            return jsonify({'success': True, 'data': results})
+            
+        elif action == 'delete':
+            domain_id = filters.get('id')
+            if domain_id:
+                cursor.execute("DELETE FROM blocked_domains WHERE id = ?", (domain_id,))
+                conn.commit()
+                conn.close()
+                return jsonify({'success': True, 'message': 'Entry deleted'})
+            
+        elif action == 'whitelist':
+            domain = filters.get('domain')
+            if domain:
+                cursor.execute("DELETE FROM blocked_domains WHERE domain = ?", (domain,))
+                conn.commit()
+                conn.close()
+                return jsonify({'success': True, 'message': f'Domain {domain} whitelisted'})
+        
+        conn.close()
+        return jsonify({'error': 'Invalid action'}), 400
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/database/tables')
+def get_database_tables():
+    try:
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        tables = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return jsonify({'success': True, 'tables': tables})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/database/count')
+def get_database_counts():
+    try:
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        counts = {}
+        cursor.execute("SELECT COUNT(*) FROM blocklist_sources")
+        counts['sources'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM blocked_domains")
+        counts['domains'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(DISTINCT source_id) FROM blocked_domains")
+        counts['active_sources'] = cursor.fetchone()[0]
+        
+        conn.close()
+        return jsonify({'success': True, 'counts': counts})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 def reload_suricata():
     try:
         subprocess.run(['sudo', 'systemctl', 'reload', 'suricata'], 
