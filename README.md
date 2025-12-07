@@ -163,7 +163,6 @@ Internet
 
 ## Modular Installer
 
-The installer uses a **modular architecture** for maintainability and flexibility:
 
 ### Architecture
 
@@ -250,12 +249,6 @@ nano installer/config/custom.conf
 
 # Run with custom config
 sudo CONFIG_FILE=installer/config/custom.conf ./karens-ips-installer.sh
-```
-
-**Debug mode:**
-
-```bash
-sudo DEBUG=1 ./karens-ips-installer.sh
 ```
 
 See [installer/README.md](installer/README.md) for complete modular installer documentation.
@@ -382,7 +375,7 @@ karens-ips/
 ├── requirements.txt                # Python dependencies
 ├── README.md                       # This file
 ├── QUICK_START.md                  # Quick start guide
-└── FINAL_CODE_REVIEW.md            # Comprehensive code review
+
 ```
 
 ## System Requirements
@@ -490,7 +483,7 @@ bridge link show
 
 - **[QUICK_START.md](QUICK_START.md)** - Quick start guide
 - **[installer/README.md](installer/README.md)** - Modular installer documentation
-- **[FINAL_CODE_REVIEW.md](FINAL_CODE_REVIEW.md)** - Comprehensive code review (9.4/10)
+
 
 ## Performance Tuning
 
@@ -501,19 +494,6 @@ See `installer/modules/02-kernel-tuning.sh` for kernel optimizations:
 - TCP BBR congestion control
 - Busy polling enabled
 - IPv6 disabled
-
-## Security Features
-
-- ✅ No critical vulnerabilities (security audited)
-- ✅ Proper privilege separation (suricata user)
-- ✅ File permissions correctly set (644/755)
-- ✅ Input validation throughout
-- ✅ No shell injection vulnerabilities
-- ✅ Localhost-only Redis binding
-- ✅ nftables host protection
-- ✅ Secure systemd service configurations
-
-See [FINAL_CODE_REVIEW.md](FINAL_CODE_REVIEW.md) for complete security analysis.
 
 ## Testing
 
@@ -553,4 +533,4 @@ GPL-2.0-only
 
 ---
 
-**Status:** Production-ready (Code Review: 9.4/10) | **Version:** 4.0 Modular
+

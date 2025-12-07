@@ -1130,7 +1130,12 @@ $(document).ready(function() {
     $('#btn_export_detections').on('click', exportDetections);
     $('#btn_view_logs').on('click', viewLogs);
 
-    // Load Alerts & Actions data when tab is shown
+    // Load Alerts & Actions data immediately on page load
+    loadBlockingStatus();
+    loadWhitelist();
+    loadBlacklist();
+
+    // Also reload when tab is shown
     $('#alerts-tab').on('shown.bs.tab', function() {
         loadBlockingStatus();
         loadWhitelist();

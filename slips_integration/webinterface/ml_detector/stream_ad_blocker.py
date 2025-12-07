@@ -36,13 +36,29 @@ class StreamAdBlocker:
         except Exception as e:
             print(f"⚠️  ML classifier failed, using pattern-only mode: {e}")
 
-        # Known ad domains for quick filtering
+        # Known ad & telemetry domains for quick filtering
         self.ad_patterns = [
+            # Ad networks
             'doubleclick', 'googlesyndication', 'googleadservices',
             'advertising', 'adservice', 'pagead', 'adnxs', 'adsrvr',
             'criteo', 'taboola', 'outbrain', 'amazon-adsystem',
             'googletagmanager', 'googletagservices', 'imasdk',
-            'scorecardresearch', 'moatads', 'addthis', 'sharethis'
+            'scorecardresearch', 'moatads', 'addthis', 'sharethis',
+
+            # Telemetry & tracking (corpo spyware)
+            'telemetry', 'analytics', 'tracking', 'metrics', 'stats',
+            'google-analytics', 'googleanalytics', 'ga.js', 'gtag',
+            'mixpanel', 'segment.io', 'amplitude', 'heap.io',
+            'hotjar', 'fullstory', 'logrocket', 'sentry.io',
+            'bugsnag', 'newrelic', 'datadog', 'splunk',
+            'adobe.com/data', 'adobedtm', 'omtrdc', 'demdex',
+            'facebook.com/tr', 'connect.facebook.net', 'fbcdn',
+            'twitter.com/i/adsct', 'ads-twitter', 't.co/i/adsct',
+            'linkedin.com/px', 'snap.licdn.com',
+            'reddit.com/api/v1/pixel', 'redditmedia.com/gtm',
+            'tiktok.com/i18n/pixel', 'analytics.tiktok',
+            'clarity.ms', 'c.bing.com', 'bat.bing.com',
+            'quantserve', 'quantcast', 'chartbeat', 'kissmetrics'
         ]
 
         # Streaming service patterns
@@ -253,10 +269,11 @@ class StreamAdBlocker:
 
     def monitor_flows(self):
         """Main monitoring loop"""
-        print("🎯 Starting Stream Ad Blocker...")
+        print("🎯 Starting Stream Ad Blocker & Telemetry Filter...")
         print(f"   ML Classifier: {'Enabled' if self.classifier else 'Disabled'}")
-        print(f"   Ad Patterns: {len(self.ad_patterns)} patterns loaded")
+        print(f"   Blocking Patterns: {len(self.ad_patterns)} ad/telemetry domains loaded")
         print(f"   Streaming Services: {len(self.streaming_services)} services monitored")
+        print(f"   🛡️  Blocking ads, tracking, analytics, and corpo spyware")
         print()
 
         seen_domains = set()
