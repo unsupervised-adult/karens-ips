@@ -166,29 +166,45 @@ redis:
 ml:
   use_ml: yes
   ml_models_folder: modules/ml/models/
+
+threatintelligence:
+  ti_files: config/TI_feeds.csv
+  ja3_feeds: config/JA3_feeds.csv
+  ssl_feeds: config/SSL_feeds.csv
 SLIPS_CONFIG_EOF
 
     # Create empty feed files to prevent "Bad file descriptor" errors
     log "Creating feed configuration files..."
     
+    # Create main TI feeds file (required by SLIPS)
+    cat > config/TI_feeds.csv << 'TI_FEEDS_EOF'
+# Main Threat Intelligence Feeds
+# Format: URL,threat_level,tags
+# threat_level: info, low, medium, high, critical
+# tags: optional comma-separated tags
+https://rules.emergingthreats.net/blockrules/compromised-ips.txt,high,
+https://cinsscore.com/list/ci-badguys.txt,medium,
+https://www.spamhaus.org/drop/drop.txt,high,
+TI_FEEDS_EOF
+
     # Create JA3 feeds file
     cat > config/JA3_feeds.csv << 'JA3_FEEDS_EOF'
 # JA3 Threat Intelligence Feeds
-# Format: URL,Description
-https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv,Abuse.ch SSL Blacklist JA3 Fingerprints
+# Format: URL,threat_level,tags
+https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv,high,
 JA3_FEEDS_EOF
 
     # Create SSL feeds file
     cat > config/SSL_feeds.csv << 'SSL_FEEDS_EOF'
 # SSL Certificate Threat Intelligence Feeds
-# Format: URL,Description
-https://sslbl.abuse.ch/blacklist/sslblacklist.csv,Abuse.ch SSL Blacklist
+# Format: URL,threat_level,tags
+https://sslbl.abuse.ch/blacklist/sslblacklist.csv,high,
 SSL_FEEDS_EOF
 
-    # Create JARM feeds file
+    # Create JARM feeds file (empty but required)
     cat > config/JARM_feeds.csv << 'JARM_FEEDS_EOF'
 # JARM Threat Intelligence Feeds
-# Format: URL,Description
+# Format: URL,threat_level,tags
 JARM_FEEDS_EOF
 
     chmod 644 config/*.csv
