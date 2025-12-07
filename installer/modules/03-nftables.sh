@@ -213,10 +213,23 @@ IP="$1"
 REASON="$2"
 CONFIDENCE="${3:-0.8}"
 
-# Validate IP address
+# Validate IP address format
 if [[ ! "$IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
     echo "Invalid IP address: $IP" >&2
     exit 1
+fi
+
+# Skip private/local RFC addresses
+if [[ "$IP" =~ ^10\. ]] || \
+   [[ "$IP" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
+   [[ "$IP" =~ ^192\.168\. ]] || \
+   [[ "$IP" =~ ^127\. ]] || \
+   [[ "$IP" =~ ^169\.254\. ]] || \
+   [[ "$IP" =~ ^22[4-9]\. ]] || \
+   [[ "$IP" =~ ^23[0-9]\. ]]; then
+    logger -t slips-blocking "Skipping private/local IP: $IP"
+    echo "Skipping private/local IP: $IP"
+    exit 0
 fi
 
 # Block IP in nftables
@@ -255,10 +268,23 @@ if [[ -z "$IP" ]]; then
     exit 1
 fi
 
-# Validate IP
+# Validate IP format
 if [[ ! "$IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
     echo "Invalid IP address: $IP" >&2
     exit 1
+fi
+
+# Skip private/local RFC addresses
+if [[ "$IP" =~ ^10\. ]] || \
+   [[ "$IP" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
+   [[ "$IP" =~ ^192\.168\. ]] || \
+   [[ "$IP" =~ ^127\. ]] || \
+   [[ "$IP" =~ ^169\.254\. ]] || \
+   [[ "$IP" =~ ^22[4-9]\. ]] || \
+   [[ "$IP" =~ ^23[0-9]\. ]]; then
+    logger -t suricata-blocking "Skipping private/local IP: $IP"
+    echo "Skipping private/local IP: $IP"
+    exit 0
 fi
 
 # Encode IP for suricatasc
@@ -394,13 +420,38 @@ class ThreatBlocker:
         except Exception as e:
             logger.error(f"Error processing ML alerts: {e}")
             
+    def is_private_ip(self, ip):
+        """Check if IP is RFC1918 private or non-routable"""
+        try:
+            parts = [int(x) for x in ip.split('.')]
+            if len(parts) != 4:
+                return True
+            
+            # RFC1918 private
+            if parts[0] == 10:
+                return True
+            if parts[0] == 172 and 16 <= parts[1] <= 31:
+                return True
+            if parts[0] == 192 and parts[1] == 168:
+                return True
+            
+            # Loopback, link-local, multicast
+            if parts[0] in [127, 169] or parts[0] >= 224:
+                return True
+                
+            return False
+        except (ValueError, IndexError):
+            return True
+    
     def is_valid_ip(self, ip):
-        """Validate IP address format"""
+        """Validate IP address format and ensure it's not private"""
         parts = ip.split('.')
         if len(parts) != 4:
             return False
         try:
-            return all(0 <= int(part) <= 255 for part in parts)
+            if not all(0 <= int(part) <= 255 for part in parts):
+                return False
+            return not self.is_private_ip(ip)
         except ValueError:
             return False
     

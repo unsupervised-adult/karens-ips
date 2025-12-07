@@ -99,6 +99,37 @@ class Blocking(IModule):
         result = result.stdout.decode("utf-8")
         return ip in result
 
+    def _is_private_ip(self, ip: str) -> bool:
+        """Check if IP is RFC1918 private address or other non-routable"""
+        try:
+            octets = [int(x) for x in ip.split('.')]
+            if len(octets) != 4:
+                return False
+            
+            # RFC1918 private ranges
+            if octets[0] == 10:
+                return True
+            if octets[0] == 172 and 16 <= octets[1] <= 31:
+                return True
+            if octets[0] == 192 and octets[1] == 168:
+                return True
+            
+            # Loopback
+            if octets[0] == 127:
+                return True
+            
+            # Link-local
+            if octets[0] == 169 and octets[1] == 254:
+                return True
+            
+            # Multicast and reserved
+            if octets[0] >= 224:
+                return True
+                
+            return False
+        except (ValueError, IndexError):
+            return False
+
     def _block_ip(self, ip_to_block: str, flags: Dict[str, str]) -> bool:
         """
         Block IP by adding it to the nftables blocked4 set
@@ -109,6 +140,11 @@ class Blocking(IModule):
             return False
 
         if not isinstance(ip_to_block, str):
+            return False
+        
+        if self._is_private_ip(ip_to_block):
+            txt = f"Skipping private/local IP: {ip_to_block}"
+            self.print(txt, 3, 0)
             return False
 
         if self._is_ip_already_blocked(ip_to_block):
