@@ -25,7 +25,11 @@ function initTabs() {
             document.getElementById(tabName).classList.add('active');
             
             if (tabName === 'alerts') loadAlerts();
-            if (tabName === 'rules') loadRules();
+            if (tabName === 'rules') {
+                loadRules();
+                loadRuleSources();
+                loadSeverityClassifications();
+            }
             if (tabName === 'config') loadConfig();
             if (tabName === 'blocklists') loadBlocklists();
             if (tabName === 'database') loadDatabaseStats();
@@ -751,4 +755,131 @@ async function syncDatabaseToSuricata() {
         btn.disabled = false;
         btn.innerHTML = originalText;
     }
+}
+
+async function loadRuleSources() {
+    try {
+        const response = await fetch('/suricata/api/rulesets/sources');
+        const data = await response.json();
+        
+        const sourcesEl = document.getElementById('rule-sources-list');
+        
+        if (!data.sources || data.sources.length === 0) {
+            sourcesEl.innerHTML = '<p>No rule sources available.</p>';
+            return;
+        }
+        
+        let html = '<table class="data-table"><thead><tr>';
+        html += '<th>Source</th><th>Summary</th><th>License</th><th>Status</th><th>Action</th>';
+        html += '</tr></thead><tbody>';
+        
+        data.sources.forEach(source => {
+            const needsSubscription = source.subscription || source.license === 'Commercial';
+            html += '<tr>';
+            html += `<td><strong>${escapeHtml(source.name)}</strong></td>`;
+            html += `<td>${escapeHtml(source.summary || 'N/A')}</td>`;
+            html += `<td>${escapeHtml(source.license || 'Unknown')}</td>`;
+            html += `<td>${source.enabled ? '<span style="color: green;">✓ Enabled</span>' : '<span style="color: gray;">Disabled</span>'}</td>`;
+            html += '<td>';
+            
+            if (needsSubscription && !source.enabled) {
+                html += '<span style="color: #999; font-size: 0.9em;">Requires Subscription</span>';
+            } else {
+                html += `<button onclick="toggleRuleSource('${escapeHtml(source.name)}', ${!source.enabled})" class="${source.enabled ? 'btn-danger' : 'btn-primary'}">`;
+                html += source.enabled ? 'Disable' : 'Enable';
+                html += '</button>';
+            }
+            
+            html += '</td>';
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table>';
+        sourcesEl.innerHTML = html;
+    } catch (error) {
+        console.error('Failed to load rule sources:', error);
+        document.getElementById('rule-sources-list').innerHTML = '<p>Error loading rule sources.</p>';
+    }
+}
+
+async function toggleRuleSource(sourceName, enable) {
+    if (!confirm(`${enable ? 'Enable' : 'Disable'} rule source "${sourceName}"?\n\nThis will update rules and reload Suricata (~30-60 seconds).`)) {
+        return;
+    }
+    
+    showNotification(`${enable ? 'Enabling' : 'Disabling'} ${sourceName}...`, 'info');
+    
+    try {
+        const response = await fetch('/suricata/api/rulesets/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                source: sourceName,
+                enable: enable
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadRuleSources();
+        } else {
+            showNotification('Failed: ' + (data.error || data.warning), 'error');
+        }
+    } catch (error) {
+        showNotification('Toggle failed: ' + error.message, 'error');
+    }
+}
+
+async function loadSeverityClassifications() {
+    try {
+        const response = await fetch('/suricata/api/rulesets/severity');
+        const data = await response.json();
+        
+        const classEl = document.getElementById('severity-classifications');
+        
+        if (!data.classifications || data.classifications.length === 0) {
+            classEl.innerHTML = '<p>No classifications available.</p>';
+            return;
+        }
+        
+        data.classifications.sort((a, b) => a.priority - b.priority);
+        
+        let html = '<table class="data-table"><thead><tr>';
+        html += '<th>Priority</th><th>Classification</th><th>Description</th>';
+        html += '</tr></thead><tbody>';
+        
+        data.classifications.forEach(cls => {
+            let priorityLabel = 'Low';
+            let priorityColor = '#999';
+            
+            if (cls.priority === 1) {
+                priorityLabel = 'Critical';
+                priorityColor = '#dc3545';
+            } else if (cls.priority === 2) {
+                priorityLabel = 'High';
+                priorityColor = '#fd7e14';
+            } else if (cls.priority === 3) {
+                priorityLabel = 'Medium';
+                priorityColor = '#ffc107';
+            }
+            
+            html += '<tr>';
+            html += `<td><strong style="color: ${priorityColor};">${cls.priority} - ${priorityLabel}</strong></td>`;
+            html += `<td><code>${escapeHtml(cls.name)}</code></td>`;
+            html += `<td>${escapeHtml(cls.description)}</td>`;
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table>';
+        classEl.innerHTML = html;
+    } catch (error) {
+        console.error('Failed to load classifications:', error);
+        document.getElementById('severity-classifications').innerHTML = '<p>Error loading classifications.</p>';
+    }
+}
+
+function updateSeverityFilter() {
+    const filterValue = document.getElementById('severity-filter').value;
+    showNotification(`Alert filter set to priority ${filterValue} and above. Update custom rules or suricata.yaml action settings to apply blocking thresholds.`, 'info');
 }

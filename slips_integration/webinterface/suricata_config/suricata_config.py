@@ -578,6 +578,99 @@ def get_database_counts():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@suricata_bp.route('/api/rulesets/sources')
+def get_rule_sources():
+    try:
+        result = subprocess.run(['sudo', 'suricata-update', 'list-sources'],
+                              capture_output=True, text=True, timeout=30)
+        
+        enabled_result = subprocess.run(['sudo', 'suricata-update', 'list-enabled-sources'],
+                                       capture_output=True, text=True, timeout=30)
+        
+        enabled_sources = []
+        if enabled_result.returncode == 0:
+            for line in enabled_result.stdout.split('\n'):
+                if line.strip().startswith('- '):
+                    enabled_sources.append(line.strip()[2:])
+        
+        sources = []
+        if result.returncode == 0:
+            current_source = {}
+            for line in result.stdout.split('\n'):
+                if line.startswith('Name: '):
+                    if current_source:
+                        sources.append(current_source)
+                    current_source = {
+                        'name': line.split('Name: ')[1].strip(),
+                        'enabled': False
+                    }
+                elif line.startswith('  Summary: ') and current_source:
+                    current_source['summary'] = line.split('Summary: ')[1].strip()
+                elif line.startswith('  License: ') and current_source:
+                    current_source['license'] = line.split('License: ')[1].strip()
+                elif line.startswith('  Subscription: ') and current_source:
+                    current_source['subscription'] = True
+            
+            if current_source:
+                sources.append(current_source)
+            
+            for source in sources:
+                source['enabled'] = source['name'] in enabled_sources
+        
+        return jsonify({'sources': sources})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/rulesets/toggle', methods=['POST'])
+def toggle_rule_source():
+    try:
+        data = request.get_json()
+        source_name = data.get('source')
+        enable = data.get('enable', True)
+        
+        if enable:
+            result = subprocess.run(['sudo', 'suricata-update', 'enable-source', source_name],
+                                  capture_output=True, text=True, timeout=30)
+        else:
+            result = subprocess.run(['sudo', 'suricata-update', 'disable-source', source_name],
+                                  capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            update_result = subprocess.run(['sudo', 'suricata-update'],
+                                         capture_output=True, text=True, timeout=60)
+            if update_result.returncode == 0:
+                reload_suricata()
+                return jsonify({'success': True, 'message': f'Source {"enabled" if enable else "disabled"} and rules updated'})
+            else:
+                return jsonify({'warning': 'Source toggled but update failed', 'details': update_result.stderr}), 500
+        else:
+            return jsonify({'error': result.stderr}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@suricata_bp.route('/api/rulesets/severity')
+def get_severity_levels():
+    try:
+        classifications = []
+        result = subprocess.run(['sudo', 'cat', '/var/lib/suricata/rules/classification.config'],
+                              capture_output=True, text=True, timeout=10)
+        
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if line.startswith('config classification:'):
+                    parts = line.split('config classification:')[1].strip().split(',')
+                    if len(parts) >= 3:
+                        classifications.append({
+                            'name': parts[0].strip(),
+                            'description': parts[1].strip(),
+                            'priority': int(parts[2].strip())
+                        })
+        
+        return jsonify({'classifications': classifications})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @suricata_bp.route('/api/database/sync', methods=['POST'])
 def sync_database_to_suricata():
     try:
