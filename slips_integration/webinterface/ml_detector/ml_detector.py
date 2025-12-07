@@ -129,6 +129,10 @@ def get_stats():
                     v.decode() if isinstance(v, bytes) else v
                     for k, v in stats.items()}
             
+            # Map detections_found to ads_detected for display
+            if 'detections_found' in stats:
+                stats['ads_detected'] = stats['detections_found']
+            
             # Get Suricata packet stats to show as total analyzed
             # Read REAL packet count from stats.log (not suricatasc which doesn't work)
             try:
@@ -162,6 +166,9 @@ def get_stats():
                         detections = int(detections_str) if detections_str.isdigit() else 0
                         legitimate = packets - detections
                         stats['legitimate_traffic'] = f"{legitimate:,}"
+                        
+                        # Use detections_found for ads_detected display field
+                        stats['ads_detected'] = stats.get('detections_found', '0')
                     except (ValueError, TypeError):
                         pass
 

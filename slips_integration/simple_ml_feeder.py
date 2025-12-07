@@ -11,11 +11,12 @@ import glob
 from datetime import datetime
 
 def main():
-    # Connect to Redis
-    r = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
-    
+    # Connect to Redis DB 0 where SLIPS stores ALL data including web interface keys
+    # SLIPS web interface reads from DB 0 (via db.rdb.r from SLIPS' database module)
+    r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
     print("Starting ML data feeder...")
-    
+
     # Initialize model info
     model_info = {
         'model_type': 'SLIPS Zeek-based Analysis',
@@ -27,12 +28,12 @@ def main():
         'description': 'ML detection integrated with SLIPS network behavioral analysis'
     }
     r.hset('ml_detector:model_info', mapping=model_info)
-    
+
     # Feature importance
     features = {
         'flow_duration': '0.20',
         'bytes_transferred': '0.18',
-        'connection_patterns': '0.16', 
+        'connection_patterns': '0.16',
         'dns_behavior': '0.14',
         'port_usage': '0.12',
         'ssl_patterns': '0.10',
@@ -72,13 +73,14 @@ def main():
 
             print(f"[DEBUG] Total flows after counting: {total_flows}")
 
-            # Fallback: if no Zeek logs found, try analyzed_ips counter
+            # Fallback: if no Zeek logs found, try analyzed_ips counter from SLIPS (DB 0)
             if total_flows == 0:
                 analyzed_ips = r.get('analyzed_ips') or '0'
                 total_flows = int(analyzed_ips)
                 print(f"[DEBUG] Using fallback analyzed_ips: {total_flows}")
 
             # Count evidence from the last hour only (not all accumulated evidence)
+            # Read from SLIPS database (DB 0)
             evidence_keys = r.keys('profile_*_evidence')
             recent_evidence_count = 0
 
@@ -126,6 +128,7 @@ def main():
                 'uptime': uptime_str,
                 'status': 'Active - Live Network Analysis'
             }
+            # Write to web interface database (DB 1)
             r.hset('ml_detector:stats', mapping=stats)
             print(f"[DEBUG] Redis write complete - stats={stats}")
             
@@ -134,7 +137,7 @@ def main():
                 # Track unique evidence IDs we've already processed to avoid duplicates
                 processed_key = 'ml_detector:processed_evidence'
 
-                # Get recent evidence from SLIPS profiles
+                # Get recent evidence from SLIPS profiles (DB 0)
                 for profile_key in evidence_keys[:100]:
                     if '_evidence' in profile_key:
                         # Extract profile ID (IP address) from key like 'profile_192.168.1.5_evidence'
@@ -143,7 +146,7 @@ def main():
                         evidence_data = r.hgetall(profile_key)
 
                         for eid, evidence_json in evidence_data.items():
-                            # Skip if already processed
+                            # Skip if already processed (check in web DB)
                             evidence_hash = f"{profile_key}:{eid}"
                             if r.sismember(processed_key, evidence_hash):
                                 continue
@@ -206,7 +209,7 @@ def main():
                                     'detection_type': evidence_type
                                 }
 
-                                # Add to recent detections (keep last 100)
+                                # Add to recent detections (keep last 100) in web DB
                                 r.lpush('ml_detector:recent_detections', json.dumps(detection))
                                 r.ltrim('ml_detector:recent_detections', 0, 99)
 
@@ -222,7 +225,7 @@ def main():
                                 r.lpush('ml_detector:timeline', json.dumps(timeline))
                                 r.ltrim('ml_detector:timeline', 0, 999)
 
-                                # Mark as processed
+                                # Mark as processed in web DB
                                 r.sadd(processed_key, evidence_hash)
 
                                 # Keep processed set size manageable (last 1000)
