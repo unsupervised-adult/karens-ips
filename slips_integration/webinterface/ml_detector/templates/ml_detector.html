@@ -13,32 +13,32 @@
     <div class="col-md-3">
       <div class="card h-100">
         <div class="card-body text-center p-4">
-          <h3 class="text-muted text-uppercase mb-3" style="font-size: 0.75rem; font-weight: 600;">Packets Processed</h3>
-          <div class="text-primary" style="font-size: 2.5rem; font-weight: 700;" id="stat_total_analyzed">0</div>
+          <h3 class="text-muted text-uppercase mb-3 stat-label">Packets Processed</h3>
+          <div class="text-primary stat-value" id="stat_total_analyzed">0</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="card h-100">
         <div class="card-body text-center p-4">
-          <h3 class="text-muted text-uppercase mb-3" style="font-size: 0.75rem; font-weight: 600;">Ads Detected</h3>
-          <div class="text-danger" style="font-size: 2.5rem; font-weight: 700;" id="stat_ads_detected">0</div>
+          <h3 class="text-muted text-uppercase mb-3 stat-label">Ads Detected</h3>
+          <div class="text-danger stat-value" id="stat_ads_detected">0</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="card h-100">
         <div class="card-body text-center p-4">
-          <h3 class="text-muted text-uppercase mb-3" style="font-size: 0.75rem; font-weight: 600;">Legitimate Traffic</h3>
-          <div class="text-success" style="font-size: 2.5rem; font-weight: 700;" id="stat_legitimate">0</div>
+          <h3 class="text-muted text-uppercase mb-3 stat-label">Legitimate Traffic</h3>
+          <div class="text-success stat-value" id="stat_legitimate">0</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="card h-100">
         <div class="card-body text-center p-4">
-          <h3 class="text-muted text-uppercase mb-3" style="font-size: 0.75rem; font-weight: 600;">Model Accuracy</h3>
-          <div class="text-info" style="font-size: 2.5rem; font-weight: 700;" id="stat_accuracy">0%</div>
+          <h3 class="text-muted text-uppercase mb-3 stat-label">Model Accuracy</h3>
+          <div class="text-info stat-value" id="stat_accuracy">0%</div>
         </div>
       </div>
     </div>
@@ -240,7 +240,7 @@
                     </div>
                     <div class="col-md-4 text-end">
                       <div class="form-check form-switch d-inline-block">
-                        <input class="form-check-input" type="checkbox" id="live_blocking_toggle" style="width: 3em; height: 1.5em;">
+                        <input class="form-check-input large-toggle" type="checkbox" id="live_blocking_toggle">
                         <label class="form-check-label ms-2" id="blocking_status" for="live_blocking_toggle">
                           <span class="badge bg-secondary">Checking...</span>
                         </label>
@@ -262,7 +262,7 @@
                 </div>
                 <div class="card-body">
                   <div class="table-responsive">
-                    <table id="table_alerts" class="table table-sm table-hover display nowrap" style="width:100%">
+                    <table id="table_alerts" class="table table-sm table-hover display nowrap full-width">
                       <thead>
                         <tr>
                           <th>Timestamp</th>

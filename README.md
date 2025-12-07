@@ -163,7 +163,6 @@ Internet
 
 ## Modular Installer
 
-
 ### Architecture
 
 ```
@@ -484,7 +483,6 @@ bridge link show
 - **[QUICK_START.md](QUICK_START.md)** - Quick start guide
 - **[installer/README.md](installer/README.md)** - Modular installer documentation
 
-
 ## Performance Tuning
 
 See `installer/modules/02-kernel-tuning.sh` for kernel optimizations:
@@ -532,5 +530,3 @@ GPL-2.0-only
 - **Zeek**: The Zeek Project
 
 ---
-
-

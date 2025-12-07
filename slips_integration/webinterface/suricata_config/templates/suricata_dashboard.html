@@ -98,7 +98,7 @@
                 <p>Suricata uses priority levels: <strong>1 (Critical)</strong>, <strong>2 (High)</strong>, <strong>3 (Medium)</strong>, <strong>4 (Low)</strong></p>
                 <div class="form-group" style="margin-bottom: 15px;">
                     <label>Filter alerts by minimum priority:</label>
-                    <select id="severity-filter" onchange="updateSeverityFilter()">
+                    <select id="severity-filter" onchange="updateSeverityFilter()" title="Filter alerts by minimum priority level">
                         <option value="4">All Alerts (Priority 1-4)</option>
                         <option value="3">Medium+ (Priority 1-3)</option>
                         <option value="2" selected>High+ (Priority 1-2)</option>
@@ -114,9 +114,9 @@
                 <h3>TLS/HTTPS Domain Blocking (SNI)</h3>
                 <p>Block domains via TLS Server Name Indication. Uses Suricata datasets for efficient matching.</p>
                 
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <input type="text" id="tls-domain" placeholder="example.com or ads.tracking.net" style="flex: 2;">
-                    <select id="tls-action" style="flex: 1;">
+                <div class="form-group tls-form">
+                    <input type="text" id="tls-domain" placeholder="example.com or ads.tracking.net" class="tls-domain-input">
+                    <select id="tls-action" class="tls-action-select" title="Select action for TLS domain">
                         <option value="drop">Drop (Block)</option>
                         <option value="alert">Alert Only</option>
                         <option value="reject">Reject (RST)</option>
