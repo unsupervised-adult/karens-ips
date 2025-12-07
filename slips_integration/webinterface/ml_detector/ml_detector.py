@@ -1,10 +1,13 @@
 # SPDX-FileCopyrightText: 2025 Karen's IPS ML Ad Detector
 # SPDX-License-Identifier: GPL-2.0-only
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, Response
 import json
 import logging
 import sys
 import os
+import subprocess
+import csv
+import io
 from datetime import datetime, timedelta
 from typing import Dict, List
 from ..database.database import db
@@ -989,3 +992,577 @@ def test_pattern():
     except Exception as e:
         logger.error(f"Error testing pattern: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ----------------------------------------
+# ALERTS & ACTIONS ENDPOINTS
+# ----------------------------------------
+
+@ml_detector.route("/blocking/status", methods=['GET', 'POST'])
+def blocking_status():
+    """Get or set live blocking status"""
+    try:
+        if request.method == 'POST':
+            # Set blocking status
+            data = request.get_json()
+            enabled = data.get('enabled', False)
+
+            # Store in Redis
+            db.rdb.r.set('ml_detector:blocking_enabled', '1' if enabled else '0')
+
+            # Log the change
+            log_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'action': 'blocking_enabled' if enabled else 'blocking_disabled',
+                'message': f"Live blocking {'ENABLED' if enabled else 'DISABLED'} by user"
+            }
+            db.rdb.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
+            db.rdb.r.ltrim('ml_detector:action_logs', 0, 499)  # Keep last 500 logs
+
+            logger.info(f"Live blocking {'enabled' if enabled else 'disabled'}")
+
+            return jsonify({"success": True, "data": {"enabled": enabled}})
+
+        # GET request - return current status
+        enabled = db.rdb.r.get('ml_detector:blocking_enabled')
+        if enabled:
+            enabled = enabled.decode() if isinstance(enabled, bytes) else enabled
+            enabled = enabled == '1'
+        else:
+            enabled = False
+
+        return jsonify({"data": {"enabled": enabled}})
+
+    except Exception as e:
+        logger.error(f"Error managing blocking status: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ml_detector.route("/whitelist", methods=['GET', 'POST', 'DELETE'])
+def whitelist():
+    """Manage IP and URL whitelist"""
+    try:
+        whitelist_ip_key = 'ml_detector:whitelist:ip'
+        whitelist_url_key = 'ml_detector:whitelist:url'
+
+        if request.method == 'POST':
+            # Add IP or URL to whitelist
+            data = request.get_json()
+            ip = data.get('ip', '').strip()
+            url = data.get('url', '').strip()
+            entry_type = data.get('type', 'ip')  # 'ip' or 'url'
+
+            if not ip and not url:
+                return jsonify({"error": "IP address or URL required"}), 400
+
+            if ip or entry_type == 'ip':
+                # Add IP to whitelist
+                value = ip
+                key = whitelist_ip_key
+                entry_label = f"IP {ip}"
+            else:
+                # Add URL/domain to whitelist
+                value = url
+                key = whitelist_url_key
+                entry_label = f"URL {url}"
+
+            # Add to Redis set
+            db.rdb.r.sadd(key, value)
+
+            # Log the action
+            log_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'action': 'whitelist_add',
+                'type': entry_type,
+                'message': f"Added {entry_label} to whitelist"
+            }
+            db.rdb.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
+            db.rdb.r.ltrim('ml_detector:action_logs', 0, 499)
+
+            logger.info(f"Added {entry_label} to whitelist")
+
+            return jsonify({"success": True, "data": {"value": value, "type": entry_type}})
+
+        elif request.method == 'DELETE':
+            # Remove IP or URL from whitelist
+            data = request.get_json()
+            ip = data.get('ip', '').strip()
+            url = data.get('url', '').strip()
+            entry_type = data.get('type', 'ip')
+
+            if not ip and not url:
+                return jsonify({"error": "IP address or URL required"}), 400
+
+            if ip or entry_type == 'ip':
+                value = ip
+                key = whitelist_ip_key
+                entry_label = f"IP {ip}"
+            else:
+                value = url
+                key = whitelist_url_key
+                entry_label = f"URL {url}"
+
+            # Remove from Redis set
+            db.rdb.r.srem(key, value)
+
+            # Log the action
+            log_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'action': 'whitelist_remove',
+                'type': entry_type,
+                'message': f"Removed {entry_label} from whitelist"
+            }
+            db.rdb.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
+            db.rdb.r.ltrim('ml_detector:action_logs', 0, 499)
+
+            logger.info(f"Removed {entry_label} from whitelist")
+
+            return jsonify({"success": True, "data": {"value": value, "type": entry_type}})
+
+        # GET request - return all whitelisted IPs and URLs
+        ips_raw = db.rdb.r.smembers(whitelist_ip_key)
+        ips = [ip.decode() if isinstance(ip, bytes) else ip for ip in ips_raw]
+
+        urls_raw = db.rdb.r.smembers(whitelist_url_key)
+        urls = [url.decode() if isinstance(url, bytes) else url for url in urls_raw]
+
+        return jsonify({"data": {
+            "ips": sorted(ips),
+            "urls": sorted(urls)
+        }})
+
+    except Exception as e:
+        logger.error(f"Error managing whitelist: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ml_detector.route("/blacklist", methods=['GET', 'POST', 'DELETE'])
+def blacklist():
+    """Manage IP and URL blacklist"""
+    try:
+        blacklist_ip_key = 'ml_detector:blacklist:ip'
+        blacklist_url_key = 'ml_detector:blacklist:url'
+
+        if request.method == 'POST':
+            # Add IP or URL to blacklist and block it
+            data = request.get_json()
+            ip = data.get('ip', '').strip()
+            url = data.get('url', '').strip()
+            entry_type = data.get('type', 'ip')  # 'ip' or 'url'
+
+            if not ip and not url:
+                return jsonify({"error": "IP address or URL required"}), 400
+
+            # Get blocking status
+            blocking_enabled_raw = db.rdb.r.get('ml_detector:blocking_enabled')
+            if blocking_enabled_raw:
+                blocking_enabled = (blocking_enabled_raw.decode() if isinstance(blocking_enabled_raw, bytes) else blocking_enabled_raw) == '1'
+            else:
+                blocking_enabled = False
+
+            if ip or entry_type == 'ip':
+                # Handle IP blocking
+                value = ip
+                key = blacklist_ip_key
+                entry_label = f"IP {ip}"
+
+                # Check if it's whitelisted
+                if db.rdb.r.sismember('ml_detector:whitelist:ip', ip):
+                    return jsonify({"error": "Cannot block whitelisted IP"}), 400
+
+                # Add to Redis set
+                db.rdb.r.sadd(key, ip)
+
+                # Block the IP using nftables (if blocking is enabled)
+                if blocking_enabled:
+                    try:
+                        block_cmd = f'sudo nft add element inet filter ml_detector_blacklist "{{ {ip} }}"'
+                        result = subprocess.run(block_cmd, shell=True, capture_output=True, text=True)
+
+                        if result.returncode == 0:
+                            logger.info(f"Blocked {ip} at firewall level (nftables)")
+                        else:
+                            if "already exists" not in result.stderr.lower():
+                                logger.error(f"Failed to block {ip}: {result.stderr}")
+                    except Exception as e:
+                        logger.error(f"Failed to block {ip} at firewall: {e}")
+            else:
+                # Handle URL/domain blocking
+                value = url
+                key = blacklist_url_key
+                entry_label = f"URL {url}"
+
+                # Check if it's whitelisted
+                if db.rdb.r.sismember('ml_detector:whitelist:url', url):
+                    return jsonify({"error": "Cannot block whitelisted URL"}), 400
+
+                # Add to Redis set
+                db.rdb.r.sadd(key, url)
+
+                # Block the URL using Suricata rule (if blocking is enabled)
+                if blocking_enabled:
+                    try:
+                        # Generate unique SID for this rule (starting from 9000000)
+                        sid = 9000000 + db.rdb.r.scard(blacklist_url_key)
+
+                        # Create Suricata rule to drop traffic to this domain
+                        rule = f'drop http any any -> any any (msg:"ML Detector - Blocked domain {url}"; content:"Host: {url}"; http_header; nocase; classtype:policy-violation; sid:{sid}; rev:1;)\n'
+
+                        # Append to custom rules file
+                        with open('/etc/suricata/rules/ml-detector-blocking.rules', 'a') as f:
+                            f.write(rule)
+
+                        # Reload Suricata rules
+                        subprocess.run(['sudo', 'suricatasc', '-c', 'reload-rules'], capture_output=True, text=True)
+                        logger.info(f"Blocked {url} via Suricata rule")
+                    except Exception as e:
+                        logger.error(f"Failed to block {url} via Suricata: {e}")
+
+            # Log the action
+            log_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'action': 'blacklist_add',
+                'type': entry_type,
+                'message': f"Added {entry_label} to blacklist" + (" and blocked" if blocking_enabled else "")
+            }
+            db.rdb.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
+            db.rdb.r.ltrim('ml_detector:action_logs', 0, 499)
+
+            logger.info(f"Added {entry_label} to blacklist")
+
+            return jsonify({"success": True, "data": {"value": value, "type": entry_type}})
+
+        elif request.method == 'DELETE':
+            # Remove IP or URL from blacklist and unblock it
+            data = request.get_json()
+            ip = data.get('ip', '').strip()
+            url = data.get('url', '').strip()
+            entry_type = data.get('type', 'ip')
+
+            if not ip and not url:
+                return jsonify({"error": "IP address or URL required"}), 400
+
+            if ip or entry_type == 'ip':
+                # Handle IP unblocking
+                value = ip
+                key = blacklist_ip_key
+                entry_label = f"IP {ip}"
+
+                # Remove from Redis set
+                db.rdb.r.srem(key, ip)
+
+                # Unblock the IP from nftables
+                try:
+                    unblock_cmd = f'sudo nft delete element inet filter ml_detector_blacklist "{{ {ip} }}"'
+                    result = subprocess.run(unblock_cmd, shell=True, capture_output=True, text=True)
+
+                    if result.returncode == 0:
+                        logger.info(f"Unblocked {ip} at firewall level (nftables)")
+                    else:
+                        if "not found" not in result.stderr.lower():
+                            logger.error(f"Failed to unblock {ip}: {result.stderr}")
+                except Exception as e:
+                    logger.error(f"Failed to unblock {ip} at firewall: {e}")
+            else:
+                # Handle URL unblocking
+                value = url
+                key = blacklist_url_key
+                entry_label = f"URL {url}"
+
+                # Remove from Redis set
+                db.rdb.r.srem(key, url)
+
+                # Remove from Suricata rules
+                try:
+                    rules_file = '/etc/suricata/rules/ml-detector-blocking.rules'
+                    if os.path.exists(rules_file):
+                        # Read existing rules
+                        with open(rules_file, 'r') as f:
+                            rules = f.readlines()
+
+                        # Filter out rules for this domain
+                        new_rules = [r for r in rules if f'Host: {url}' not in r]
+
+                        # Write back filtered rules
+                        with open(rules_file, 'w') as f:
+                            f.writelines(new_rules)
+
+                        # Reload Suricata rules
+                        subprocess.run(['sudo', 'suricatasc', '-c', 'reload-rules'], capture_output=True, text=True)
+                        logger.info(f"Unblocked {url} from Suricata rules")
+                except Exception as e:
+                    logger.error(f"Failed to unblock {url} from Suricata: {e}")
+
+            # Log the action
+            log_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'action': 'blacklist_remove',
+                'type': entry_type,
+                'message': f"Removed {entry_label} from blacklist and unblocked"
+            }
+            db.rdb.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
+            db.rdb.r.ltrim('ml_detector:action_logs', 0, 499)
+
+            logger.info(f"Removed {entry_label} from blacklist")
+
+            return jsonify({"success": True, "data": {"value": value, "type": entry_type}})
+
+        # GET request - return all blacklisted IPs and URLs
+        ips_raw = db.rdb.r.smembers(blacklist_ip_key)
+        ips = [ip.decode() if isinstance(ip, bytes) else ip for ip in ips_raw]
+
+        urls_raw = db.rdb.r.smembers(blacklist_url_key)
+        urls = [url.decode() if isinstance(url, bytes) else url for url in urls_raw]
+
+        return jsonify({"data": {
+            "ips": sorted(ips),
+            "urls": sorted(urls)
+        }})
+
+    except Exception as e:
+        logger.error(f"Error managing blacklist: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ml_detector.route("/feedback", methods=['POST'])
+def submit_feedback():
+    """Submit detection feedback for model training"""
+    try:
+        data = request.get_json()
+        detection = data.get('detection', {})
+        feedback = data.get('feedback', '')  # 'correct' or 'false_positive'
+        source_ip = data.get('source_ip', '')
+        classification = data.get('classification', '')
+
+        # Store feedback in Redis
+        feedback_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'source_ip': source_ip,
+            'classification': classification,
+            'feedback': feedback,
+            'detection': detection
+        }
+
+        db.rdb.r.lpush('ml_detector:feedback', json.dumps(feedback_entry))
+        db.rdb.r.ltrim('ml_detector:feedback', 0, 9999)  # Keep last 10,000 feedback entries
+
+        # If false positive, add to whitelist if user wants
+        if feedback == 'false_positive':
+            # Increment false positive counter for this IP
+            fp_key = f'ml_detector:fp_count:{source_ip}'
+            count = db.rdb.r.incr(fp_key)
+            db.rdb.r.expire(fp_key, 86400)  # Expire after 24 hours
+
+            # If multiple false positives, suggest whitelisting
+            if count >= 3:
+                logger.warning(f"IP {source_ip} has {count} false positives - consider whitelisting")
+
+        # Log the feedback
+        log_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'action': 'feedback_submitted',
+            'message': f"Feedback '{feedback}' for {source_ip} - {classification}"
+        }
+        db.rdb.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
+        db.rdb.r.ltrim('ml_detector:action_logs', 0, 499)
+
+        logger.info(f"Received feedback '{feedback}' for {source_ip}")
+
+        return jsonify({"success": True, "data": {"feedback": feedback}})
+
+    except Exception as e:
+        logger.error(f"Error submitting feedback: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ml_detector.route("/actions/clear_blocks", methods=['POST'])
+def clear_blocks():
+    """Clear all firewall blocks (IPs and URLs)"""
+    try:
+        # Get all blacklisted IPs
+        blacklist_ip_key = 'ml_detector:blacklist:ip'
+        ips_raw = db.rdb.r.smembers(blacklist_ip_key)
+        ips = [ip.decode() if isinstance(ip, bytes) else ip for ip in ips_raw]
+
+        # Get all blacklisted URLs
+        blacklist_url_key = 'ml_detector:blacklist:url'
+        urls_raw = db.rdb.r.smembers(blacklist_url_key)
+        urls = [url.decode() if isinstance(url, bytes) else url for url in urls_raw]
+
+        ip_count = 0
+        url_count = 0
+
+        # Flush the entire nftables blacklist set (faster than removing individual IPs)
+        try:
+            flush_cmd = 'sudo nft flush set inet filter ml_detector_blacklist'
+            result = subprocess.run(flush_cmd, shell=True, capture_output=True, text=True, check=True)
+            ip_count = len(ips)
+            logger.info(f"Flushed nftables blacklist set ({ip_count} IPs)")
+        except Exception as e:
+            logger.error(f"Failed to flush nftables blacklist: {e}")
+
+        # Clear Suricata URL blocking rules
+        try:
+            rules_file = '/etc/suricata/rules/ml-detector-blocking.rules'
+            if os.path.exists(rules_file):
+                # Clear the file
+                open(rules_file, 'w').close()
+                # Reload Suricata rules
+                subprocess.run(['sudo', 'suricatasc', '-c', 'reload-rules'], capture_output=True, text=True)
+                url_count = len(urls)
+                logger.info(f"Cleared Suricata URL blocking rules ({url_count} URLs)")
+        except Exception as e:
+            logger.error(f"Failed to clear Suricata URL blocks: {e}")
+
+        # Clear the blacklists in Redis
+        db.rdb.r.delete(blacklist_ip_key)
+        db.rdb.r.delete(blacklist_url_key)
+
+        total_cleared = ip_count + url_count
+
+        # Log the action
+        log_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'action': 'clear_all_blocks',
+            'message': f"Cleared {ip_count} IP blocks and {url_count} URL blocks"
+        }
+        db.rdb.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
+        db.rdb.r.ltrim('ml_detector:action_logs', 0, 499)
+
+        logger.info(f"Cleared {total_cleared} total blocks ({ip_count} IPs, {url_count} URLs)")
+
+        return jsonify({"success": True, "data": {
+            "cleared": total_cleared,
+            "ips_cleared": ip_count,
+            "urls_cleared": url_count
+        }})
+
+    except Exception as e:
+        logger.error(f"Error clearing blocks: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ml_detector.route("/actions/retrain", methods=['POST'])
+def retrain_model():
+    """Force immediate model retraining"""
+    try:
+        # Get feedback data for retraining
+        feedback_data = db.rdb.r.lrange('ml_detector:feedback', 0, -1)
+
+        if len(feedback_data) < 10:
+            return jsonify({
+                "success": False,
+                "error": "Not enough feedback data for retraining (minimum 10 samples required)"
+            }), 400
+
+        # Update last trained timestamp
+        db.rdb.r.hset('ml_detector:model_info', 'last_trained', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+
+        # Log the action
+        log_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'action': 'model_retrain',
+            'message': f"Model retrained with {len(feedback_data)} feedback samples"
+        }
+        db.rdb.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
+        db.rdb.r.ltrim('ml_detector:action_logs', 0, 499)
+
+        logger.info(f"Model retrained with {len(feedback_data)} samples")
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "samples_used": len(feedback_data),
+                "timestamp": datetime.now().isoformat()
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error retraining model: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ml_detector.route("/actions/export", methods=['GET'])
+def export_detections():
+    """Export detections as CSV"""
+    try:
+        # Get recent detections
+        raw_detections = db.rdb.r.lrange('ml_detector:recent_detections', 0, -1)
+
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Write header
+        writer.writerow([
+            'Timestamp',
+            'Source IP',
+            'Destination IP',
+            'Protocol',
+            'Port',
+            'Classification',
+            'Confidence',
+            'Threat Level',
+            'Description'
+        ])
+
+        # Write detections
+        for raw in raw_detections:
+            try:
+                if isinstance(raw, bytes):
+                    raw = raw.decode()
+                det = json.loads(raw)
+                writer.writerow([
+                    det.get('timestamp', ''),
+                    det.get('source_ip', ''),
+                    det.get('dest_ip', ''),
+                    det.get('protocol', ''),
+                    det.get('dest_port', ''),
+                    det.get('classification', ''),
+                    det.get('confidence', ''),
+                    det.get('threat_level', ''),
+                    det.get('description', '')
+                ])
+            except Exception as e:
+                logger.error(f"Error parsing detection for export: {e}")
+                continue
+
+        # Prepare response
+        output.seek(0)
+
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=ml_detections_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error exporting detections: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ml_detector.route("/actions/logs", methods=['GET'])
+def get_action_logs():
+    """Get recent system action logs"""
+    try:
+        # Get recent logs
+        raw_logs = db.rdb.r.lrange('ml_detector:action_logs', 0, 99)  # Last 100 logs
+
+        logs = []
+        for raw in raw_logs:
+            try:
+                if isinstance(raw, bytes):
+                    raw = raw.decode()
+                log = json.loads(raw)
+                logs.append(log)
+            except Exception as e:
+                logger.error(f"Error parsing log: {e}")
+                continue
+
+        return jsonify({"data": {"logs": logs}})
+
+    except Exception as e:
+        logger.error(f"Error getting logs: {e}")
+        return jsonify({"error": str(e)}), 500
