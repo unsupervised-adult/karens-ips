@@ -339,57 +339,55 @@ function loadModelInfo() {
             console.log("ML Detector: Model info received:", response);
             if (response.data) {
                 const d = response.data;
-                
+
+                // Core Configuration
                 $('#model_type').text(d.model_type || '-');
                 $('#model_version').text(d.version || '-');
-                $('#model_algorithm').text(d.algorithm || '-');
-                $('#model_architecture').text(d.model_architecture || '-');
-                $('#model_threshold').text(d.confidence_threshold || '-');
-                $('#model_training_accuracy').text(d.training_accuracy || '-');
-                $('#model_validation_accuracy').text(d.validation_accuracy || '-');
-                $('#model_fpr').text(d.false_positive_rate || '-');
+                $('#model_algorithm').text('SLIPS Behavioral Analysis');
+                $('#model_architecture').text('Real-time Stream Processing');
+                $('#model_threshold').text('Dynamic (Evidence-based)');
+
+                // Performance Metrics
+                $('#model_training_accuracy').text(d.training_accuracy || d.accuracy || '-');
+                $('#model_validation_accuracy').text('-');
+                $('#model_fpr').text('-');
                 $('#model_last_trained').text(d.last_trained || '-');
-                $('#model_training_dataset').text(d.training_dataset || '-');
-                $('#model_feature_extraction').text(d.feature_extraction || '-');
-                $('#model_detection_window').text(d.detection_window || '-');
-                $('#model_update_frequency').text(d.update_frequency || '-');
-                
-                // Parse detection_methods if it's a JSON string
-                let methods = d.detection_methods;
-                if (typeof methods === 'string') {
-                    try {
-                        methods = JSON.parse(methods);
-                    } catch (e) {
-                        console.warn("Failed to parse detection_methods:", e);
-                        methods = [];
-                    }
-                }
-                
-                if (methods && Array.isArray(methods)) {
-                    const methodsHtml = methods.map(m => 
+                $('#model_training_dataset').text('-');
+
+                // Feature Extraction Details
+                $('#model_feature_extraction').text('Zeek Network Flows');
+                $('#model_detection_window').text('Real-time (continuous)');
+                $('#model_update_frequency').text('Live streaming analysis');
+
+                // Detection Methods - parse from 'features' field
+                const features = d.features || 'Real-time behavioral analysis, Flow monitoring, Evidence correlation';
+                if (typeof features === 'string') {
+                    const featuresList = features.split(',').map(f =>
+                        `<li><i class="fa fa-check-circle text-success"></i> ${f.trim()}</li>`
+                    ).join('');
+                    $('#model_detection_methods').html(featuresList);
+                } else if (Array.isArray(features)) {
+                    const methodsHtml = features.map(m =>
                         `<li><i class="fa fa-check-circle text-success"></i> ${m}</li>`
                     ).join('');
                     $('#model_detection_methods').html(methodsHtml);
                 }
-                
-                // Parse features_used if it's a JSON string
-                let features = d.features_used;
-                if (typeof features === 'string') {
-                    try {
-                        features = JSON.parse(features);
-                    } catch (e) {
-                        console.warn("Failed to parse features_used:", e);
-                        features = [];
-                    }
-                }
-                
-                if (features && Array.isArray(features)) {
-                    const featuresHtml = features.map(f => 
+
+                // Features Used - from 'features_used' field
+                const featuresUsed = d.features_used || 'Flow patterns, connection duration, data transfer, domain analysis';
+                if (typeof featuresUsed === 'string') {
+                    // Split comma-separated string into list items
+                    const featureItems = featuresUsed.split(',').map(f =>
+                        `<li class="list-group-item py-1 small"><i class="fa fa-cog text-primary"></i> ${f.trim()}</li>`
+                    ).join('');
+                    $('#model_features_list').html(featureItems);
+                } else if (Array.isArray(featuresUsed)) {
+                    const featuresHtml = featuresUsed.map(f =>
                         `<li class="list-group-item py-1 small"><i class="fa fa-cog text-primary"></i> ${f}</li>`
                     ).join('');
                     $('#model_features_list').html(featuresHtml);
                 }
-                
+
                 console.log("ML Detector: Model info populated successfully");
             }
         },
@@ -648,7 +646,7 @@ function showStatus(message, type) {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>`);
-    
+
     if (type === 'success') {
         setTimeout(() => {
             statusDiv.html('');
@@ -656,16 +654,400 @@ function showStatus(message, type) {
     }
 }
 
+// ========== Alerts & Actions Tab Functions ==========
+
+function loadBlockingStatus() {
+    $.getJSON('/ml_detector/blocking/status', function(response) {
+        if (response.data) {
+            const enabled = response.data.enabled;
+            $('#live_blocking_toggle').prop('checked', enabled);
+
+            if (enabled) {
+                $('#blocking_status').html('<span class="badge bg-success">Active</span>');
+                $('#blocking_status_message').html(
+                    '<div class="alert alert-success">' +
+                    '<i class="fa fa-shield"></i> Live blocking is ENABLED. Detected threats will be automatically blocked.' +
+                    '</div>'
+                );
+            } else {
+                $('#blocking_status').html('<span class="badge bg-danger">Disabled</span>');
+                $('#blocking_status_message').html(
+                    '<div class="alert alert-warning">' +
+                    '<i class="fa fa-exclamation-triangle"></i> Live blocking is DISABLED. Threats will only be logged, not blocked.' +
+                    '</div>'
+                );
+            }
+        }
+    }).fail(function() {
+        $('#blocking_status').html('<span class="badge bg-secondary">Unknown</span>');
+        $('#blocking_status_message').html(
+            '<div class="alert alert-danger">Failed to check blocking status</div>'
+        );
+    });
+}
+
+function toggleBlocking() {
+    const enabled = $('#live_blocking_toggle').is(':checked');
+
+    $.ajax({
+        url: '/ml_detector/blocking/status',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ enabled: enabled }),
+        success: function(response) {
+            loadBlockingStatus();
+            const message = enabled ?
+                '<div class="alert alert-success">Live blocking ENABLED</div>' :
+                '<div class="alert alert-warning">Live blocking DISABLED</div>';
+            $('#blocking_status_message').html(message);
+        },
+        error: function(xhr, status, error) {
+            // Revert toggle on error
+            $('#live_blocking_toggle').prop('checked', !enabled);
+            $('#blocking_status_message').html(
+                '<div class="alert alert-danger">Failed to update blocking status: ' + error + '</div>'
+            );
+        }
+    });
+}
+
+function loadWhitelist() {
+    $.getJSON('/ml_detector/whitelist', function(response) {
+        if (response.data && response.data.length > 0) {
+            const html = response.data.map(ip =>
+                '<div class="list-group-item d-flex justify-content-between align-items-center">' +
+                '<span><i class="fa fa-shield text-success"></i> ' + ip + '</span>' +
+                '<button class="btn btn-sm btn-outline-danger remove-whitelist" data-ip="' + ip + '">' +
+                '<i class="fa fa-times"></i> Remove</button>' +
+                '</div>'
+            ).join('');
+            $('#whitelist_items').html(html);
+        } else {
+            $('#whitelist_items').html('<div class="text-muted small">No whitelisted IPs</div>');
+        }
+    });
+}
+
+function addWhitelist() {
+    const ip = $('#whitelist_ip').val().trim();
+    if (!ip) {
+        alert('Please enter an IP address');
+        return;
+    }
+
+    // Basic IP validation
+    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
+    if (!ipPattern.test(ip)) {
+        alert('Invalid IP address format');
+        return;
+    }
+
+    $.ajax({
+        url: '/ml_detector/whitelist',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ ip: ip }),
+        success: function(response) {
+            $('#whitelist_ip').val('');
+            loadWhitelist();
+            $('#action_status').html('<div class="alert alert-success">Added ' + ip + ' to whitelist</div>');
+            setTimeout(() => $('#action_status').html(''), 3000);
+        },
+        error: function(xhr, status, error) {
+            alert('Failed to add IP to whitelist: ' + error);
+        }
+    });
+}
+
+function removeWhitelist(ip) {
+    if (confirm('Remove ' + ip + ' from whitelist?')) {
+        $.ajax({
+            url: '/ml_detector/whitelist',
+            method: 'DELETE',
+            contentType: 'application/json',
+            data: JSON.stringify({ ip: ip }),
+            success: function(response) {
+                loadWhitelist();
+                $('#action_status').html('<div class="alert alert-info">Removed ' + ip + ' from whitelist</div>');
+                setTimeout(() => $('#action_status').html(''), 3000);
+            },
+            error: function(xhr, status, error) {
+                alert('Failed to remove IP from whitelist: ' + error);
+            }
+        });
+    }
+}
+
+function loadBlacklist() {
+    $.getJSON('/ml_detector/blacklist', function(response) {
+        if (response.data && response.data.length > 0) {
+            const html = response.data.map(ip =>
+                '<div class="list-group-item d-flex justify-content-between align-items-center">' +
+                '<span><i class="fa fa-ban text-danger"></i> ' + ip + '</span>' +
+                '<button class="btn btn-sm btn-outline-success remove-blacklist" data-ip="' + ip + '">' +
+                '<i class="fa fa-times"></i> Unblock</button>' +
+                '</div>'
+            ).join('');
+            $('#blacklist_items').html(html);
+        } else {
+            $('#blacklist_items').html('<div class="text-muted small">No blocked IPs</div>');
+        }
+    });
+}
+
+function addBlacklist() {
+    const ip = $('#blacklist_ip').val().trim();
+    if (!ip) {
+        alert('Please enter an IP address');
+        return;
+    }
+
+    // Basic IP validation
+    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
+    if (!ipPattern.test(ip)) {
+        alert('Invalid IP address format');
+        return;
+    }
+
+    if (confirm('Block all traffic from ' + ip + '?')) {
+        $.ajax({
+            url: '/ml_detector/blacklist',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ ip: ip }),
+            success: function(response) {
+                $('#blacklist_ip').val('');
+                loadBlacklist();
+                $('#action_status').html('<div class="alert alert-success">Blocked ' + ip + '</div>');
+                setTimeout(() => $('#action_status').html(''), 3000);
+            },
+            error: function(xhr, status, error) {
+                alert('Failed to block IP: ' + error);
+            }
+        });
+    }
+}
+
+function removeBlacklist(ip) {
+    if (confirm('Unblock ' + ip + '?')) {
+        $.ajax({
+            url: '/ml_detector/blacklist',
+            method: 'DELETE',
+            contentType: 'application/json',
+            data: JSON.stringify({ ip: ip }),
+            success: function(response) {
+                loadBlacklist();
+                $('#action_status').html('<div class="alert alert-info">Unblocked ' + ip + '</div>');
+                setTimeout(() => $('#action_status').html(''), 3000);
+            },
+            error: function(xhr, status, error) {
+                alert('Failed to unblock IP: ' + error);
+            }
+        });
+    }
+}
+
+function loadFeedbackTable() {
+    if ($.fn.DataTable.isDataTable('#feedback_table')) {
+        $('#feedback_table').DataTable().destroy();
+    }
+
+    $('#feedback_table').DataTable({
+        ajax: {
+            url: '/ml_detector/detections/recent',
+            dataSrc: 'data'
+        },
+        columns: [
+            {
+                data: 'timestamp',
+                render: function(data) {
+                    return new Date(data).toLocaleString();
+                }
+            },
+            { data: 'source_ip' },
+            {
+                data: 'classification',
+                render: function(data) {
+                    return '<span class="badge bg-danger">' + data + '</span>';
+                }
+            },
+            {
+                data: 'confidence',
+                render: function(data) {
+                    const percent = (data * 100).toFixed(1);
+                    return percent + '%';
+                }
+            },
+            {
+                data: null,
+                render: function(data, type, row) {
+                    return '<div class="btn-group btn-group-sm" role="group">' +
+                        '<button class="btn btn-outline-success feedback-correct" data-detection=\'' +
+                        JSON.stringify(row) + '\'>' +
+                        '<i class="fa fa-check"></i> Correct</button>' +
+                        '<button class="btn btn-outline-danger feedback-false" data-detection=\'' +
+                        JSON.stringify(row) + '\'>' +
+                        '<i class="fa fa-times"></i> False Positive</button>' +
+                        '</div>';
+                }
+            }
+        ],
+        order: [[0, 'desc']],
+        pageLength: 10,
+        language: {
+            emptyTable: 'No recent detections available for feedback'
+        }
+    });
+}
+
+function submitFeedback(detection, feedback) {
+    $.ajax({
+        url: '/ml_detector/feedback',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            detection: detection,
+            feedback: feedback,
+            source_ip: detection.source_ip,
+            classification: detection.classification
+        }),
+        success: function(response) {
+            const message = feedback === 'correct' ?
+                '<div class="alert alert-success">Feedback recorded: True positive confirmed</div>' :
+                '<div class="alert alert-warning">Feedback recorded: False positive marked. Model will be retrained.</div>';
+            $('#action_status').html(message);
+            setTimeout(() => $('#action_status').html(''), 3000);
+        },
+        error: function(xhr, status, error) {
+            alert('Failed to submit feedback: ' + error);
+        }
+    });
+}
+
+function clearAllBlocks() {
+    if (confirm('Clear ALL firewall blocks? This will remove all blocked IPs.')) {
+        $.ajax({
+            url: '/ml_detector/actions/clear_blocks',
+            method: 'POST',
+            success: function(response) {
+                loadBlacklist();
+                $('#action_status').html(
+                    '<div class="alert alert-success">All blocks cleared successfully</div>'
+                );
+                setTimeout(() => $('#action_status').html(''), 3000);
+            },
+            error: function(xhr, status, error) {
+                $('#action_status').html(
+                    '<div class="alert alert-danger">Failed to clear blocks: ' + error + '</div>'
+                );
+            }
+        });
+    }
+}
+
+function retrainModel() {
+    if (confirm('Force immediate model retraining? This may take several minutes.')) {
+        const btn = $('#btn_retrain_model');
+        btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Retraining...');
+
+        $.ajax({
+            url: '/ml_detector/actions/retrain',
+            method: 'POST',
+            success: function(response) {
+                btn.prop('disabled', false).html('Retrain Model Now');
+                $('#action_status').html(
+                    '<div class="alert alert-success">Model retrained successfully</div>'
+                );
+                setTimeout(() => $('#action_status').html(''), 3000);
+                loadModelInfo();
+            },
+            error: function(xhr, status, error) {
+                btn.prop('disabled', false).html('Retrain Model Now');
+                $('#action_status').html(
+                    '<div class="alert alert-danger">Failed to retrain model: ' + error + '</div>'
+                );
+            }
+        });
+    }
+}
+
+function exportDetections() {
+    window.location.href = '/ml_detector/actions/export';
+}
+
+function viewLogs() {
+    $.ajax({
+        url: '/ml_detector/actions/logs',
+        method: 'GET',
+        success: function(response) {
+            if (response.data) {
+                const logs = response.data.logs || [];
+                const logsHtml = logs.map(log =>
+                    '<div class="mb-2 p-2 border-bottom">' +
+                    '<small class="text-muted">' + log.timestamp + '</small><br>' +
+                    '<code>' + log.message + '</code>' +
+                    '</div>'
+                ).join('');
+
+                $('#action_status').html(
+                    '<div class="card mt-3">' +
+                    '<div class="card-header">Recent System Logs</div>' +
+                    '<div class="card-body" style="max-height: 400px; overflow-y: auto;">' +
+                    (logs.length > 0 ? logsHtml : '<p class="text-muted">No recent logs</p>') +
+                    '</div>' +
+                    '</div>'
+                );
+            }
+        },
+        error: function(xhr, status, error) {
+            $('#action_status').html(
+                '<div class="alert alert-danger">Failed to load logs: ' + error + '</div>'
+            );
+        }
+    });
+}
+
 $(document).ready(function() {
     loadSettings();
-    
+
     $('#btn_save_config').on('click', saveSettings);
     $('#btn_reset_config').on('click', loadSettings);
     $('#btn_restart_service').on('click', restartMonitor);
-    
+
     $('#preset_aggressive').on('click', () => applyPreset('aggressive'));
     $('#preset_conservative').on('click', () => applyPreset('conservative'));
     $('#preset_short_videos').on('click', () => applyPreset('short_videos'));
     $('#preset_quic').on('click', () => applyPreset('quic_optimized'));
+
+    // Alerts & Actions event handlers
+    $('#live_blocking_toggle').on('change', toggleBlocking);
+    $('#btn_add_whitelist').on('click', addWhitelist);
+    $('#btn_add_blacklist').on('click', addBlacklist);
+    $(document).on('click', '.remove-whitelist', function() {
+        removeWhitelist($(this).data('ip'));
+    });
+    $(document).on('click', '.remove-blacklist', function() {
+        removeBlacklist($(this).data('ip'));
+    });
+    $(document).on('click', '.feedback-correct', function() {
+        const detection = JSON.parse($(this).attr('data-detection'));
+        submitFeedback(detection, 'correct');
+    });
+    $(document).on('click', '.feedback-false', function() {
+        const detection = JSON.parse($(this).attr('data-detection'));
+        submitFeedback(detection, 'false_positive');
+    });
+    $('#btn_clear_blocks').on('click', clearAllBlocks);
+    $('#btn_retrain_model').on('click', retrainModel);
+    $('#btn_export_detections').on('click', exportDetections);
+    $('#btn_view_logs').on('click', viewLogs);
+
+    // Load Alerts & Actions data when tab is shown
+    $('#alerts-tab').on('shown.bs.tab', function() {
+        loadBlockingStatus();
+        loadWhitelist();
+        loadBlacklist();
+        loadFeedbackTable();
+    });
 });
 
