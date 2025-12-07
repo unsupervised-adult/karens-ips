@@ -595,6 +595,48 @@ karens-ips/
 | SLIPS Journal | `journalctl -fu slips` |
 | System | `journalctl -xe` |
 
+### Log Disk Protection
+
+Logs grow rapidly in high-traffic environments. To prevent disk exhaustion, use contained loop-mounted images:
+
+**Setup protected log directories:**
+```bash
+# Run the log protection script (creates 40GB of contained log space)
+sudo ./scripts/setup-log-images.sh
+```
+
+**What it does:**
+- Creates loop-mounted images for high-growth directories:
+  - `/var/log/suricata` - 20GB (EVE JSON, fast.log, stats.log)
+  - `/var/log/slips` - 10GB (SLIPS analysis logs)
+  - `/var/lib/redis` - 5GB (Redis persistence)
+  - `/opt/StratosphereLinuxIPS/output` - 5GB (SLIPS output files)
+- Images stored in `/srv/images/`
+- Original data preserved in `*.old` directories
+- Automatic mount on boot via `/etc/fstab`
+- Logs can fill to capacity without affecting system
+
+**Monitor image usage:**
+```bash
+# Check disk usage of contained logs
+df -h /var/log/suricata /var/log/slips /var/lib/redis
+
+# View all loop mounts
+losetup -a
+
+# Check fstab entries
+grep "/srv/images" /etc/fstab
+```
+
+**Adjust sizes if needed:**
+```bash
+# Edit the script before running
+nano scripts/setup-log-images.sh
+
+# Modify DIR_SIZES array:
+# ["/var/log/suricata"]="30G"  # Increase if needed
+```
+
 ## Troubleshooting
 
 ### Services not starting
