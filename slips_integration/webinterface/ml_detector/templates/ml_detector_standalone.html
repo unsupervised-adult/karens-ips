@@ -304,12 +304,14 @@
     });
 
     function loadStats() {
-      $.getJSON('/ml_detector/stats', function(data) {
-        $('#stat_total_analyzed').text(data.total_analyzed || '0');
-        $('#stat_ads_detected').text(data.detections_found || '0');
-        $('#stat_legitimate').text(data.legitimate_traffic || '0');
-        $('#stat_accuracy').text(data.accuracy || '0%');
-        $('#last_update').text('Updated: ' + (data.last_update || '--:--:--'));
+      $.getJSON('/ml_detector/stats', function(response) {
+        if (response.data) {
+          $('#stat_total_analyzed').text(response.data.total_analyzed || '0');
+          $('#stat_ads_detected').text(response.data.detections_found || '0');
+          $('#stat_legitimate').text(response.data.legitimate_traffic || '0');
+          $('#stat_accuracy').text(response.data.accuracy || '0%');
+          $('#last_update').text('Updated: ' + (response.data.last_update || '--:--:--'));
+        }
       });
     }
 
