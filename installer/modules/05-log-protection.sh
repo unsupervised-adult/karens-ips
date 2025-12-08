@@ -16,7 +16,7 @@ module_05_log_protection() {
 
     if ! command -v rsync &> /dev/null; then
         log "Installing rsync..."
-        apt-get update && apt-get install -y rsync || handle_error "Failed to install rsync"
+        apt-get update && apt-get install -y rsync || error_exit "Failed to install rsync"
     fi
 
     for D in "${!DIR_SIZES[@]}"; do
@@ -27,11 +27,11 @@ module_05_log_protection() {
 
         log "Creating ${SZ} image for $D at $IMG"
         
-        fallocate -l "$SZ" "$IMG" || handle_error "Failed to create image $IMG"
-        mkfs.ext4 -F "$IMG" || handle_error "Failed to format image $IMG"
+        fallocate -l "$SZ" "$IMG" || error_exit "Failed to create image $IMG"
+        mkfs.ext4 -F "$IMG" || error_exit "Failed to format image $IMG"
         
         mkdir -p "$TEMP"
-        mount -o loop "$IMG" "$TEMP" || handle_error "Failed to mount $IMG to $TEMP"
+        mount -o loop "$IMG" "$TEMP" || error_exit "Failed to mount $IMG to $TEMP"
 
         mkdir -p "$D"
         if [ -d "$D" ] && [ "$(ls -A $D 2>/dev/null)" ]; then
@@ -51,7 +51,7 @@ module_05_log_protection() {
         fi
 
         mkdir -p "$D"
-        mount -o loop "$IMG" "$D" || handle_error "Failed to mount $IMG to $D"
+        mount -o loop "$IMG" "$D" || error_exit "Failed to mount $IMG to $D"
 
         if ! grep -qF "$IMG $D" /etc/fstab; then
             echo "$IMG $D ext4 $FSTAB_OPTS 0 2" >> /etc/fstab
