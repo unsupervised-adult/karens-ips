@@ -1509,6 +1509,19 @@ class RedisDB(IoCHandler, AlertHandler, ProfileHandler, P2PHandler):
             # it's a dict
             return org_info
 
+    def set_org_cidrs(self, org, org_subnets):
+        """
+        Store organization CIDR ranges
+        :param org: Organization name
+        :param org_subnets: List of CIDR ranges for the organization
+        """
+        if org_subnets:
+            self.rcache.hset(
+                self.constants.ORG_INFO,
+                f"{org}_IPs",
+                json.dumps(org_subnets)
+            )
+
     def set_whitelist(self, type_, whitelist_dict):
         """
         Store the whitelist_dict in the given key
