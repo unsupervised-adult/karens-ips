@@ -145,7 +145,7 @@ install_zeek() {
         success "Zeek installed from precompiled package"
     else
         warn "Could not install Zeek - SLIPS will work without it but with reduced capabilities"
-        return 1
+        return 0  # Don't fail installation if Zeek can't be installed (it's optional)
     fi
 
     # Verify installation - check actual installation location
@@ -195,12 +195,14 @@ install_zeek_from_repo() {
     fi
 
     # Update package list
+    wait_for_apt_lock
     if ! apt-get update; then
         warn "Failed to update package lists after adding Zeek repository"
         return 1
     fi
 
     # Install Zeek
+    wait_for_apt_lock
     if ! apt-get install -y --no-install-recommends zeek; then
         warn "Failed to install Zeek from repository"
         return 1
