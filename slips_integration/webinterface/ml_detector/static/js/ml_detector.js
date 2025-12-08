@@ -1069,7 +1069,17 @@ function loadFeedbackTable() {
     });
 }
 
-function submitFeedback(detection, feedback) {
+function submitFeedback(detection, feedback, buttonElement) {
+    const $row = $(buttonElement).closest('tr');
+    const originalHtml = $row.html();
+    
+    // Show immediate feedback in the row
+    const feedbackMsg = feedback === 'correct' ? 
+        '<td colspan="5" class="text-center text-success"><i class="fa fa-check-circle"></i> Confirmed correct - Thank you!</td>' :
+        '<td colspan="5" class="text-center text-info"><i class="fa fa-info-circle"></i> Marked as false positive - Model will be retrained</td>';
+    
+    $row.html(feedbackMsg);
+    
     $.ajax({
         url: '/ml_detector/feedback',
         method: 'POST',
@@ -1081,13 +1091,20 @@ function submitFeedback(detection, feedback) {
             classification: detection.classification
         }),
         success: function(response) {
-            const message = feedback === 'correct' ?
-                '<div class="alert alert-success">Feedback recorded: True positive confirmed</div>' :
-                '<div class="alert alert-warning">Feedback recorded: False positive marked. Model will be retrained.</div>';
-            $('#action_status').html(message);
-            setTimeout(() => $('#action_status').html(''), 3000);
+            // Fade out and remove row after 2 seconds
+            setTimeout(() => {
+                $row.fadeOut(400, function() {
+                    $(this).remove();
+                    // Check if table is empty
+                    if ($('#feedback_table tbody tr:visible').length === 0) {
+                        $('#feedback_table tbody').html('<tr><td colspan="5" class="text-center text-muted">No pending feedback items</td></tr>');
+                    }
+                });
+            }, 2000);
         },
         error: function(xhr, status, error) {
+            // Restore original content on error
+            $row.html(originalHtml);
             alert('Failed to submit feedback: ' + error);
         }
     });
@@ -1200,11 +1217,11 @@ $(document).ready(function() {
     });
     $(document).on('click', '.feedback-correct', function() {
         const detection = JSON.parse($(this).attr('data-detection'));
-        submitFeedback(detection, 'correct');
+        submitFeedback(detection, 'correct', this);
     });
     $(document).on('click', '.feedback-false', function() {
         const detection = JSON.parse($(this).attr('data-detection'));
-        submitFeedback(detection, 'false_positive');
+        submitFeedback(detection, 'false_positive', this);
     });
     $('#btn_clear_blocks').on('click', clearAllBlocks);
     $('#btn_retrain_model').on('click', retrainModel);
