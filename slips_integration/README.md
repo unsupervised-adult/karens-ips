@@ -17,6 +17,7 @@ slips_integration/
     └── ml_detector/               # ML Detector Flask Blueprint
         ├── __init__.py
         ├── ml_detector.py         # Backend routes and API endpoints
+        ├── stream_ad_blocker.py   # QUIC stream ad blocking service
         ├── templates/
         │   └── ml_detector.html   # Frontend dashboard template
         └── static/
@@ -144,7 +145,8 @@ The ML Detector blueprint provides the following REST API endpoints:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/ml_detector/` | GET | Main dashboard page |
-| `/ml_detector/stats` | GET | Overall statistics |
+| `/ml_detector/stats` | GET | Overall SLIPS evidence-based statistics |
+| `/ml_detector/stream_stats` | GET | QUIC stream blocking statistics |
 | `/ml_detector/detections/recent` | GET | Recent detections (last 100) |
 | `/ml_detector/detections/timeline` | GET | Time-series data for charts |
 | `/ml_detector/model/info` | GET | ML model metadata |
@@ -153,10 +155,11 @@ The ML Detector blueprint provides the following REST API endpoints:
 
 ## Redis Data Structure
 
-The ML Detector reads from the following Redis keys (populated by the Karen's IPS ML detector module):
+The ML Detector reads from the following Redis keys:
 
+**Database 0 (SLIPS Core Data):**
 ```bash
-ml_detector:stats                   # Hash: Overall statistics
+ml_detector:stats                   # Hash: SLIPS evidence-based statistics
 ml_detector:recent_detections       # List: Recent detections
 ml_detector:timeline                # List: Timeline data
 ml_detector:model_info              # Hash: Model information
@@ -164,16 +167,39 @@ ml_detector:feature_importance      # Hash: Feature importance scores
 ml_detector:alerts                  # List: Alerts
 ```
 
+**Database 1 (Stream Ad Blocker):**
+```bash
+stream_ad_blocker:stats             # Hash: QUIC stream blocking statistics
+  - total_analyzed                  # Total QUIC streams analyzed
+  - ads_detected                    # Advertisement streams detected
+  - ips_blocked                     # Unique IPs blocked
+  - urls_blocked                    # Unique URLs blocked
+  - legitimate_traffic              # Legitimate streams allowed
+  - blocking_status                 # Active/Monitoring Only/Not Running
+  - last_update                     # Last stats update timestamp
+```
+
 See [ML_DETECTOR_INTEGRATION.md](../ML_DETECTOR_INTEGRATION.md) for detailed data formats.
 
 ## Dashboard Features
 
-### Statistics Cards
+The ML Detector dashboard displays two independent monitoring systems side-by-side:
 
-- Total traffic analyzed
-- Advertisements detected
+### SLIPS Evidence Detection (Blue Cards)
+
+Behavioral analysis using SLIPS core detection engine:
+- Total packets analyzed
+- Advertisements detected via ML behavioral analysis
 - Legitimate traffic
 - Model accuracy
+
+### QUIC Stream Blocking (Yellow Cards)
+
+Real-time QUIC (UDP/443) stream inspection and blocking:
+- Total streams analyzed
+- Advertisement streams blocked
+- Unique IPs blocked
+- Service status (Active/Monitoring/Not Running)
 
 ### Visualizations
 
@@ -191,6 +217,67 @@ See [ML_DETECTOR_INTEGRATION.md](../ML_DETECTOR_INTEGRATION.md) for detailed dat
 - Training accuracy
 - Features used
 - Last training date
+
+## QUIC Stream Ad Blocker
+
+The stream_ad_blocker.py service provides real-time QUIC stream analysis and advertisement blocking for video platforms (YouTube, streaming services, etc.).
+
+### Features
+
+- **Protocol**: QUIC (UDP port 443) stream inspection
+- **Detection**: Machine learning model trained on QUIC flow patterns
+- **Action**: Automatic IP blocking via nftables or monitoring-only mode
+- **Statistics**: Real-time stats to Redis DB 1 for dashboard display
+- **Dual Database**: Reads SLIPS data from DB 0, writes stats to DB 1
+
+### Service Management
+
+```bash
+# Start service
+sudo systemctl start stream-ad-blocker
+
+# Enable on boot
+sudo systemctl enable stream-ad-blocker
+
+# Check status
+sudo systemctl status stream-ad-blocker
+
+# View logs
+sudo journalctl -fu stream-ad-blocker
+```
+
+### Configuration
+
+Edit `/etc/systemd/system/stream-ad-blocker.service`:
+
+```ini
+[Service]
+Environment="BLOCKING_MODE=active"     # active or monitoring
+Environment="REDIS_HOST=localhost"
+Environment="REDIS_PORT=6379"
+```
+
+### Verification
+
+Check real-time statistics:
+
+```bash
+# View stream stats
+redis-cli -n 1 HGETALL stream_ad_blocker:stats
+
+# Expected output:
+# total_analyzed: 67
+# ads_detected: 5
+# ips_blocked: 5
+# blocking_status: Active
+# last_update: 2025-12-08 06:08:18
+```
+
+View blocked IPs in nftables:
+
+```bash
+sudo nft list set inet filter blocked_ips
+```
 
 ## Troubleshooting
 
@@ -212,7 +299,39 @@ See [ML_DETECTOR_INTEGRATION.md](../ML_DETECTOR_INTEGRATION.md) for detailed dat
    redis-cli HGETALL ml_detector:stats
    ```
 
-3. Verify the web interface is connecting to the correct Redis instance
+3. Check stream ad blocker stats (DB 1):
+
+   ```bash
+   redis-cli -n 1 HGETALL stream_ad_blocker:stats
+   ```
+
+4. Verify the web interface is connecting to the correct Redis instance
+
+### QUIC Stream Blocking shows "Not Running"
+
+**Problem**: QUIC Stream Blocking section shows "Not Running" with zeros
+
+**Solutions**:
+
+1. Check stream-ad-blocker service status:
+
+   ```bash
+   sudo systemctl status stream-ad-blocker
+   ```
+
+2. Verify service is writing to Redis DB 1:
+
+   ```bash
+   redis-cli -n 1 HGETALL stream_ad_blocker:stats
+   ```
+
+3. Check web UI is reading from correct database (ml_detector.py should use redis_db1 connection)
+
+4. Restart web UI after any changes:
+
+   ```bash
+   sudo systemctl restart slips-webui
+   ```
 
 ### Charts not rendering
 
@@ -342,6 +461,7 @@ Regenerate TLS SNI blocking rules after:
 ### Technical Details
 
 **Rule Format:**
+
 ```
 drop tls any any -> any any (msg:"Blocked ads domain: example.com"; tls.sni; content:"example.com"; nocase; classtype:policy-violation; sid:9000000; rev:1;)
 ```
@@ -387,6 +507,7 @@ tail -f /var/log/suricata/fast.log | grep "Blocked ads domain"
 - Created before each regeneration
 
 **Manual Restore:**
+
 ```bash
 # List backups
 ls -lh /var/lib/suricata/rules/backups/
@@ -409,6 +530,7 @@ The Suricata web interface provides REST API endpoints for rule management:
 | `/suricata/api/tls-sni/rules-status` | GET | Get current rules status and counts |
 
 **Example API Usage:**
+
 ```bash
 # Check status
 curl http://localhost:55000/suricata/api/tls-sni/rules-status
@@ -439,17 +561,20 @@ curl -X POST http://localhost:55000/suricata/api/tls-sni/generate-rules
 **Rules not blocking traffic:**
 
 1. Verify Suricata is in IPS mode:
+
    ```bash
    ps aux | grep suricata
    # Should show: suricata -q 0
    ```
 
 2. Check rules are loaded:
+
    ```bash
    grep "ml-detector-blocking.rules" /etc/suricata/suricata.yaml
    ```
 
 3. Verify nftables is sending traffic to queue:
+
    ```bash
    sudo nft list ruleset | grep queue
    ```
@@ -457,17 +582,20 @@ curl -X POST http://localhost:55000/suricata/api/tls-sni/generate-rules
 **Generation fails:**
 
 1. Check database exists:
+
    ```bash
    ls -lh /var/lib/suricata/ips_filter.db
    ```
 
 2. Verify permissions:
+
    ```bash
    sudo chown root:root /opt/StratosphereLinuxIPS/generate_suricata_rules.py
    sudo chmod +x /opt/StratosphereLinuxIPS/generate_suricata_rules.py
    ```
 
 3. Check disk space:
+
    ```bash
    df -h /var/lib/suricata/
    # Need ~100 MB free
@@ -477,11 +605,13 @@ curl -X POST http://localhost:55000/suricata/api/tls-sni/generate-rules
 
 1. Clear browser cache (Ctrl+Shift+R)
 2. Verify files deployed:
+
    ```bash
    ls -l /opt/StratosphereLinuxIPS/webinterface/suricata_config/
    ```
 
 3. Restart web interface:
+
    ```bash
    sudo systemctl restart slips-webui
    ```

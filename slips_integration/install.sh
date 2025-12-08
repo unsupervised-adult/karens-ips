@@ -66,6 +66,15 @@ fi
 
 cp -r "$SCRIPT_DIR/webinterface/ml_detector" "$ML_DETECTOR_DEST"
 echo -e "${GREEN}✓${NC} ML Detector blueprint installed"
+
+# Install stream_ad_blocker.py service
+echo "Installing stream ad blocker service..."
+if [ -f "$SCRIPT_DIR/webinterface/ml_detector/stream_ad_blocker.py" ]; then
+    cp "$SCRIPT_DIR/webinterface/ml_detector/stream_ad_blocker.py" "$SLIPS_PATH/webinterface/ml_detector/stream_ad_blocker.py"
+    echo -e "${GREEN}✓${NC} Stream ad blocker service installed"
+else
+    echo -e "${YELLOW}⚠${NC} stream_ad_blocker.py not found"
+fi
 echo ""
 
 # Install pre-modified SLIPS files
