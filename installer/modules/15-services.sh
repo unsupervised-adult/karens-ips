@@ -590,8 +590,6 @@ except Exception as e:
 POPULATE_ACTUAL
 }
 
-validate_ip_datasets() {
-
 update_dataset_header() {
     local ip_file="$1"
     local ip_count="$2"
