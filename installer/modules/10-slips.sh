@@ -92,6 +92,15 @@ clone_slips_repository() {
         # Remove incomplete/invalid installation
         if [ -d "$SLIPS_DIR" ]; then
             warn "Found incomplete SLIPS directory, removing..."
+            
+            # Unmount any loop devices first
+            for mount_point in "$SLIPS_DIR/output" "$SLIPS_DIR"/*; do
+                if mountpoint -q "$mount_point" 2>/dev/null; then
+                    log "Unmounting $mount_point..."
+                    umount "$mount_point" 2>/dev/null || true
+                fi
+            done
+            
             rm -rf "$SLIPS_DIR"
         fi
         
