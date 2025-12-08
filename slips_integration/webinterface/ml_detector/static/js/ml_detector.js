@@ -522,19 +522,28 @@ function loadTimeline() {
         url: '/ml_detector/detections/timeline',
         method: 'GET',
         success: function(response) {
+            console.log('Timeline data received:', response);
+            console.log('Timeline chart exists:', !!timelineChart);
+            
             if (response.data && timelineChart) {
                 const labels = response.data.map(d => d.time);
                 const adsData = response.data.map(d => d.ads || 0);
                 const legitData = response.data.map(d => d.legitimate || 0);
 
+                console.log('Timeline labels:', labels);
+                console.log('Ads data:', adsData);
+                console.log('Legit data:', legitData);
+
                 timelineChart.data.labels = labels;
                 timelineChart.data.datasets[0].data = adsData;
                 timelineChart.data.datasets[1].data = legitData;
                 timelineChart.update();
+            } else {
+                console.warn('Timeline chart not ready or no data. Chart:', !!timelineChart, 'Data:', !!response.data);
             }
         },
         error: function(xhr, status, error) {
-            console.error('Error loading timeline:', error);
+            console.error('Error loading timeline:', error, xhr.responseText);
         }
     });
 }
