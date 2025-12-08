@@ -82,16 +82,23 @@ clone_slips_repository() {
 
     cd /opt || error_exit "Failed to change to /opt directory"
 
-    if [ ! -d "$SLIPS_DIR" ]; then
+    # Check if valid SLIPS installation exists
+    if [ -d "$SLIPS_DIR" ] && [ -f "$SLIPS_DIR/slips.py" ]; then
+        log "SLIPS repository already exists and appears valid"
+    else
+        # Remove incomplete/invalid installation
+        if [ -d "$SLIPS_DIR" ]; then
+            warn "Found incomplete SLIPS directory, removing..."
+            rm -rf "$SLIPS_DIR"
+        fi
+        
         git clone --depth 1 https://github.com/stratosphereips/StratosphereLinuxIPS.git || error_exit "Failed to clone SLIPS repository"
         success "SLIPS repository cloned"
-    else
-        log "SLIPS repository already exists"
-    fi
-
-    # Verify slips.py exists (git clone succeeded)
-    if [ ! -f "$SLIPS_DIR/slips.py" ]; then
-        error_exit "SLIPS repository cloned but slips.py not found - clone may have failed"
+        
+        # Verify slips.py exists (git clone succeeded)
+        if [ ! -f "$SLIPS_DIR/slips.py" ]; then
+            error_exit "SLIPS repository cloned but slips.py not found - clone may have failed"
+        fi
     fi
 
     # Fix ownership and git permissions
