@@ -494,8 +494,16 @@ configure_blocking_permissions() {
 SUDO_EOF
 
     chmod 440 /etc/sudoers.d/karens-ips-blocking
-    
-    # Fix suricatasc socket permissions
+
+    # Validate sudoers file to prevent syntax errors from breaking sudo
+    if visudo -c -f /etc/sudoers.d/karens-ips-blocking >/dev/null 2>&1; then
+        success "Sudoers file validated successfully"
+    else
+        error_exit "Sudoers file validation failed - syntax error detected. Removing invalid file."
+        rm -f /etc/sudoers.d/karens-ips-blocking
+    fi
+
+    # Fix suricatasc socket permissions (only if socket exists)
     if [[ -S /var/run/suricata/suricata.socket ]]; then
         chmod 666 /var/run/suricata/suricata.socket
     fi

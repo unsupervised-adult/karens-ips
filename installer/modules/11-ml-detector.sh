@@ -60,10 +60,23 @@ install_stream_monitor_service() {
 
     local service_source="$PROJECT_ROOT/slips_integration/webinterface/ml_detector/stream-monitor.service"
     local service_dest="/etc/systemd/system/stream-monitor.service"
+    local script_source="$PROJECT_ROOT/slips_integration/webinterface/ml_detector/realtime_stream_monitor.py"
+    local script_dest="$SLIPS_DIR/webinterface/ml_detector/realtime_stream_monitor.py"
 
     if [[ ! -f "$service_source" ]]; then
         warn "stream-monitor.service not found at: $service_source"
         return 1
+    fi
+
+    # Ensure destination directory exists
+    mkdir -p "$(dirname "$script_dest")"
+
+    # Ensure the Python script is installed
+    if [[ -f "$script_source" ]] && [[ ! -f "$script_dest" ]]; then
+        cp "$script_source" "$script_dest"
+        chmod +x "$script_dest"
+        chown root:root "$script_dest"
+        log "realtime_stream_monitor.py installed"
     fi
 
     # Copy service file
@@ -94,6 +107,9 @@ install_stream_ad_blocker_service() {
     local service_dest="/etc/systemd/system/stream-ad-blocker.service"
     local script_source="$PROJECT_ROOT/slips_integration/webinterface/ml_detector/stream_ad_blocker.py"
     local script_dest="$SLIPS_DIR/webinterface/ml_detector/stream_ad_blocker.py"
+
+    # Ensure destination directory exists
+    mkdir -p "$(dirname "$script_dest")"
 
     # Copy Python script
     if [[ -f "$script_source" ]]; then

@@ -60,7 +60,7 @@ Description=Suricata IPS NFQUEUE Mode
 Documentation=https://suricata.readthedocs.io/
 After=network-online.target redis.service ips-interfaces.service nftables.service
 Wants=network-online.target
-Requires=ips-interfaces.service nftables.service
+Requires=redis.service ips-interfaces.service nftables.service
 
 [Service]
 Type=simple
@@ -94,7 +94,7 @@ Description=SLIPS (Stratosphere Linux IPS) - ML Behavioral Analysis
 Documentation=https://stratospherelinuxips.readthedocs.io/
 After=network.target redis.service ips-interfaces.service
 Wants=redis.service ips-interfaces.service
-Requires=ips-interfaces.service
+Requires=redis.service ips-interfaces.service
 
 [Service]
 Type=simple
@@ -103,6 +103,7 @@ Group=root
 WorkingDirectory=${SLIPS_DIR}
 ExecStartPre=/bin/mkdir -p /tmp/slips
 ExecStartPre=/bin/chmod 1777 /tmp/slips
+ExecStartPre=/bin/test -f ${SLIPS_DIR}/venv/bin/python
 ExecStart=${SLIPS_DIR}/venv/bin/python ${SLIPS_DIR}/slips.py -c ${SLIPS_DIR}/config/slips.yaml -i br0
 Restart=on-failure
 RestartSec=30

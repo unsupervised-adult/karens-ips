@@ -50,6 +50,19 @@ setup_interfaces() {
 create_interface_setup_script() {
     log "Creating interface setup script..."
 
+    # Validate required interface variables are set
+    if [[ -z "${IFACE_IN}" || -z "${IFACE_OUT}" ]]; then
+        error_exit "IFACE_IN and IFACE_OUT must be set before interface setup"
+    fi
+
+    # Verify interfaces exist
+    if ! ip link show "${IFACE_IN}" &>/dev/null; then
+        error_exit "Interface ${IFACE_IN} does not exist"
+    fi
+    if ! ip link show "${IFACE_OUT}" &>/dev/null; then
+        error_exit "Interface ${IFACE_OUT} does not exist"
+    fi
+
     cat > /usr/local/bin/ips-interface-setup.sh << EOF
 #!/bin/bash
 # IPS Interface Setup Script for NFQUEUE Bridge Mode

@@ -101,16 +101,21 @@ setup_slips_venv() {
 
     cd "$SLIPS_DIR" || error_exit "Failed to change to SLIPS directory"
 
+    # Verify Python3 venv module is available
+    if ! python3 -m venv --help &>/dev/null; then
+        error_exit "Python3 venv module not installed. Install with: apt install python3-venv"
+    fi
+
     # Create Python virtual environment
     python3 -m venv venv || error_exit "Failed to create virtual environment"
     source venv/bin/activate
 
     # Upgrade pip
-    pip install --upgrade pip setuptools wheel || warn "Failed to upgrade pip"
-    
+    pip install --upgrade pip setuptools wheel || error_exit "Failed to upgrade pip - check network connectivity"
+
     # Install core ML and Redis dependencies first
-    pip install scikit-learn joblib numpy pandas redis || warn "Failed to install core ML dependencies"
-    
+    pip install scikit-learn joblib numpy pandas redis || error_exit "Failed to install core ML dependencies - SLIPS cannot function without these"
+
     # Install additional dependencies for Karen's IPS integration
     pip install flask flask-socketio eventlet || warn "Failed to install web dependencies"
 
@@ -119,6 +124,11 @@ setup_slips_venv() {
         log "Found SLIPS requirements.txt"
         log "Installing SLIPS dependencies (this may take several minutes)..."
         pip install -r install/requirements.txt || warn "Some SLIPS dependencies failed to install"
+
+        # Verify git is installed for idmefv2 installation
+        if ! command -v git >/dev/null 2>&1; then
+            error_exit "git not installed - required for idmefv2 dependency. Install with: apt install git"
+        fi
 
         # Explicitly install idmefv2 from GitHub (critical dependency)
         log "Installing idmefv2 from GitHub..."
@@ -418,7 +428,10 @@ install_karens_ips_ml_modules() {
     # Copy ML detector webinterface integration
     local webinterface_dir="$SLIPS_DIR/webinterface"
     local source_webinterface_dir="$PROJECT_ROOT/slips_integration/webinterface"
-    
+
+    # Create webinterface directory if it doesn't exist
+    mkdir -p "$webinterface_dir"
+
     if [[ -d "$source_webinterface_dir/ml_detector" ]]; then
         log "Installing ML detector web interface blueprint..."
         cp -r "$source_webinterface_dir/ml_detector" "$webinterface_dir/" && \
@@ -436,10 +449,10 @@ install_karens_ips_ml_modules() {
         cp -r "$source_webinterface_dir/suricata_config" "$webinterface_dir/" && \
         chown -R root:root "$webinterface_dir/suricata_config" && \
         chmod 755 "$webinterface_dir/suricata_config" && \
-        find "$webinterface_dir/suricata_config" -type f -name "*.py" -exec chmod 644 {} \; && \
-        find "$webinterface_dir/suricata_config" -type f -name "*.html" -exec chmod 644 {} \;
-        find "$webinterface_dir/suricata_config" -type f -name "*.css" -exec chmod 644 {} \;
-        find "$webinterface_dir/suricata_config" -type f -name "*.js" -exec chmod 644 {} \;
+        find "$webinterface_dir/suricata_config" -type f -name "*.py" -exec chmod 644 {} \; 2>/dev/null && \
+        find "$webinterface_dir/suricata_config" -type f -name "*.html" -exec chmod 644 {} \; 2>/dev/null && \
+        find "$webinterface_dir/suricata_config" -type f -name "*.css" -exec chmod 644 {} \; 2>/dev/null && \
+        find "$webinterface_dir/suricata_config" -type f -name "*.js" -exec chmod 644 {} \; 2>/dev/null
         success "Suricata configuration blueprint installed"
     else
         warn "Suricata configuration blueprint not found at $source_webinterface_dir/suricata_config"
@@ -448,7 +461,10 @@ install_karens_ips_ml_modules() {
     # Install pre-modified app.py with ML detector integration
     if [[ -f "$source_webinterface_dir/app.py" ]]; then
         log "Installing ML detector integrated app.py..."
-        cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.backup" 2>/dev/null || true
+        # Backup existing app.py if it exists
+        if [[ -f "$webinterface_dir/app.py" ]]; then
+            cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.backup" 2>/dev/null || true
+        fi
         cp "$source_webinterface_dir/app.py" "$webinterface_dir/app.py"
         chmod 644 "$webinterface_dir/app.py"
         success "ML detector integrated app.py installed"
@@ -459,7 +475,12 @@ install_karens_ips_ml_modules() {
     # Install pre-modified app.html template with ML detector tab
     if [[ -f "$source_webinterface_dir/templates/app.html" ]]; then
         log "Installing ML detector integrated app.html template..."
-        cp "$webinterface_dir/templates/app.html" "$webinterface_dir/templates/app.html.backup" 2>/dev/null || true
+        # Create templates directory if it doesn't exist
+        mkdir -p "$webinterface_dir/templates"
+        # Backup existing app.html if it exists
+        if [[ -f "$webinterface_dir/templates/app.html" ]]; then
+            cp "$webinterface_dir/templates/app.html" "$webinterface_dir/templates/app.html.backup" 2>/dev/null || true
+        fi
         cp "$source_webinterface_dir/templates/app.html" "$webinterface_dir/templates/app.html"
         chmod 644 "$webinterface_dir/templates/app.html"
         success "ML detector integrated app.html installed"
