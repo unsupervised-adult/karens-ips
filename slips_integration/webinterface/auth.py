@@ -10,11 +10,18 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from functools import wraps
 import bcrypt
 import os
+from time import time
+from collections import defaultdict
 
 auth_bp = Blueprint('auth', __name__)
 
 # Password hash file location
 PASSWORD_FILE = os.environ.get('IPS_PASSWORD_FILE', '/etc/karens-ips/.password')
+
+# Rate limiting: track failed login attempts
+failed_attempts = defaultdict(list)
+MAX_ATTEMPTS = 5
+LOCKOUT_DURATION = 900  # 15 minutes in seconds
 
 def load_password_hash():
     """Load the bcrypt password hash from file."""
@@ -50,16 +57,40 @@ def login_required(f):
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    """Login page and handler."""
+    """Login page and handler with rate limiting."""
+    client_ip = request.headers.get('X-Real-IP', request.remote_addr)
+    current_time = time()
+    
+    # Clean old failed attempts
+    failed_attempts[client_ip] = [
+        attempt_time for attempt_time in failed_attempts[client_ip]
+        if current_time - attempt_time < LOCKOUT_DURATION
+    ]
+    
+    # Check if IP is locked out
+    if len(failed_attempts[client_ip]) >= MAX_ATTEMPTS:
+        time_remaining = int(LOCKOUT_DURATION - (current_time - failed_attempts[client_ip][0]))
+        return render_template('login.html', locked=True, time_remaining=time_remaining)
+        return render_template('login.html', 
+                             error='too_many_attempts',
+                             lockout_time=time_remaining)
+    
     if request.method == 'POST':
         password = request.form.get('password', '')
 
         if check_password(password):
+            # Success - clear failed attempts
+            failed_attempts[client_ip] = []
             session['authenticated'] = True
-            session.permanent = True  # Remember session
+            session.permanent = True
             return redirect(url_for('index'))
         else:
-            return redirect(url_for('auth.login', error=1))
+            # Failed - record attempt
+            failed_attempts[client_ip].append(current_time)
+            attempts_left = MAX_ATTEMPTS - len(failed_attempts[client_ip])
+            return redirect(url_for('auth.login', 
+                                  error=1, 
+                                  attempts_left=attempts_left))
 
     # GET request - show login page
     return render_template('login.html')

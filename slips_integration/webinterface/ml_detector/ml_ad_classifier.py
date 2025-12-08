@@ -12,6 +12,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 import pickle
 import os
+from collections import defaultdict
+from time import time
 
 class MLAdClassifier:
     def __init__(self):
@@ -71,15 +73,67 @@ class MLAdClassifier:
                 'skip_time': (5, 6),
                 'bitrate_range': (1000, 4000),
                 'confidence': 0.88
+            },
+            'double_ad_pod': {
+                'duration': (55, 65),          # 2x30s consecutive ads
+                'skip_time': None,
+                'bitrate_range': (800, 3000),
+                'confidence': 0.93
+            },
+            'triple_ad_pod': {
+                'duration': (85, 95),          # 3x30s consecutive ads
+                'skip_time': None,
+                'bitrate_range': (800, 3000),
+                'confidence': 0.93
             }
         }
+        
+        # Track recent ads per IP to detect ad pods
+        self.recent_ads = defaultdict(list)  # {ip: [(timestamp, duration), ...]}
         
         if os.path.exists(self.model_path):
             self.load_model()
         else:
             self.train_initial_model()
     
-    def detect_video_ad_pattern(self, duration, bytes_transferred, skip_detected=False):
+    def detect_ad_pod_sequence(self, ip_addr, duration):
+        """
+        Track consecutive ads to detect ad pods (e.g., 2x30s YouTube ads)
+        Returns: (is_pod, pod_type) or (False, None)
+        """
+        current_time = time()
+        
+        # Clean old entries (older than 5 minutes)
+        self.recent_ads[ip_addr] = [
+            (ts, dur) for ts, dur in self.recent_ads[ip_addr]
+            if current_time - ts < 300
+        ]
+        
+        # Add current ad
+        self.recent_ads[ip_addr].append((current_time, duration))
+        
+        # Look for consecutive ads within 10 seconds of each other
+        recent = self.recent_ads[ip_addr]
+        if len(recent) >= 2:
+            last_two = recent[-2:]
+            time_gap = last_two[1][0] - last_two[0][0]
+            total_duration = sum(dur for _, dur in last_two)
+            
+            # 2x30s ad pod (55-65 seconds total, within 10s gap)
+            if time_gap < 10 and 55 <= total_duration <= 65:
+                return True, 'double_ad_pod_detected'
+            
+            # Check for 3x30s if we have enough history
+            if len(recent) >= 3:
+                last_three = recent[-3:]
+                if all(last_three[i+1][0] - last_three[i][0] < 10 for i in range(2)):
+                    total_duration = sum(dur for _, dur in last_three)
+                    if 85 <= total_duration <= 95:
+                        return True, 'triple_ad_pod_detected'
+        
+        return False, None
+    
+    def detect_video_ad_pattern(self, duration, bytes_transferred, ip_addr=None, skip_detected=False):
         """
         Detect universal video ad patterns based on temporal signatures
         Returns: (is_ad, ad_type, confidence)
@@ -89,6 +143,12 @@ class MLAdClassifier:
         
         # Calculate approximate bitrate (Kbps)
         bitrate = (bytes_transferred * 8) / (duration * 1000)
+        
+        # Check for ad pod sequences first (higher confidence)
+        if ip_addr:
+            is_pod, pod_type = self.detect_ad_pod_sequence(ip_addr, duration)
+            if is_pod:
+                return True, pod_type, 0.95
         
         best_match = None
         best_confidence = 0.0

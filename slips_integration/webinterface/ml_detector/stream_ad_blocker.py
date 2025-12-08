@@ -97,6 +97,12 @@ class StreamAdBlocker:
         # Track video session context for better ad detection
         # Key: source_ip, Value: {'last_content_flow': timestamp, 'content_duration': seconds, 'ad_count': int}
         self.video_sessions = {}
+        
+        # Track ad pods (consecutive ads like 2x30s YouTube pre-roll)
+        # Key: (src_ip, dst_ip), Value: [{'timestamp': ts, 'duration': dur, 'bytes': bytes}]
+        self.ad_pod_tracking = defaultdict(list)
+        self.AD_POD_WINDOW = 60  # seconds - track ads within 60s window
+        self.AD_POD_MIN_COUNT = 2  # Flag as ad pod if 2+ ads in sequence
 
         # YouTube 2025 ad pattern knowledge
         # Based on May 2025 update: ads at "natural breakpoints"
@@ -191,6 +197,50 @@ class StreamAdBlocker:
         domain_lower = domain.lower()
         return any(pattern in domain_lower for pattern in self.ad_patterns)
 
+    def check_ad_pod(self, src_ip, dst_ip, duration, bytes_sent, confidence):
+        """
+        Detect ad pods (consecutive ads like 2x30s YouTube pre-rolls)
+        Boosts confidence when multiple ads detected in sequence
+        Returns: (is_pod, pod_confidence_boost)
+        """
+        current_time = time.time()
+        flow_key = (src_ip, dst_ip)
+        
+        # Clean old entries outside time window
+        self.ad_pod_tracking[flow_key] = [
+            ad for ad in self.ad_pod_tracking[flow_key]
+            if current_time - ad['timestamp'] < self.AD_POD_WINDOW
+        ]
+        
+        # Add current potential ad
+        if confidence > 0.5:
+            self.ad_pod_tracking[flow_key].append({
+                'timestamp': current_time,
+                'duration': duration,
+                'bytes': bytes_sent,
+                'confidence': confidence
+            })
+        
+        # Check if this is part of an ad pod
+        recent_ads = self.ad_pod_tracking[flow_key]
+        if len(recent_ads) >= self.AD_POD_MIN_COUNT:
+            # Multiple ads in sequence - likely an ad pod (2x30s, etc.)
+            total_duration = sum(ad['duration'] for ad in recent_ads)
+            avg_confidence = sum(ad['confidence'] for ad in recent_ads) / len(recent_ads)
+            
+            # Classic YouTube 2x30s pre-roll pattern
+            if len(recent_ads) == 2 and 25 <= total_duration <= 70:
+                return True, 0.25
+            
+            # Multi-ad pod (3+ ads)
+            if len(recent_ads) >= 3:
+                return True, 0.30
+            
+            # Generic ad pod boost
+            return True, 0.15
+        
+        return False, 0.0
+
     def analyze_flow_pattern(self, flow_data):
         """
         Analyze flow characteristics to detect in-stream ads
@@ -203,6 +253,8 @@ class StreamAdBlocker:
             duration = float(flow_data.get('dur', 0.1))
             protocol = flow_data.get('proto', '').upper()
             dst_port = int(flow_data.get('dport', 0))
+            src_ip = flow_data.get('saddr', '')
+            dst_ip = flow_data.get('daddr', '')
 
             # Calculate flow characteristics
             avg_packet_size = bytes_sent / max(packets, 1)
@@ -287,6 +339,12 @@ class StreamAdBlocker:
             if 100000 < bytes_sent < 10000000 and 5 < duration < 30:
                 confidence += 0.2
                 reasons.append(f"video_ad_pattern")
+
+            # Check for ad pod (consecutive ads like 2x30s YouTube pre-rolls)
+            is_pod, pod_boost = self.check_ad_pod(src_ip, dst_ip, duration, bytes_sent, confidence)
+            if is_pod:
+                confidence += pod_boost
+                reasons.append(f"ad_pod:{len(self.ad_pod_tracking.get((src_ip, dst_ip), []))}ads")
 
             is_ad = confidence > 0.5
 

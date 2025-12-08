@@ -59,14 +59,16 @@
 </head>
 <body>
     <div class="container">
-        {% if request.args.get('error') == '1' %}
-        <div class="error">Invalid password</div>
+        {% if error == 'too_many_attempts' %}
+        <div class="error">Too many failed attempts. Locked out for {{ lockout_time // 60 }} minutes.</div>
+        {% elif request.args.get('error') == '1' %}
+        <div class="error">Invalid password{% if request.args.get('attempts_left') %} ({{ request.args.get('attempts_left') }} attempts left){% endif %}</div>
         {% endif %}
         {% if request.args.get('changed') == '1' %}
         <div class="success">Password changed successfully</div>
         {% endif %}
         <form method="POST">
-            <input type="password" name="password" placeholder="Password" required autofocus autocomplete="current-password">
+            <input type="password" name="password" placeholder="Password" required autofocus autocomplete="current-password" {% if error == 'too_many_attempts' %}disabled{% endif %}>
         </form>
     </div>
 </body>
