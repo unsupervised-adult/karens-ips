@@ -104,19 +104,20 @@ clone_slips_repository() {
             rm -rf "$SLIPS_DIR"
         fi
         
-        # Clone SLIPS and checkout a known working commit
-        # Note: Pinning to commit before set_org_cidrs API breaking change
+        # Clone SLIPS and checkout known working commit
+        # Note: Pinning to commit 97c32c2b (Dec 7, 2024) - last known working version
+        log "Cloning SLIPS and checking out commit 97c32c2b..."
         git clone https://github.com/stratosphereips/StratosphereLinuxIPS.git || error_exit "Failed to clone SLIPS repository"
 
         cd "$SLIPS_DIR" || error_exit "Failed to change to SLIPS directory"
 
-        # Checkout known working commit (before set_org_cidrs incompatibility)
-        # Using commit from Dec 7, 2024 that was working on restored VM
-        git checkout 97c32c2b 2>/dev/null || warn "Failed to checkout specific commit, using latest"
+        # Checkout specific working commit
+        git checkout 97c32c2b || error_exit "Failed to checkout commit 97c32c2b"
+        log "SLIPS pinned to commit 97c32c2b"
 
         cd /opt || error_exit "Failed to return to /opt"
 
-        success "SLIPS repository cloned"
+        success "SLIPS repository cloned and pinned to working commit"
 
         # Verify slips.py exists (git clone succeeded)
         if [ ! -f "$SLIPS_DIR/slips.py" ]; then
