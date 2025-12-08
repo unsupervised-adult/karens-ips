@@ -405,15 +405,15 @@ def apply_preset(preset_name):
 @ml_detector.route("/detections/recent")
 def get_recent_detections():
     """
-    Get recent ad detections
-    Returns: List of recent detections with details
+    Get recent ad detections from both SLIPS ML (DB 0) and Stream Ad Blocker (DB 1)
+    Returns: Combined list of recent detections with details
     """
     try:
-        # Fetch recent detections from Redis
-        detections = db.rdb.r.lrange("ml_detector:recent_detections", 0, 99)
-
         data = []
-        for detection in detections:
+        
+        # Fetch SLIPS ML detections from Redis DB 0
+        slips_detections = db.rdb.r.lrange("ml_detector:recent_detections", 0, 99)
+        for detection in slips_detections:
             try:
                 if isinstance(detection, bytes):
                     detection = detection.decode()
@@ -424,11 +424,33 @@ def get_recent_detections():
                     detection_data["timestamp_formatted"] = ts_to_date(
                         detection_data["timestamp"], seconds=True
                     )
-
+                
+                detection_data["source"] = "SLIPS ML"
                 data.append(detection_data)
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                logger.warning(f"Skipping malformed detection data: {str(e)}")
+                logger.warning(f"Skipping malformed SLIPS detection data: {str(e)}")
                 continue
+        
+        # Fetch Stream Ad Blocker detections from Redis DB 1
+        stream_detections = redis_db1.lrange("ml_detector:recent_detections", 0, 99)
+        for detection in stream_detections:
+            try:
+                if isinstance(detection, bytes):
+                    detection = detection.decode()
+                detection_data = json.loads(detection)
+                
+                # Already has timestamp_formatted from stream_ad_blocker
+                detection_data["source"] = "QUIC Stream"
+                data.append(detection_data)
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                logger.warning(f"Skipping malformed stream detection data: {str(e)}")
+                continue
+        
+        # Sort by timestamp (most recent first)
+        data.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        
+        # Limit to 100 most recent
+        data = data[:100]
 
         return jsonify({"data": data})
     except Exception as e:

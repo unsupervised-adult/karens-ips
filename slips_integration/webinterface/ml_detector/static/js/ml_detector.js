@@ -221,6 +221,15 @@ function initializeTables() {
         window.detectionsTable = $('#table_detections').DataTable({
             columns: [
                 { data: 'timestamp_formatted', defaultContent: 'N/A' },
+                {
+                    data: 'source',
+                    defaultContent: 'SLIPS ML',
+                    render: function(data) {
+                        const isStream = data && data.includes('QUIC');
+                        const badge = isStream ? 'warning' : 'info';
+                        return `<span class="badge bg-${badge}">${data || 'SLIPS ML'}</span>`;
+                    }
+                },
                 { data: 'src_ip', defaultContent: 'N/A' },
                 { data: 'dst_ip', defaultContent: 'N/A' },
                 { data: 'dst_port', defaultContent: 'N/A' },
