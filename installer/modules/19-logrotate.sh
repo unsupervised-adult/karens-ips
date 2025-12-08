@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 module_18_logrotate() {
-    log_info "Configuring aggressive log rotation policies..."
+    log "Configuring aggressive log rotation policies..."
 
     cat > /etc/logrotate.d/suricata << 'EOF'
 /var/log/suricata/*.log /var/log/suricata/*.json {
@@ -66,7 +66,7 @@ EOF
     chmod 644 /etc/logrotate.d/suricata /etc/logrotate.d/slips
 
     if [ ! -f /etc/cron.hourly/logrotate ]; then
-        log_info "Creating hourly logrotate cron job..."
+        log "Creating hourly logrotate cron job..."
         cat > /etc/cron.hourly/logrotate << 'EOF'
 #!/bin/sh
 /usr/sbin/logrotate /etc/logrotate.conf
@@ -74,15 +74,15 @@ EOF
         chmod 755 /etc/cron.hourly/logrotate
     fi
 
-    log_info "Testing logrotate configuration..."
+    log "Testing logrotate configuration..."
     logrotate -d /etc/logrotate.d/suricata > /dev/null 2>&1 || log_warn "Suricata logrotate test had warnings"
     logrotate -d /etc/logrotate.d/slips > /dev/null 2>&1 || log_warn "SLIPS logrotate test had warnings"
 
     log_success "Logrotate configured with aggressive policies"
-    log_info "  - Suricata: Daily rotation, 7 days, 1GB max"
-    log_info "  - EVE JSON: Hourly rotation, 2 days, 2GB max"
-    log_info "  - SLIPS: Daily rotation, 7 days, 500MB max"
-    log_info "  - Hourly cron job monitoring all logs"
+    log "  - Suricata: Daily rotation, 7 days, 1GB max"
+    log "  - EVE JSON: Hourly rotation, 2 days, 2GB max"
+    log "  - SLIPS: Daily rotation, 7 days, 500MB max"
+    log "  - Hourly cron job monitoring all logs"
 }
 
 module_18_logrotate_info() {
