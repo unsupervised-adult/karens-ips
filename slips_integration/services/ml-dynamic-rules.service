@@ -1,0 +1,31 @@
+[Unit]
+Description=ML Dynamic Suricata Rule Generator
+Documentation=https://github.com/unsupervised-adult/karens-ips
+After=network.target redis.service suricata.service slips.service
+Wants=redis.service suricata.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /opt/StratosphereLinuxIPS/dynamic_rule_generator.py
+Restart=always
+RestartSec=10
+
+# Resource limits
+MemoryMax=512M
+CPUQuota=25%
+
+# Security
+NoNewPrivileges=false
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/etc/suricata/rules /var/log
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ml-dynamic-rules
+
+[Install]
+WantedBy=multi-user.target
