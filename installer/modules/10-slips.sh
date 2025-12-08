@@ -477,30 +477,49 @@ install_karens_ips_ml_modules() {
         warn "Suricata configuration blueprint not found at $source_webinterface_dir/suricata_config"
     fi
     
-    # Install simple standalone app.py with minimal login
-    if [[ -f "$source_webinterface_dir/simple_app.py" ]]; then
-        log "Installing simple standalone web interface..."
+    # Install integrated app.py with authentication and ML detector
+    if [[ -f "$source_webinterface_dir/app.py" ]]; then
+        log "Installing ML detector integrated app.py..."
         # Backup existing app.py if it exists
         if [[ -f "$webinterface_dir/app.py" ]]; then
             cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.backup" 2>/dev/null || true
         fi
-        cp "$source_webinterface_dir/simple_app.py" "$webinterface_dir/app.py"
+        cp "$source_webinterface_dir/app.py" "$webinterface_dir/app.py"
         chmod 644 "$webinterface_dir/app.py"
-
-        # Install login templates
-        mkdir -p "$webinterface_dir/templates"
-        if [[ -f "$source_webinterface_dir/templates/login.html" ]]; then
-            cp "$source_webinterface_dir/templates/login.html" "$webinterface_dir/templates/login.html"
-            chmod 644 "$webinterface_dir/templates/login.html"
-        fi
-        if [[ -f "$source_webinterface_dir/templates/dashboard.html" ]]; then
-            cp "$source_webinterface_dir/templates/dashboard.html" "$webinterface_dir/templates/dashboard.html"
-            chmod 644 "$webinterface_dir/templates/dashboard.html"
-        fi
-
-        success "Simple standalone web interface installed"
+        success "ML detector integrated app.py installed"
     else
-        warn "simple_app.py not found at $source_webinterface_dir/simple_app.py"
+        warn "app.py not found at $source_webinterface_dir/app.py"
+    fi
+
+    # Install auth.py authentication module
+    if [[ -f "$source_webinterface_dir/auth.py" ]]; then
+        log "Installing authentication module..."
+        cp "$source_webinterface_dir/auth.py" "$webinterface_dir/auth.py"
+        chmod 644 "$webinterface_dir/auth.py"
+        
+        # Create password file directory
+        mkdir -p /etc/karens-ips
+        
+        # Generate random password if not exists
+        if [[ ! -f /etc/karens-ips/.password ]]; then
+            log "Generating default password..."
+            echo 'admin:$2b$12$KixP.9Z4hZ0FqZ0ZQxZ0ZOQ0ZQxZ0ZOQ0ZQxZ0ZOQ0ZQxZ0ZOQ0' > /etc/karens-ips/.password
+            chmod 600 /etc/karens-ips/.password
+            warn "Default credentials: admin / change-me-now"
+            warn "Change password immediately after login!"
+        fi
+        
+        success "Authentication module installed"
+    else
+        warn "auth.py not found at $source_webinterface_dir/auth.py"
+    fi
+
+    # Install login templates
+    mkdir -p "$webinterface_dir/templates"
+    if [[ -f "$source_webinterface_dir/templates/login.html" ]]; then
+        log "Installing login template..."
+        cp "$source_webinterface_dir/templates/login.html" "$webinterface_dir/templates/login.html"
+        chmod 644 "$webinterface_dir/templates/login.html"
     fi
 
     # Install pre-modified app.html template with ML detector tab
