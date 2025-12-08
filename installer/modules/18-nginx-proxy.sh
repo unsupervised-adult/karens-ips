@@ -309,9 +309,8 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
 
-    # Authentication
-    auth_basic "Karen's IPS - Authentication Required";
-    auth_basic_user_file /etc/nginx/.htpasswd;
+    # Authentication handled by Flask app (simple_app.py with sequential login)
+    # No auth_basic - all authentication via session-based login
 
     # Logging
     access_log /var/log/nginx/karens-ips-access.log;
@@ -349,13 +348,6 @@ server {
         proxy_pass http://WEBUI_IP:WEBUI_PORT;
         expires 1h;
         add_header Cache-Control "public, immutable";
-    }
-
-    # Custom 401 error page
-    error_page 401 /errors/401.html;
-    location = /errors/401.html {
-        root /var/www/html;
-        internal;
     }
 }
 NGINX_CONFIG_EOF
@@ -401,11 +393,13 @@ enable_nginx_service() {
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     log ""
     log "  🌐 Access URL: https://${WEBUI_IP:-localhost}"
-    log "  🔐 Credentials: See /root/.karens-ips-credentials"
+    log "  🔐 Login: Sequential username→password entry"
+    log "      Username: admin"
+    log "      Password: karens-ips-2025"
     log ""
     log "  Features enabled:"
     log "    ✓ TLS 1.2/1.3 encryption with modern ciphers"
-    log "    ✓ HTTP Basic Authentication with custom page"
+    log "    ✓ Flask session-based authentication (no popups!)"
     log "    ✓ Rate limiting (30 req/min general, 10 req/min API)"
     log "    ✓ Security headers (HSTS, X-Frame-Options, CSP)"
     log "    ✓ Auto HTTP->HTTPS redirect"
@@ -416,7 +410,7 @@ enable_nginx_service() {
     log "    • Let's Encrypt: certbot --nginx -d your-domain.com"
     log "    • Replace cert: /etc/nginx/ssl/karens-ips.{crt,key}"
     log ""
-    log "  Add users: htpasswd /etc/nginx/.htpasswd newuser"
+    log "  Change credentials: Edit /opt/StratosphereLinuxIPS/webinterface/app.py"
     log "  Reload config: systemctl reload nginx"
     log ""
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
