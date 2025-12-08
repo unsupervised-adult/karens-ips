@@ -75,10 +75,10 @@ EOF
     fi
 
     log "Testing logrotate configuration..."
-    logrotate -d /etc/logrotate.d/suricata > /dev/null 2>&1 || log_warn "Suricata logrotate test had warnings"
-    logrotate -d /etc/logrotate.d/slips > /dev/null 2>&1 || log_warn "SLIPS logrotate test had warnings"
+    logrotate -d /etc/logrotate.d/suricata > /dev/null 2>&1 || warn "Suricata logrotate test had warnings"
+    logrotate -d /etc/logrotate.d/slips > /dev/null 2>&1 || warn "SLIPS logrotate test had warnings"
 
-    log_success "Logrotate configured with aggressive policies"
+    success "Logrotate configured with aggressive policies"
     log "  - Suricata: Daily rotation, 7 days, 1GB max"
     log "  - EVE JSON: Hourly rotation, 2 days, 2GB max"
     log "  - SLIPS: Daily rotation, 7 days, 500MB max"

@@ -36,18 +36,18 @@ module_05_log_protection() {
         mkdir -p "$D"
         if [ -d "$D" ] && [ "$(ls -A $D 2>/dev/null)" ]; then
             log "Copying existing data from $D to image"
-            rsync -aAX --numeric-ids "$D/" "$TEMP/" 2>/dev/null || log_warn "rsync for $D had errors (may be empty)"
+            rsync -aAX --numeric-ids "$D/" "$TEMP/" 2>/dev/null || warn "rsync for $D had errors (may be empty)"
         fi
         
         umount "$TEMP"
         rmdir "$TEMP"
 
         if mountpoint -q "$D" 2>/dev/null; then
-            umount "$D" || log_warn "Could not unmount $D"
+            umount "$D" || warn "Could not unmount $D"
         fi
 
         if [ -d "$D" ] && [ ! -L "$D" ]; then
-            mv "$D" "${D}.old" 2>/dev/null || log_warn "Could not backup $D to ${D}.old"
+            mv "$D" "${D}.old" 2>/dev/null || warn "Could not backup $D to ${D}.old"
         fi
 
         mkdir -p "$D"
@@ -58,10 +58,10 @@ module_05_log_protection() {
             log "Added $D to /etc/fstab"
         fi
 
-        log_success "Mounted $IMG at $D"
+        success "Mounted $IMG at $D"
     done
 
-    log_success "Log disk protection configured (40GB contained)"
+    success "Log disk protection configured (40GB contained)"
 }
 
 module_05_log_protection_info() {
