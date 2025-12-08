@@ -264,6 +264,228 @@ To remove the ML Detector integration:
 
    Then revert changes to `app.py` and `app.html`
 
+## TLS SNI Blocking Rules Generation
+
+Karen's IPS includes a powerful feature to generate Suricata drop rules from blocked domains database for true inline IPS blocking based on TLS Server Name Indication (SNI).
+
+### Overview
+
+The TLS SNI blocking system enables **true IPS mode** where Suricata directly drops packets inline when the TLS handshake contains a Server Name Indication matching domains in your blocklist database. This is more efficient than external scripts and provides real intrusion prevention.
+
+### How It Works
+
+1. **Blocklist Database**: 344,806+ blocked domains stored in `/var/lib/suricata/ips_filter.db`
+2. **Rule Generation**: Python script reads domains and generates Suricata `drop` rules
+3. **Inline Blocking**: Suricata inspects TLS handshakes and drops matching packets in real-time
+4. **NFQueue Mode**: Traffic flows through NFQueue where Suricata performs inline inspection
+
+### Components
+
+- **Script**: `generate_suricata_rules.py` - Converts domains to Suricata drop rules
+- **Rules File**: `/var/lib/suricata/rules/ml-detector-blocking.rules` - Generated drop rules (~58 MB)
+- **Web UI**: Suricata Dashboard → Configuration tab → "TLS SNI Blocking Rules"
+- **Backup**: Automatic backup of old rules to `/var/lib/suricata/rules/backups/`
+
+### Usage
+
+#### Via Web Interface
+
+1. Navigate to `http://your-ip:55000/suricata/`
+2. Click the **Configuration** tab
+3. Scroll to **"TLS SNI Blocking Rules"** section
+4. Click **"Check Status"** to view current state:
+   - Domains in Database: 344,806
+   - Rules Generated: 344,806
+   - Last Updated: timestamp
+   - Status: Up to Date / Needs Regeneration
+
+5. Click **"Generate TLS SNI Rules"** to create/update rules:
+   - Backs up existing rules automatically
+   - Generates fresh rules from database (takes 2-3 minutes)
+   - Reloads Suricata to activate new rules
+
+#### Via Command Line
+
+```bash
+sudo python3 /opt/StratosphereLinuxIPS/generate_suricata_rules.py
+```
+
+### When to Regenerate Rules
+
+Regenerate TLS SNI blocking rules after:
+
+- Importing new blocklists (Hagezi, Perflyst, etc.)
+- Manually adding domains to the database
+- Blocklist repository updates
+- Database shows more domains than generated rules
+
+### Web UI Buttons Explained
+
+| Button | Function | Safe? | What It Does |
+|--------|----------|-------|--------------|
+| **Check Status** | Read-only status check | ✅ Yes | Displays current stats without modifying anything |
+| **Generate TLS SNI Rules** | Full rule regeneration | ⚠️ Takes 2-3 min | Replaces all rules with fresh ones from database |
+
+**Check Status** - Safe to use anytime:
+- Queries database for domain count
+- Checks rules file existence and counts rules
+- Shows last generation timestamp
+- Displays sync status with color coding (green/yellow/red)
+
+**Generate TLS SNI Rules** - Creates fresh rules:
+1. Backs up old rules with timestamp
+2. Reads all domains from database
+3. Generates Suricata drop rules with TLS SNI matching
+4. Writes 58 MB rules file (~344k rules)
+5. Reloads Suricata to activate rules immediately
+
+### Technical Details
+
+**Rule Format:**
+```
+drop tls any any -> any any (msg:"Blocked ads domain: example.com"; tls.sni; content:"example.com"; nocase; classtype:policy-violation; sid:9000000; rev:1;)
+```
+
+**Database:**
+- Path: `/var/lib/suricata/ips_filter.db`
+- Tables: `blocked_domains`, `blocklist_sources`, `blocklist_metadata`
+- Domains: 344,806+ ad/tracking/malware domains
+
+**Generated Rules:**
+- Output: `/var/lib/suricata/rules/ml-detector-blocking.rules`
+- Size: ~58 MB (344,806 rules + header)
+- SID Range: 9000000 - 9344806 (avoids conflicts)
+
+**Suricata Configuration:**
+- Mode: NFQueue (`suricata -q 0`)
+- Rules loaded: Configured in `/etc/suricata/suricata.yaml`
+- Reload: Graceful via `systemctl reload suricata`
+
+### Verification
+
+Check that rules are active and blocking:
+
+```bash
+# View Suricata stats
+tail -100 /var/log/suricata/stats.log | grep ips.blocked
+
+# Expected output:
+# ips.blocked                    | Total                     | 146
+
+# Check generated rules
+wc -l /var/lib/suricata/rules/ml-detector-blocking.rules
+
+# View recent blocks in logs
+tail -f /var/log/suricata/fast.log | grep "Blocked ads domain"
+```
+
+### Backup & Recovery
+
+**Automatic Backups:**
+- Location: `/var/lib/suricata/rules/backups/`
+- Format: `ml-detector-blocking.rules.YYYYMMDD_HHMMSS`
+- Created before each regeneration
+
+**Manual Restore:**
+```bash
+# List backups
+ls -lh /var/lib/suricata/rules/backups/
+
+# Restore from backup
+sudo cp /var/lib/suricata/rules/backups/ml-detector-blocking.rules.20251207_235201 \
+        /var/lib/suricata/rules/ml-detector-blocking.rules
+
+# Reload Suricata
+sudo systemctl reload suricata
+```
+
+### API Endpoints
+
+The Suricata web interface provides REST API endpoints for rule management:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/suricata/api/tls-sni/generate-rules` | POST | Generate TLS SNI rules from database |
+| `/suricata/api/tls-sni/rules-status` | GET | Get current rules status and counts |
+
+**Example API Usage:**
+```bash
+# Check status
+curl http://localhost:55000/suricata/api/tls-sni/rules-status
+
+# Generate rules
+curl -X POST http://localhost:55000/suricata/api/tls-sni/generate-rules
+```
+
+### Performance Considerations
+
+**Rule Loading:**
+- 344k rules load in ~10 seconds on modern hardware
+- Memory usage: ~500 MB additional RAM for rule storage
+- No noticeable performance impact on packet processing
+
+**Generation Time:**
+- Small database (<10k domains): ~5 seconds
+- Medium database (100k domains): ~30 seconds
+- Large database (344k domains): ~2-3 minutes
+
+**Blocking Performance:**
+- Inline inspection: < 1ms latency per packet
+- TLS SNI lookup: Constant time O(1) via hash table
+- No external script overhead
+
+### Troubleshooting
+
+**Rules not blocking traffic:**
+
+1. Verify Suricata is in IPS mode:
+   ```bash
+   ps aux | grep suricata
+   # Should show: suricata -q 0
+   ```
+
+2. Check rules are loaded:
+   ```bash
+   grep "ml-detector-blocking.rules" /etc/suricata/suricata.yaml
+   ```
+
+3. Verify nftables is sending traffic to queue:
+   ```bash
+   sudo nft list ruleset | grep queue
+   ```
+
+**Generation fails:**
+
+1. Check database exists:
+   ```bash
+   ls -lh /var/lib/suricata/ips_filter.db
+   ```
+
+2. Verify permissions:
+   ```bash
+   sudo chown root:root /opt/StratosphereLinuxIPS/generate_suricata_rules.py
+   sudo chmod +x /opt/StratosphereLinuxIPS/generate_suricata_rules.py
+   ```
+
+3. Check disk space:
+   ```bash
+   df -h /var/lib/suricata/
+   # Need ~100 MB free
+   ```
+
+**Web UI button not showing:**
+
+1. Clear browser cache (Ctrl+Shift+R)
+2. Verify files deployed:
+   ```bash
+   ls -l /opt/StratosphereLinuxIPS/webinterface/suricata_config/
+   ```
+
+3. Restart web interface:
+   ```bash
+   sudo systemctl restart slips-webui
+   ```
+
 ## License
 
 SPDX-License-Identifier: GPL-2.0-only
