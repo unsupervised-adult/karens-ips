@@ -1084,8 +1084,8 @@ function submitFeedback(detection, feedback, buttonElement) {
     
     // Show immediate feedback in the row
     const feedbackMsg = feedback === 'correct' ? 
-        '<td colspan="5" class="text-center text-success"><i class="fa fa-check-circle"></i> Confirmed correct - Thank you!</td>' :
-        '<td colspan="5" class="text-center text-info"><i class="fa fa-info-circle"></i> Marked as false positive - Model will be retrained</td>';
+        '<td colspan="5" class="text-center text-success"><i class="fa fa-check-circle"></i> Confirmed</td>' :
+        '<td colspan="5" class="text-center text-info"><i class="fa fa-info-circle"></i> Marked as false positive</td>';
     
     $row.html(feedbackMsg);
     

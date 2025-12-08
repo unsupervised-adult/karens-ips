@@ -449,10 +449,20 @@ def get_recent_detections():
         # Sort by timestamp (most recent first)
         data.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
         
+        # Filter out detections that already have feedback
+        feedback_given = db.rdb.r.smembers('ml_detector:feedback_given')
+        feedback_ids = {fid.decode() if isinstance(fid, bytes) else fid for fid in feedback_given}
+        
+        filtered_data = []
+        for detection in data:
+            detection_id = f"{detection.get('source_ip', '')}_{detection.get('timestamp', '')}"
+            if detection_id not in feedback_ids:
+                filtered_data.append(detection)
+        
         # Limit to 100 most recent
-        data = data[:100]
+        filtered_data = filtered_data[:100]
 
-        return jsonify({"data": data})
+        return jsonify({"data": filtered_data})
     except Exception as e:
         logger.error(f"Error fetching recent detections: {str(e)}")
         return jsonify({"error": "Failed to fetch detections", "data": []}), 200
@@ -1453,13 +1463,20 @@ def submit_feedback():
         source_ip = data.get('source_ip', '')
         classification = data.get('classification', '')
 
+        # Create unique detection ID
+        detection_id = f"{source_ip}_{detection.get('timestamp', '')}"
+        
+        # Mark this detection as having feedback (so it doesn't show again)
+        db.rdb.r.sadd('ml_detector:feedback_given', detection_id)
+        
         # Store feedback in Redis
         feedback_entry = {
             'timestamp': datetime.now().isoformat(),
             'source_ip': source_ip,
             'classification': classification,
             'feedback': feedback,
-            'detection': detection
+            'detection': detection,
+            'detection_id': detection_id
         }
 
         db.rdb.r.lpush('ml_detector:feedback', json.dumps(feedback_entry))
