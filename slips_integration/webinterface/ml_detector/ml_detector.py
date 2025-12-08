@@ -472,11 +472,11 @@ def get_recent_detections():
 def get_detection_timeline():
     """
     Get detection timeline data for charts
-    Returns: Time-series data of detections
+    Returns: Time-series data of detections from stream-ad-blocker (DB 1)
     """
     try:
-        # Fetch detection timeline from Redis
-        timeline_data = db.rdb.r.lrange("ml_detector:timeline", 0, 999)
+        # Fetch detection timeline from Redis DB 1 (stream-ad-blocker)
+        timeline_data = redis_db1.lrange("ml_detector:timeline", 0, 999)
 
         data = []
         for entry in timeline_data:

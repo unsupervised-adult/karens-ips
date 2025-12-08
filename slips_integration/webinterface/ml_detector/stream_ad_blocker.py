@@ -658,6 +658,17 @@ class StreamAdBlocker:
         # Store detection
         self.r_stats.lpush('ml_detector:recent_detections', json.dumps(detection))
         self.r_stats.ltrim('ml_detector:recent_detections', 0, 99)
+        
+        # Store timeline entry for chart
+        timeline_entry = {
+            'timestamp': now.isoformat(),
+            'hour': now.strftime('%H:00'),
+            'classification': 'ad',
+            'confidence': round(confidence, 2),
+            'method': method
+        }
+        self.r_stats.lpush('ml_detector:timeline', json.dumps(timeline_entry))
+        self.r_stats.ltrim('ml_detector:timeline', 0, 999)
 
         self.stats['ads_detected'] += 1
 
