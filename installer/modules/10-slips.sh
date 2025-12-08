@@ -56,6 +56,9 @@ install_slips() {
     # Install Karen's IPS ML integration modules
     install_karens_ips_ml_modules
 
+    # Patch SLIPS for Redis DB 1 connection
+    patch_slips_redis_db
+
     # Patch SLIPS for bridge interface support
     patch_slips_bridge_support
 
@@ -584,6 +587,51 @@ verify_slips() {
     fi
 }
 
+patch_slips_redis_db() {
+    log "Installing SLIPS Redis DB 1 patch..."
+
+    local karens_ips_dir
+    karens_ips_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    
+    local source_file="$karens_ips_dir/StratosphereLinuxIPS/slips_files/core/database/redis_db/database.py"
+    local dest_file="$SLIPS_DIR/slips_files/core/database/redis_db/database.py"
+
+    if [[ ! -f "$source_file" ]]; then
+        warn "Patched database.py not found at: $source_file"
+        warn "Skipping Redis DB 1 patch"
+        return 0
+    fi
+
+    if [[ ! -f "$dest_file" ]]; then
+        warn "Destination database.py not found at: $dest_file"
+        warn "Skipping Redis DB 1 patch"
+        return 0
+    fi
+
+    # Check if already patched (look for db=1 in redis connection)
+    if grep -q "db=1" "$dest_file"; then
+        success "SLIPS Redis DB 1 patch already applied"
+        return 0
+    fi
+
+    log "Backing up original database.py..."
+    cp "$dest_file" "${dest_file}.backup"
+
+    log "Installing patched database.py for Redis DB 1..."
+    if cp "$source_file" "$dest_file"; then
+        success "Redis DB 1 patch installed successfully"
+        if grep -q "db=1" "$dest_file"; then
+            success "✓ Redis DB 1 patch verification successful"
+        else
+            warn "File copied but verification failed"
+        fi
+    else
+        warn "Failed to copy patched database.py"
+    fi
+
+    return 0
+}
+
 patch_slips_bridge_support() {
     log "═══════════════════════════════════════════════"
     log "Installing SLIPS bridge interface support..."
@@ -645,7 +693,7 @@ patch_slips_bridge_support() {
     return 0
 }
 
-configure_suricata_webui_permissions() {
+export -f patch_slips_redis_db patch_slips_bridge_support() {
     log "Configuring web interface permissions for Suricata management..."
     
     local sudoers_file="/etc/sudoers.d/slips-webui"
