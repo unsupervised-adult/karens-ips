@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 module_05_log_protection() {
-    log_info "Setting up log disk protection with loop-mounted images..."
+    log "Setting up log disk protection with loop-mounted images..."
 
     local IMG_DIR="/srv/images"
     declare -A DIR_SIZES=(
@@ -15,7 +15,7 @@ module_05_log_protection() {
     mkdir -p "$IMG_DIR"
 
     if ! command -v rsync &> /dev/null; then
-        log_info "Installing rsync..."
+        log "Installing rsync..."
         apt-get update && apt-get install -y rsync || handle_error "Failed to install rsync"
     fi
 
@@ -25,7 +25,7 @@ module_05_log_protection() {
         local IMG="$IMG_DIR/${SAFE_NAME}.img"
         local TEMP="/mnt/temp_${SAFE_NAME}"
 
-        log_info "Creating ${SZ} image for $D at $IMG"
+        log "Creating ${SZ} image for $D at $IMG"
         
         fallocate -l "$SZ" "$IMG" || handle_error "Failed to create image $IMG"
         mkfs.ext4 -F "$IMG" || handle_error "Failed to format image $IMG"
@@ -35,7 +35,7 @@ module_05_log_protection() {
 
         mkdir -p "$D"
         if [ -d "$D" ] && [ "$(ls -A $D 2>/dev/null)" ]; then
-            log_info "Copying existing data from $D to image"
+            log "Copying existing data from $D to image"
             rsync -aAX --numeric-ids "$D/" "$TEMP/" 2>/dev/null || log_warn "rsync for $D had errors (may be empty)"
         fi
         
@@ -55,7 +55,7 @@ module_05_log_protection() {
 
         if ! grep -qF "$IMG $D" /etc/fstab; then
             echo "$IMG $D ext4 $FSTAB_OPTS 0 2" >> /etc/fstab
-            log_info "Added $D to /etc/fstab"
+            log "Added $D to /etc/fstab"
         fi
 
         log_success "Mounted $IMG at $D"
