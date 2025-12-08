@@ -62,6 +62,10 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 
 - ✅ Real-time ad detection visualization
 - ✅ QUIC/HTTP3 protocol detection (YouTube, streaming video ads)
+- ✅ **Adaptive learning**: SLIPS ML engine learns ad patterns and unique signatures over time
+- ✅ **Multi-source correlation**: Cross-references blocklist DB (338K+ domains), SLIPS behavioral analysis, and temporal patterns
+- ✅ **Flow-level blocking**: Surgical drops via conntrack - blocks ad flow without affecting CDN IPs
+- ✅ **Universal video ad signatures**: Recognizes 6s bumper, 15s/30s non-skippable, skip-after-5 patterns across all platforms
 - ✅ Detection timeline charts (ads vs legitimate traffic)
 - ✅ Feature importance analysis with timing/size patterns
 - ✅ Model performance metrics (45.59% detection rate, 85% accuracy)
@@ -501,16 +505,132 @@ Edit `/etc/karens-ips/blocklists.yaml` to customize:
 - **Statistics Cards**: Total analyzed, ads detected, legitimate traffic, accuracy
 - **Timeline Chart**: Real-time ad detection trends (Chart.js)
 - **Feature Importance**: ML model feature weights visualization
-- **Recent Detections**: Searchable, sortable table with confidence scores
+- **Recent Detections**: Searchable, sortable table with confidence scores (shows detection source: Blocklist, ML, SLIPS, Flow pattern)
 - **Alerts**: High-priority ML detector alerts
 - **Suricata Stats**: Real-time packet counts, alerts, blocked IPs
 - **Auto-refresh**: Live updates every 5 seconds
+
+### Intelligent Ad Detection System
+
+**Multi-Layer Detection Pipeline:**
+
+1. **Blocklist Database** (338K+ domains from Perflyst, hagezi)
+   - Instant lookup: `ade.googlesyndication.com` → 95% confidence
+   - Covers known ad servers, tracking domains, telemetry endpoints
+
+2. **Universal Video Ad Patterns** (Platform-agnostic temporal signatures)
+   - 6-second bumper ads (non-skippable)
+   - 15-20 second forced ads
+   - 30-second+ ads with skip-after-5 behavior
+   - Bitrate analysis: Ads use lower quality encoding (1100-1300 bytes/packet vs 1350-1500 for content)
+   - Works across YouTube, Twitch, Hulu, streaming platforms
+
+3. **SLIPS Behavioral Analysis Integration**
+   - Correlates flow data with SLIPS threat intelligence
+   - Checks for malicious IP alerts, suspicious activity timelines
+   - Learns unique ad server behavior patterns over time
+   - Improves detection accuracy through continuous behavioral profiling
+
+4. **ML Flow Pattern Recognition**
+   - Duration analysis (short flows = likely ads)
+   - Packet rate vs byte rate correlation
+   - QUIC protocol-specific signatures
+   - YouTube connection caching and pattern learning
+
+**Adaptive Learning:**
+
+- SLIPS ML engine stores ad patterns in Redis (`ml_detector:youtube_quic_patterns`)
+- Builds confidence profiles for IP addresses over time
+- Learns advertiser-specific signatures (e.g., Google's ad CDN patterns)
+- Continuously improves detection accuracy with each analyzed flow
+
+**Three-Tier Blocking Architecture:**
+
+The system uses three complementary blocking mechanisms based on detection confidence and network layer:
+
+1. **Suricata Rule-Based Blocking** (Signature + Dataset matching)
+   - Dataset lookup: 338K+ domains from blocklist DB
+   - TLS SNI inspection: Blocks at handshake (bypasses DNS, works for HTTPS)
+   - Protocol-aware rules: ET Open, TrafficID, custom family filters
+   - Best for: Known malicious domains, protocol violations, immediate drops
+
+2. **TLS SNI Inspection** (Middle-ground HTTPS blocking)
+   - Intercepts TLS Client Hello SNI field
+   - Matches against unified DNS blocklist dataset
+   - Blocks connection before encryption completes
+   - Best for: HTTPS ad servers, tracking domains, bypassing DNS-based blocking
+
+3. **ML-Driven Flow Termination** (Behavioral + Pattern analysis)
+   - Conntrack flow drops for CDN-served ads
+   - Multi-source detection pipeline (Blocklist + Pattern + SLIPS + ML)
+   - Surgical termination of specific connections
+   - Best for: Dynamic content, CDN-hosted ads, QUIC/HTTP3 streams
+
+**Smart Blocking Strategy:**
+
+| Scenario | Domain Example | IP Type | Confidence | Primary Action | Fallback |
+|----------|---------------|---------|------------|----------------|----------|
+| Known ad domain | `ads.example.com` | Any IP | 95% (dataset) | **Suricata DROP** via rule match | N/A - Immediate |
+| HTTPS ad server | `ade.googlesyndication.com` | Any IP | 95% (blocklist) | **TLS SNI block** at handshake | Flow drop if SNI missed |
+| Ad on CDN (QUIC) | `r5---sn-*.googlevideo.com` | Google CDN | 85% (pattern) + 88% (flow) = 90% + 5% boost | **Flow drop** via conntrack | Monitor (CDN shared IP) |
+| Dedicated ad server | `ad.doubleclick.net` | Dedicated IP | 90% (blocklist) + 75% (pattern) = 90% + 5% boost | **IP block** via nftables | Suricata rule |
+| Unknown short video | `cdn.example.com` | CDN IP | 70% (pattern only) | **Monitor only** | Escalate on repeat |
+| Multi-layer detection | `pagead2.googlesyndication.com` | Google CDN | 95% (blocklist) + 88% (flow) + 75% (SLIPS) = **96%** | **TLS SNI block** + Flow drop | IP block |
+
+**Confidence Boosting:**
+
+- Multiple detection sources increase confidence
+- Each additional confirming source adds 5% (max 15% boost)
+- Example: Blocklist hit + Flow pattern match + SLIPS correlation = 3 sources = +10% confidence
+- Prevents false positives while maximizing ad blocking effectiveness
+
+**Private Network Exemption & Directional Blocking:**
+
+The system uses **destination-based blocking** - it blocks where traffic is going, never the source device:
+
+- **RFC1918 source addresses never blocked**: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+- **Link-local exempt**: 169.254.0.0/16 (APIPA), fe80::/10 (IPv6 link-local)
+- **Loopback exempt**: 127.0.0.0/8, ::1/128
+- **IoT devices are never blocked** - only their outbound connections to malicious destinations
+
+**How Directional Blocking Works:**
+
+```
+IoT Device (10.10.1.50) → ads.tracking.com (8.8.8.8)
+   ↓
+NFQUEUE forwards to Suricata
+   ↓
+Suricata matches "ads.tracking.com" in dataset
+   ↓
+DROP verdict blocks OUTBOUND connection to 8.8.8.8
+   ↓
+IoT device (10.10.1.50) remains fully functional for legitimate traffic
+```
+
+**Traffic Direction Logic:**
+
+- **Outbound (LAN → Internet)**: Block destination IPs/domains from blocklists via NFQUEUE
+  - Example: SmartTV (192.168.1.20) tries to reach telemetry.samsung.com → **BLOCKED**
+  - SmartTV can still access Netflix, YouTube, legitimate services
+  
+- **Inbound (Internet → LAN)**: Block source IPs from threat feeds
+  - Example: Botnet IP (1.2.3.4) tries to reach your server → **BLOCKED**
+  - Your devices remain accessible from legitimate sources
+
+- **Internal (LAN → LAN)**: Always permitted
+  - Example: Phone (192.168.1.10) → NAS (192.168.1.100) → **ALLOWED**
+  - All RFC1918-to-RFC1918 traffic passes through unchecked
+
+This ensures your IoT devices, printers, NAS, and servers are never blocked - only their attempts to reach malicious/ad/tracking destinations on the public internet are stopped.
 
 ### Technical Details
 
 - **Backend**: Flask Blueprint integrated into SLIPS
 - **Frontend**: Chart.js for charts, DataTables for tables
 - **Data Storage**: Redis database 1 (persistent SLIPS data)
+- **Learning Storage**: Redis lists for YouTube QUIC patterns (10K pattern history)
+- **Blocklist Integration**: SQLite database query for domain lookups
+- **Flow Control**: Conntrack for surgical connection termination
 - **Security**: Input validation, error handling, no info disclosure
 - **TLS SNI Blocking**: Integrated with DNS blocklist infrastructure (338K+ domains)
 

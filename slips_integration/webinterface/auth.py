@@ -69,3 +69,36 @@ def logout():
     """Logout and clear session."""
     session.clear()
     return redirect(url_for('auth.login'))
+
+@auth_bp.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    """Change password page and handler."""
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        # Validate current password
+        if not check_password(current_password):
+            return render_template('change_password.html', error='Current password is incorrect')
+
+        # Validate new password
+        if len(new_password) < 8:
+            return render_template('change_password.html', error='New password must be at least 8 characters')
+
+        if new_password != confirm_password:
+            return render_template('change_password.html', error='New passwords do not match')
+
+        # Hash and save new password
+        password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        
+        os.makedirs(os.path.dirname(PASSWORD_FILE), exist_ok=True)
+        with open(PASSWORD_FILE, 'wb') as f:
+            f.write(password_hash)
+
+        # Logout to force re-login
+        session.clear()
+        return redirect(url_for('auth.login', changed=1))
+
+    return render_template('change_password.html')

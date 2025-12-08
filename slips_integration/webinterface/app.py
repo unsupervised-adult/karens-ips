@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2021 Sebastian Garcia <sebastian.garcia@agents.fel.cvut.cz>
 # SPDX-License-Identifier: GPL-2.0-only
+import os
 from flask import Flask, render_template, redirect, url_for
 
 from slips_files.common.parsers.config_parser import ConfigParser
@@ -11,11 +12,14 @@ from .analysis.analysis import analysis
 from .general.general import general
 from .documentation.documentation import documentation
 from .utils import get_open_redis_ports_in_order
+from .auth import auth_bp, login_required
 
 
 def create_app():
     app = Flask(__name__)
     app.config["JSON_SORT_KEYS"] = False  # disable sorting of timewindows
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(32))
+    app.config["PERMANENT_SESSION_LIFETIME"] = 3600  # 1 hour session
     return app
 
 
@@ -23,6 +27,7 @@ app = create_app()
 
 # Register blueprints - MUST be outside if __name__ == "__main__"
 # because webinterface.sh runs with "python3 -m webinterface.app"
+app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(analysis, url_prefix="/analysis")
 app.register_blueprint(general, url_prefix="/general")
 app.register_blueprint(documentation, url_prefix="/documentation")
@@ -39,9 +44,10 @@ def read_redis_port():
     res = get_open_redis_ports_in_order()
     return {"data": res}
 
-
 @app.route("/")
+@login_required
 def index():
+    return render_template("app.html", title="Slips")
     return render_template("app.html", title="Slips")
 
 
@@ -73,4 +79,4 @@ def set_pcap_info():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=ConfigParser().web_interface_port)
+    app.run(host="127.0.0.1", port=ConfigParser().web_interface_port)

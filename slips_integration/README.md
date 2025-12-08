@@ -193,12 +193,12 @@ Behavioral analysis using SLIPS core detection engine:
 - Legitimate traffic
 - Model accuracy
 
-### QUIC Stream Blocking (Yellow Cards)
+### QUIC/HTTP3 Stream Analysis (Yellow Cards)
 
-Real-time QUIC (UDP/443) stream inspection and blocking:
+Real-time protocol inspection for syndication networks and telemetry:
 - Total streams analyzed
-- Advertisement streams blocked
-- Unique IPs blocked
+- Suspicious flows filtered
+- Unique endpoints blocked
 - Service status (Active/Monitoring/Not Running)
 
 ### Visualizations
@@ -218,9 +218,9 @@ Real-time QUIC (UDP/443) stream inspection and blocking:
 - Features used
 - Last training date
 
-## QUIC Stream Ad Blocker
+## QUIC/HTTP3 Stream Analysis Engine
 
-The stream_ad_blocker.py service provides real-time QUIC stream analysis and advertisement blocking for video platforms (YouTube, streaming services, etc.).
+The stream_ad_blocker.py service provides real-time QUIC stream analysis and filtering for syndication networks and telemetry endpoints.
 
 ### Features
 

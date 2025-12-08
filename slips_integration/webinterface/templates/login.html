@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Karen's IPS - Login</title>
+    <title>Login</title>
     <style>
         * {
             margin: 0;
@@ -12,182 +12,62 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #1a1a1a;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            width: 100%;
-            max-width: 400px;
-            animation: slideIn 0.5s ease-out;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .logo {
+        .container {
             text-align: center;
-            margin-bottom: 30px;
         }
 
-        .logo h1 {
-            color: #667eea;
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 5px;
+        form {
+            display: inline-block;
         }
 
-        .logo p {
-            color: #6c757d;
-            font-size: 0.9rem;
+        input[type="password"] {
+            padding: 12px 20px;
+            width: 300px;
+            border: 2px solid #444;
+            border-radius: 6px;
+            font-size: 16px;
+            background: #2a2a2a;
+            color: #fff;
+            transition: border-color 0.2s;
         }
 
-        .login-form {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .form-group label {
-            color: #495057;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .form-group input {
-            padding: 12px 15px;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            font-size: 1rem;
-            transition: all 0.3s;
-            background: #f8f9fa;
-        }
-
-        .form-group input:focus {
+        input[type="password"]:focus {
             outline: none;
-            border-color: #667eea;
-            background: white;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #666;
         }
 
-        .submit-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 14px;
-            border: none;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 10px;
+        .error {
+            color: #ff6b6b;
+            font-size: 14px;
+            margin-bottom: 15px;
         }
 
-        .submit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
-        }
-
-        .submit-btn:active {
-            transform: translateY(0);
-        }
-
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 12px;
-            border-radius: 10px;
-            border-left: 4px solid #dc3545;
-            display: none;
-            animation: shake 0.5s;
-        }
-
-        .error-message.show {
-            display: block;
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-            20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 20px;
-            color: #6c757d;
-            font-size: 0.85rem;
+        .success {
+            color: #51cf66;
+            font-size: 14px;
+            margin-bottom: 15px;
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="logo">
-            <h1>Karen's IPS</h1>
-            <p>Intrusion Prevention System</p>
-        </div>
-
-        <div id="error-message" class="error-message">
-            Invalid password. Please try again.
-        </div>
-
-        <form class="login-form" method="POST" action="/login" id="login-form">
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    required
-                    autofocus
-                    autocomplete="current-password"
-                    placeholder="Enter your password"
-                >
-            </div>
-
-            <button type="submit" class="submit-btn">Sign In</button>
+    <div class="container">
+        {% if request.args.get('error') == '1' %}
+        <div class="error">Invalid password</div>
+        {% endif %}
+        {% if request.args.get('changed') == '1' %}
+        <div class="success">Password changed successfully</div>
+        {% endif %}
+        <form method="POST">
+            <input type="password" name="password" placeholder="Password" required autofocus autocomplete="current-password">
         </form>
-
-        <div class="footer">
-            &copy; 2025 Karen's IPS &middot; ML-Powered Network Security
-        </div>
     </div>
-
-    <script>
-        // Show error message if login failed
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('error') === '1') {
-            document.getElementById('error-message').classList.add('show');
-            document.getElementById('password').value = '';
-            document.getElementById('password').focus();
-        }
-
-        // Clear error on input
-        document.getElementById('password').addEventListener('input', function() {
-            document.getElementById('error-message').classList.remove('show');
-        });
-    </script>
 </body>
 </html>
