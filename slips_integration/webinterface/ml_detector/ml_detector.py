@@ -189,6 +189,54 @@ def get_stats():
         return jsonify({"data": demo_stats})
 
 
+@ml_detector.route("/stream_stats")
+def get_stream_stats():
+    """
+    Get QUIC stream ad blocker statistics (separate from SLIPS evidence-based stats)
+    Returns: Stream-specific detection stats from stream_ad_blocker service
+    """
+    try:
+        stats_raw = db.rdb.r.hgetall("stream_ad_blocker:stats")
+
+        if stats_raw:
+            stats = {k.decode() if isinstance(k, bytes) else k:
+                     v.decode() if isinstance(v, bytes) else v
+                     for k, v in stats_raw.items()}
+
+            return jsonify({
+                "success": True,
+                "data": {
+                    "total_analyzed": stats.get("total_analyzed", "0"),
+                    "ads_detected": stats.get("ads_detected", "0"),
+                    "ips_blocked": stats.get("ips_blocked", "0"),
+                    "urls_blocked": stats.get("urls_blocked", "0"),
+                    "legitimate_traffic": stats.get("legitimate_traffic", "0"),
+                    "last_update": stats.get("last_update", "Never"),
+                    "blocking_status": stats.get("blocking_status", "Unknown")
+                }
+            })
+        else:
+            # No stream stats yet
+            return jsonify({
+                "success": True,
+                "data": {
+                    "total_analyzed": "0",
+                    "ads_detected": "0",
+                    "ips_blocked": "0",
+                    "urls_blocked": "0",
+                    "legitimate_traffic": "0",
+                    "last_update": "Never",
+                    "blocking_status": "Not Running"
+                }
+            })
+    except Exception as e:
+        logger.error(f"Error fetching stream stats: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 @ml_detector.route("/settings")
 def get_settings():
     """Get current detector configuration"""
