@@ -121,8 +121,8 @@ setup_slips_venv() {
     # Install core ML and Redis dependencies first
     pip install scikit-learn joblib numpy pandas redis || error_exit "Failed to install core ML dependencies - SLIPS cannot function without these"
 
-    # Install additional dependencies for Karen's IPS integration
-    pip install flask flask-socketio eventlet || warn "Failed to install web dependencies"
+    # Install additional dependencies for Karen's IPS integration and authentication
+    pip install flask flask-socketio eventlet bcrypt || warn "Failed to install web dependencies"
 
     # Install SLIPS requirements
     if [[ -f install/requirements.txt ]]; then

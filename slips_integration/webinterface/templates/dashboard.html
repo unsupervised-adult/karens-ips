@@ -119,10 +119,39 @@
         </div>
 
         <div class="card">
-            <h2>ML Detector Dashboard</h2>
-            <p>ML detection dashboard will be integrated here.</p>
-            <p style="margin-top: 10px; color: #666;">Access the full SLIPS interface at port 55000</p>
+            <h2>Quick Access</h2>
+            <div class="links">
+                <a href="/ml_detector/" class="link-button">ML Stream Ad Detector</a>
+                <a href="/suricata/" class="link-button">Suricata IPS Configuration</a>
+            </div>
         </div>
     </main>
+
+    <style>
+        .links {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .link-button {
+            flex: 1;
+            min-width: 200px;
+            padding: 20px;
+            background: #f9f9f9;
+            border: 2px solid #000;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #000;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .link-button:hover {
+            background: #000;
+            color: #fff;
+        }
+    </style>
 </body>
 </html>

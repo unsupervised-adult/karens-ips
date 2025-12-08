@@ -4,6 +4,7 @@ Simple standalone web interface for Karen's IPS ML Detector
 Minimal login with username then password entry
 """
 import os
+import sys
 import secrets
 from flask import Flask, render_template, request, session, redirect, url_for, jsonify
 from functools import wraps
@@ -11,10 +12,28 @@ from functools import wraps
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 app.config["PERMANENT_SESSION_LIFETIME"] = 3600  # 1 hour
+app.config["JSON_SORT_KEYS"] = False
 
 # Simple hardcoded credentials (change these!)
 USERNAME = "admin"
 PASSWORD = "karens-ips-2025"
+
+# Register blueprints for ML detector and Suricata pages
+try:
+    # Add parent directory to path for imports
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+    from ml_detector.ml_detector import ml_detector
+    from suricata_config.suricata_config import suricata_bp
+
+    app.register_blueprint(ml_detector, url_prefix="/ml_detector")
+    app.register_blueprint(suricata_bp, url_prefix="/suricata")
+
+    BLUEPRINTS_LOADED = True
+except ImportError as e:
+    print(f"Warning: Could not import blueprints: {e}")
+    print("ML Detector and Suricata pages will not be available")
+    BLUEPRINTS_LOADED = False
 
 
 def login_required(f):
@@ -24,6 +43,15 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+
+@app.before_request
+def require_login():
+    """Protect all routes except login and auth with authentication"""
+    allowed_routes = ['login', 'authenticate', 'static']
+    if request.endpoint and request.endpoint not in allowed_routes:
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
 
 
 @app.route('/')
