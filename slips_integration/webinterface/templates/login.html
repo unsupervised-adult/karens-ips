@@ -78,9 +78,10 @@
                             step = 'password';
                             input.value = '';
                             input.type = 'password';
+                            input.placeholder = 'Enter password';
                             errorDiv.style.display = 'none';
                         } else if (result.next === 'dashboard') {
-                            window.location.href = '/dashboard';
+                            window.location.href = '/';
                         }
                     } else {
                         errorDiv.textContent = result.message || 'Access denied';

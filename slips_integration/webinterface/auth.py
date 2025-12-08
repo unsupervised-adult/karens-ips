@@ -55,9 +55,16 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
+@auth_bp.route('/login', methods=['GET'])
 def login():
-    """Login page and handler with rate limiting."""
+    """Login page."""
+    return render_template('login.html')
+
+@auth_bp.route('/auth', methods=['POST'])
+def auth():
+    """AJAX authentication endpoint for two-step login."""
+    from flask import jsonify
+    
     client_ip = request.headers.get('X-Real-IP', request.remote_addr)
     current_time = time()
     
@@ -70,30 +77,43 @@ def login():
     # Check if IP is locked out
     if len(failed_attempts[client_ip]) >= MAX_ATTEMPTS:
         time_remaining = int(LOCKOUT_DURATION - (current_time - failed_attempts[client_ip][0]))
-        return render_template('login.html', locked=True, time_remaining=time_remaining)
-        return render_template('login.html', 
-                             error='too_many_attempts',
-                             lockout_time=time_remaining)
+        return jsonify({
+            'success': False,
+            'message': f'Too many attempts. Try again in {time_remaining} seconds.'
+        }), 429
     
-    if request.method == 'POST':
-        password = request.form.get('password', '')
-
-        if check_password(password):
+    data = request.get_json()
+    step = data.get('step')
+    value = data.get('value')
+    
+    if step == 'username':
+        # Store username in session and request password
+        if value == 'admin':  # Only accept 'admin' username
+            session['temp_username'] = value
+            return jsonify({'success': True, 'next': 'password'})
+        else:
+            failed_attempts[client_ip].append(current_time)
+            return jsonify({'success': False, 'message': 'Invalid username'})
+    
+    elif step == 'password':
+        # Verify password
+        if check_password(value):
             # Success - clear failed attempts
             failed_attempts[client_ip] = []
+            session.pop('temp_username', None)
             session['authenticated'] = True
             session.permanent = True
-            return redirect(url_for('index'))
+            return jsonify({'success': True, 'next': 'dashboard'})
         else:
             # Failed - record attempt
             failed_attempts[client_ip].append(current_time)
             attempts_left = MAX_ATTEMPTS - len(failed_attempts[client_ip])
-            return redirect(url_for('auth.login', 
-                                  error=1, 
-                                  attempts_left=attempts_left))
-
-    # GET request - show login page
-    return render_template('login.html')
+            return jsonify({
+                'success': False, 
+                'message': f'Invalid password. {attempts_left} attempts remaining.'
+            })
+    
+    return jsonify({'success': False, 'message': 'Invalid request'}), 400
 
 @auth_bp.route('/logout')
 def logout():
