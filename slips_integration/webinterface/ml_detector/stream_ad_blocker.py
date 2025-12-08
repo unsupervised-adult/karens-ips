@@ -506,7 +506,7 @@ class StreamAdBlocker:
 
                     seen_domains = all_domains
 
-                # Update stats in Redis (using separate key to avoid conflict with simple_ml_feeder)
+                # Update stats in Redis - write to ml_detector:stats for dashboard display
                 stats_update = {
                     'total_analyzed': str(self.stats['total_analyzed']),
                     'stream_ads_detected': str(self.stats['ads_detected']),
@@ -516,6 +516,9 @@ class StreamAdBlocker:
                     'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'blocking_status': 'Active' if blocking_enabled else 'Monitoring Only'
                 }
+                # Write to ml_detector:stats (for ML Dashboard web UI)
+                self.r_stats.hset('ml_detector:stats', mapping=stats_update)
+                # Also write to stream_ad_blocker:stats (for backwards compatibility)
                 self.r_stats.hset('stream_ad_blocker:stats', mapping=stats_update)
 
             except Exception as e:
