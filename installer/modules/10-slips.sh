@@ -346,7 +346,7 @@ setup_slips_directories() {
     cd "$SLIPS_DIR" || error_exit "Failed to change to SLIPS directory"
 
     # Make slips executable
-    chmod +x slips.py
+    [ -f slips.py ] && chmod +x slips.py || warn "slips.py not found, skipping chmod"
 
     # Create log directory
     mkdir -p /var/log/slips
