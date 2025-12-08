@@ -191,6 +191,19 @@ AUTH_PAGE_EOF
 configure_authentication() {
     log_subsection "Authentication Setup"
 
+    # Ensure latest auth.py and login.html are deployed
+    local karens_ips_dir
+    karens_ips_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    local source_webinterface_dir="$karens_ips_dir/slips_integration/webinterface"
+    local webinterface_dir="/opt/StratosphereLinuxIPS/modules/kalipso/kalipso"
+
+    if [[ -f "$source_webinterface_dir/auth.py" ]] && [[ -d "$webinterface_dir" ]]; then
+        log "Updating auth.py and login.html..."
+        cp "$source_webinterface_dir/auth.py" "$webinterface_dir/auth.py" 2>/dev/null || true
+        cp "$source_webinterface_dir/templates/login.html" "$webinterface_dir/templates/login.html" 2>/dev/null || true
+        success "Web interface authentication files updated"
+    fi
+
     local htpasswd_file="/etc/nginx/.htpasswd"
 
     if [[ -f "$htpasswd_file" ]]; then
