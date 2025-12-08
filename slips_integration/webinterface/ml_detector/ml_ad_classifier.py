@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 ML-based Ad Traffic Classifier
-Combines pattern matching with machine learning to detect ad traffic
+Recognizes universal video ad patterns: duration, skip timing, bitrate signatures
+Works across YouTube, Twitch, Hulu, etc. - ads have consistent temporal patterns
 """
 import redis
 import json
@@ -27,10 +28,104 @@ class MLAdClassifier:
             'scorecardresearch', 'moatads', 'addthis', 'sharethis'
         ]
         
+        # Universal video ad temporal patterns (platform-agnostic)
+        self.universal_ad_signatures = {
+            'bumper': {
+                'duration': (1, 6),           # 6-second non-skippable
+                'skip_time': None,
+                'bitrate_range': (500, 2000),  # Lower quality
+                'confidence': 0.95
+            },
+            'skippable_standard': {
+                'duration': (15, 90),          # 15-90 seconds
+                'skip_time': (5, 6),           # Skip after 5 seconds
+                'bitrate_range': (800, 3000),
+                'confidence': 0.90
+            },
+            'non_skippable_15': {
+                'duration': (13, 17),          # 15-second forced
+                'skip_time': None,
+                'bitrate_range': (800, 3000),
+                'confidence': 0.92
+            },
+            'non_skippable_20': {
+                'duration': (18, 22),          # 20-second forced
+                'skip_time': None,
+                'bitrate_range': (800, 3000),
+                'confidence': 0.92
+            },
+            'non_skippable_30': {
+                'duration': (28, 32),          # 30-second forced
+                'skip_time': None,
+                'bitrate_range': (800, 3000),
+                'confidence': 0.90
+            },
+            'mid_roll_short': {
+                'duration': (10, 20),          # Mid-video interruption
+                'skip_time': (5, 6),
+                'bitrate_range': (800, 3000),
+                'confidence': 0.85
+            },
+            'pre_roll_long': {
+                'duration': (30, 180),         # Long pre-roll
+                'skip_time': (5, 6),
+                'bitrate_range': (1000, 4000),
+                'confidence': 0.88
+            }
+        }
+        
         if os.path.exists(self.model_path):
             self.load_model()
         else:
             self.train_initial_model()
+    
+    def detect_video_ad_pattern(self, duration, bytes_transferred, skip_detected=False):
+        """
+        Detect universal video ad patterns based on temporal signatures
+        Returns: (is_ad, ad_type, confidence)
+        """
+        if duration <= 0:
+            return False, None, 0.0
+        
+        # Calculate approximate bitrate (Kbps)
+        bitrate = (bytes_transferred * 8) / (duration * 1000)
+        
+        best_match = None
+        best_confidence = 0.0
+        
+        for ad_type, signature in self.universal_ad_signatures.items():
+            min_dur, max_dur = signature['duration']
+            min_br, max_br = signature['bitrate_range']
+            
+            # Check duration match
+            if min_dur <= duration <= max_dur:
+                confidence = signature['confidence']
+                
+                # Boost confidence if bitrate is in expected range
+                if min_br <= bitrate <= max_br:
+                    confidence += 0.05
+                
+                # Boost confidence if skip was detected at expected time
+                if signature['skip_time'] and skip_detected:
+                    confidence += 0.05
+                
+                # Non-skippable ads are more certain if no skip detected
+                if signature['skip_time'] is None and not skip_detected:
+                    confidence += 0.03
+                
+                if confidence > best_confidence:
+                    best_confidence = min(1.0, confidence)
+                    best_match = ad_type
+        
+        if best_match:
+            return True, best_match, best_confidence
+        
+        # Check for suspicious patterns even without exact match
+        # Short videos with low bitrate = likely ads
+        if 5 <= duration <= 60 and bitrate < 2000:
+            return True, 'unknown_short_ad', 0.70
+        
+        return False, None, 0.0
     
     def extract_flow_features(self, profile_data, dst_ip, dst_port):
         """Extract ML features from SLIPS flow data"""

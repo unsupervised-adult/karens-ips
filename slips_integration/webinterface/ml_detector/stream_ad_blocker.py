@@ -2,11 +2,13 @@
 """
 Stream Ad Blocker - Real-time detection and blocking of in-stream ads
 Monitors SLIPS flow data and automatically blocks detected ad traffic
+Cross-references with blocklist database (338K+ domains) and SLIPS behavioral analysis
 """
 import redis
 import json
 import time
 import subprocess
+import sqlite3
 from datetime import datetime
 from collections import defaultdict
 import sys
@@ -29,8 +31,23 @@ class StreamAdBlocker:
             'ads_detected': 0,
             'ips_blocked': 0,
             'urls_blocked': 0,
-            'total_analyzed': 0
+            'flows_dropped': 0,
+            'total_analyzed': 0,
+            'blocklist_hits': 0,
+            'ml_detections': 0,
+            'slips_correlated': 0,
+            'cdn_flow_blocks': 0,
+            'ad_server_blocks': 0
         }
+        
+        # Connect to blocklist database
+        self.blocklist_db = None
+        try:
+            self.blocklist_db = sqlite3.connect('/var/lib/suricata/ips_filter.db', check_same_thread=False)
+            domain_count = self.blocklist_db.execute("SELECT COUNT(*) FROM blocked_domains").fetchone()[0]
+            print(f"✅ Connected to blocklist DB: {domain_count:,} domains")
+        except Exception as e:
+            print(f"⚠️  Blocklist DB unavailable: {e}")
 
         # Initialize ML classifier
         try:
@@ -93,6 +110,82 @@ class StreamAdBlocker:
             'post_roll': {'min_dur': 5, 'max_dur': 30, 'location': 'video_end'}
         }
 
+    def check_blocklist_db(self, domain):
+        """
+        Query blocklist database for domain
+        Returns: (is_blocked, category, confidence)
+        """
+        if not self.blocklist_db:
+            return False, None, 0.0
+        
+        try:
+            # Check exact match first
+            cursor = self.blocklist_db.execute(
+                "SELECT category FROM blocked_domains WHERE domain = ? LIMIT 1",
+                (domain,)
+            )
+            result = cursor.fetchone()
+            if result:
+                self.stats['blocklist_hits'] += 1
+                return True, result[0], 0.95
+            
+            # Check subdomain matches (e.g., ads.example.com matches example.com)
+            parts = domain.split('.')
+            for i in range(len(parts) - 1):
+                parent = '.'.join(parts[i+1:])
+                cursor = self.blocklist_db.execute(
+                    "SELECT category FROM blocked_domains WHERE domain = ? LIMIT 1",
+                    (parent,)
+                )
+                result = cursor.fetchone()
+                if result:
+                    self.stats['blocklist_hits'] += 1
+                    return True, result[0], 0.85
+            
+            return False, None, 0.0
+        except Exception as e:
+            print(f"⚠️  Blocklist DB query failed: {e}")
+            return False, None, 0.0
+    
+    def get_slips_evidence(self, src_ip, dst_ip):
+        """
+        Query SLIPS for behavioral evidence about this traffic
+        Returns: (threat_level, evidence_list, confidence)
+        """
+        try:
+            # Check if SLIPS has flagged this IP
+            evidence = []
+            threat_level = 0.0
+            
+            # Check for alerts on source IP
+            src_alerts = self.r.get(f"alerts:{src_ip}")
+            if src_alerts:
+                evidence.append(f"Source IP has alerts")
+                threat_level += 0.3
+            
+            # Check for alerts on destination IP
+            dst_alerts = self.r.get(f"alerts:{dst_ip}")
+            if dst_alerts:
+                evidence.append(f"Destination IP has alerts")
+                threat_level += 0.4
+            
+            # Check timeline for this profile
+            profile_key = f"profile_{src_ip}"
+            timeline = self.r.hgetall(f"{profile_key}_timeline")
+            if timeline:
+                # Parse timeline for suspicious activities
+                suspicious_count = sum(1 for k, v in timeline.items() if 'malicious' in str(v).lower())
+                if suspicious_count > 0:
+                    evidence.append(f"{suspicious_count} malicious activities")
+                    threat_level += min(0.3, suspicious_count * 0.1)
+            
+            if evidence:
+                self.stats['slips_correlated'] += 1
+            
+            return threat_level, evidence, min(threat_level, 1.0)
+        except Exception as e:
+            return 0.0, [], 0.0
+    
     def is_ad_domain(self, domain):
         """Check if domain matches ad patterns"""
         domain_lower = domain.lower()
@@ -230,8 +323,57 @@ class StreamAdBlocker:
         except (ValueError, IndexError):
             return True
 
+    def block_flow(self, src_ip, dst_ip, dst_port, protocol, confidence, reason):
+        """
+        Block specific flow using conntrack - surgical strike on ad flows only
+        Doesn't block entire IP, just drops this specific connection
+        Perfect for CDN IPs where legitimate content shares same IP as ads
+        """
+        if confidence < 0.75:
+            return False
+        
+        # Skip private IPs
+        if self.is_private_ip(dst_ip):
+            return False
+        
+        try:
+            # Use conntrack to drop this specific flow
+            # This terminates the connection without blocking future connections to same IP
+            proto_arg = 'udp' if protocol.upper() == 'UDP' else 'tcp'
+            cmd = f'sudo conntrack -D -p {proto_arg} --orig-dst {dst_ip} --dst-port {dst_port} --src {src_ip} 2>/dev/null'
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            
+            if result.returncode == 0 or 'flow entries' in result.stdout:
+                self.stats['flows_dropped'] += 1
+                self.stats['cdn_flow_blocks'] += 1
+                
+                # Log the flow drop
+                log_entry = {
+                    'timestamp': datetime.now().isoformat(),
+                    'action': 'drop_flow',
+                    'src_ip': src_ip,
+                    'dst_ip': dst_ip,
+                    'dst_port': dst_port,
+                    'protocol': protocol,
+                    'confidence': confidence,
+                    'reason': reason
+                }
+                self.r_stats.lpush('ml_detector:flow_drops', json.dumps(log_entry))
+                self.r_stats.ltrim('ml_detector:flow_drops', 0, 499)
+                
+                print(f"🎯 DROPPED FLOW: {src_ip} -> {dst_ip}:{dst_port} ({confidence:.0%} confidence - {reason})")
+                return True
+            
+            return False
+        except Exception as e:
+            print(f"⚠️  Flow drop failed: {e}")
+            return False
+    
     def block_ip(self, ip, reason):
-        """Block IP using nftables (uses blocked4 set from main IPS config)"""
+        """
+        Block entire IP using nftables (uses blocked4 set from main IPS config)
+        Reserved for persistent ad servers, not CDN IPs with mixed content
+        """
         if ip in self.blocked_ips:
             return True
 
@@ -247,6 +389,7 @@ class StreamAdBlocker:
             if result.returncode == 0 or "already exists" in result.stderr.lower():
                 self.blocked_ips.add(ip)
                 self.stats['ips_blocked'] += 1
+                self.stats['ad_server_blocks'] += 1
 
                 # Add to Redis blacklist
                 self.r_stats.sadd('ml_detector:blacklist:ip', ip)
@@ -402,12 +545,56 @@ class StreamAdBlocker:
                 print(f"⚪ Skipping block - URL {domain} is whitelisted")
                 return detection
 
-            # Block both IP and URL for maximum effectiveness
-            if self.block_ip(dst_ip, method):
-                blocked = True
-
+            # Determine blocking strategy based on confidence and domain type
+            is_cdn = any(cdn in domain.lower() for cdn in ['googlevideo', 'cloudfront', 'akamai', 'fastly', 'edgecast'])
+            is_known_ad_server = any(ad in domain.lower() for ad in ['doubleclick', 'googlesyndication', 'adserver', 'ads.'])
+            
+            # Strategy 1: Flow-level blocking for CDN IPs (high confidence required)
+            # This drops just this specific ad flow without blocking legit content from same IP
+            if is_cdn and confidence >= 0.80:
+                if self.block_flow(
+                    flow_data.get('src_ip', '0.0.0.0'),
+                    dst_ip,
+                    flow_data.get('dport', 443),
+                    flow_data.get('proto', 'HTTPS'),
+                    confidence,
+                    method
+                ):
+                    blocked = True
+                    detection['block_type'] = 'flow'
+                    print(f"🎯 Flow-level block: {domain} ({confidence:.0%} confidence)")
+            
+            # Strategy 2: IP-level blocking for known ad servers (lower threshold)
+            # These IPs are dedicated ad infrastructure, safe to block entirely
+            elif is_known_ad_server and confidence >= 0.70:
+                if self.block_ip(dst_ip, method):
+                    blocked = True
+                    detection['block_type'] = 'ip'
+                    print(f"🚫 IP-level block: {domain} - known ad server")
+            
+            # Strategy 3: Hybrid approach - try flow first, fallback to IP if very high confidence
+            elif confidence >= 0.90:
+                # Try flow-level first (less aggressive)
+                if self.block_flow(
+                    flow_data.get('src_ip', '0.0.0.0'),
+                    dst_ip,
+                    flow_data.get('dport', 443),
+                    flow_data.get('proto', 'HTTPS'),
+                    confidence,
+                    method
+                ):
+                    blocked = True
+                    detection['block_type'] = 'flow'
+                else:
+                    # Very high confidence + flow block failed = block IP
+                    if self.block_ip(dst_ip, method):
+                        blocked = True
+                        detection['block_type'] = 'ip_fallback'
+            
+            # Always try URL blocking via Suricata (HTTP inspection)
             if self.block_url(domain, method):
                 blocked = True
+                detection['block_type'] = detection.get('block_type', 'url') + '+url'
 
         status = "BLOCKED" if blocked else "DETECTED"
         print(f"🎯 {status}: {domain} → {dst_ip} (confidence: {confidence:.2f}, method: {method})")
@@ -454,8 +641,23 @@ class StreamAdBlocker:
                         except:
                             dst_ip = str(ip_data) if ip_data else 'Unknown'
 
-                        # Check if it's an ad domain
-                        if not self.is_ad_domain(domain):
+                        # Multi-source detection pipeline
+                        detection_sources = []
+                        confidence_scores = []
+                        
+                        # 1. Check blocklist database (338K+ domains)
+                        is_blocklisted, bl_category, bl_confidence = self.check_blocklist_db(domain)
+                        if is_blocklisted:
+                            detection_sources.append(f"Blocklist:{bl_category}")
+                            confidence_scores.append(bl_confidence)
+                        
+                        # 2. Check pattern matching
+                        if self.is_ad_domain(domain):
+                            detection_sources.append("Pattern:ad_domain")
+                            confidence_scores.append(0.75)
+
+                        # Skip if no initial indicators
+                        if not detection_sources:
                             continue
 
                         # Get flow data if available
@@ -468,25 +670,44 @@ class StreamAdBlocker:
                             'proto': 'HTTPS'
                         }
 
-                        # Analyze flow pattern
+                        # 3. Analyze flow pattern
                         is_ad_flow, flow_confidence, flow_reason = self.analyze_flow_pattern(flow_data)
+                        if is_ad_flow:
+                            detection_sources.append(f"Flow:{flow_reason}")
+                            confidence_scores.append(flow_confidence)
 
-                        # Use ML classifier if available
+                        # 4. Query SLIPS behavioral analysis
+                        slips_threat, slips_evidence, slips_confidence = self.get_slips_evidence(
+                            flow_data['src_ip'], dst_ip
+                        )
+                        if slips_threat > 0:
+                            detection_sources.append(f"SLIPS:{'+'.join(slips_evidence)}")
+                            confidence_scores.append(slips_confidence)
+
+                        # 5. Use ML classifier if available
                         if self.classifier:
                             is_ad_ml, ml_confidence, ml_method = self.classifier.classify_flow(
                                 domain, flow_data, dst_ip, 443
                             )
+                            if is_ad_ml:
+                                detection_sources.append(f"ML:{ml_method}")
+                                confidence_scores.append(ml_confidence)
+                                self.stats['ml_detections'] += 1
 
-                            # Combine flow analysis with ML
-                            if is_ad_ml or is_ad_flow:
-                                combined_confidence = max(ml_confidence, flow_confidence)
-                                method = f"{ml_method}+flow:{flow_reason}" if is_ad_flow else ml_method
+                        # Calculate combined confidence (weighted average with boost for multiple sources)
+                        if confidence_scores:
+                            avg_confidence = sum(confidence_scores) / len(confidence_scores)
+                            # Boost confidence if multiple sources agree
+                            multi_source_boost = min(0.15, (len(detection_sources) - 1) * 0.05)
+                            combined_confidence = min(1.0, avg_confidence + multi_source_boost)
+                            
+                            method = " + ".join(detection_sources)
+                            
+                            # Learn from this detection (for YouTube/QUIC)
+                            if 'googlevideo' in domain or 'youtube' in domain:
+                                self.learn_youtube_pattern(dst_ip, flow_data, True, combined_confidence)
 
-                                # Learn from this detection (for YouTube/QUIC)
-                                if 'googlevideo' in domain or 'youtube' in domain:
-                                    self.learn_youtube_pattern(dst_ip, flow_data, True, combined_confidence)
-
-                                self.process_detection(domain, dst_ip, combined_confidence, method, flow_data)
+                            self.process_detection(domain, dst_ip, combined_confidence, method, flow_data)
                         else:
                             # Pattern-only mode
                             if is_ad_flow:
