@@ -549,14 +549,16 @@ patch_slips_bridge_support() {
 
     if [[ ! -f "$source_file" ]]; then
         warn "host_ip_manager.py not found at: $source_file"
-        return 1
+        warn "Skipping SLIPS bridge support patch"
+        return 0
     fi
 
     log "Checking destination: $dest_file"
 
     if [[ ! -f "$dest_file" ]]; then
         warn "Destination file not found at: $dest_file"
-        return 1
+        warn "Skipping SLIPS bridge support patch"
+        return 0
     fi
 
     # Check if already installed
