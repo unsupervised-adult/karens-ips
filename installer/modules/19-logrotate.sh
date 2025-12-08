@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-module_18_logrotate() {
+module_19_logrotate() {
     log "Configuring aggressive log rotation policies..."
 
     cat > /etc/logrotate.d/suricata << 'EOF'
@@ -85,7 +85,7 @@ EOF
     log "  - Hourly cron job monitoring all logs"
 }
 
-module_18_logrotate_info() {
+module_19_logrotate_info() {
     cat << EOF
 Module: Log Rotation
 Purpose: Configure aggressive log rotation to manage disk space
