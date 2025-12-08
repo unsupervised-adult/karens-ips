@@ -344,6 +344,7 @@ function initializeTables() {
 // ----------------------------------------
 function loadAllData() {
     loadStats();
+    loadStreamStats();
     loadModelInfo();
     loadDetections();
     loadAlerts();
@@ -364,7 +365,40 @@ function loadStats() {
             }
         },
         error: function(xhr, status, error) {
-            console.error('Error loading stats:', error);
+            console.error('Error loading SLIPS stats:', error);
+        }
+    });
+}
+
+function loadStreamStats() {
+    $.ajax({
+        url: '/ml_detector/stream_stats',
+        method: 'GET',
+        success: function(response) {
+            if (response.data) {
+                $('#stream_total_analyzed').text(response.data.total_analyzed || 0);
+                $('#stream_ads_detected').text(response.data.ads_detected || 0);
+                $('#stream_ips_blocked').text(response.data.ips_blocked || 0);
+                $('#stream_status').text(response.data.blocking_status || 'Unknown');
+                
+                // Color code status
+                const status = response.data.blocking_status;
+                if (status === 'Active') {
+                    $('#stream_status').removeClass('text-warning text-danger').addClass('text-success');
+                } else if (status === 'Monitoring Only') {
+                    $('#stream_status').removeClass('text-success text-danger').addClass('text-warning');
+                } else {
+                    $('#stream_status').removeClass('text-success text-warning').addClass('text-danger');
+                }
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading stream stats:', error);
+            // Show service not running
+            $('#stream_total_analyzed').text('0');
+            $('#stream_ads_detected').text('0');
+            $('#stream_ips_blocked').text('0');
+            $('#stream_status').text('Not Running').removeClass('text-success text-warning').addClass('text-danger');
         }
     });
 }
