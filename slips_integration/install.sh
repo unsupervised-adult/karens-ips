@@ -91,6 +91,17 @@ else
     exit 1
 fi
 
+# Enable active blocking by default in Redis
+echo "Configuring stream ad blocker..."
+if command -v redis-cli &> /dev/null; then
+    redis-cli -n 1 SET ml_detector:blocking_enabled 1 > /dev/null 2>&1 && \
+        echo -e "${GREEN}✓${NC} Active blocking enabled by default" || \
+        echo -e "${YELLOW}⚠${NC} Could not enable blocking (Redis might not be running)"
+else
+    echo -e "${YELLOW}⚠${NC} redis-cli not found. You'll need to enable blocking manually:"
+    echo "    redis-cli -n 1 SET ml_detector:blocking_enabled 1"
+fi
+
 echo ""
 echo -e "${GREEN}✓ Installation complete!${NC}"
 echo ""
@@ -98,8 +109,10 @@ echo "Next steps:"
 echo "1. Start your SLIPS instance with traffic analysis"
 echo "2. Start the SLIPS web interface:"
 echo "   cd $SLIPS_PATH && ./webinterface.sh"
-echo "3. Open your browser to http://localhost:55000"
-echo "4. Click on the 'ML Detector' tab to view the dashboard"
+echo "3. Start the stream ad blocker service:"
+echo "   sudo systemctl enable --now stream-ad-blocker"
+echo "4. Open your browser to http://localhost:55000"
+echo "5. Click on the 'ML Detector' tab to view the dashboard"
 echo ""
 echo "The ML Detector will display data from Redis keys:"
 echo "  - ml_detector:stats"
@@ -109,7 +122,10 @@ echo "  - ml_detector:model_info"
 echo "  - ml_detector:feature_importance"
 echo "  - ml_detector:alerts"
 echo ""
-echo "Make sure your ML detector module is running and writing to these Redis keys."
+echo "Stream Ad Blocker Status:"
+echo "  - Blocking mode: ACTIVE (enabled by default)"
+echo "  - Targets: QUIC streams (UDP 443) - YouTube ads, etc."
+echo "  - Check status: redis-cli -n 1 HGETALL stream_ad_blocker:stats"
 echo ""
 echo -e "${YELLOW}Backup location: $BACKUP_DIR${NC}"
 echo "If anything goes wrong, you can restore from the backup."

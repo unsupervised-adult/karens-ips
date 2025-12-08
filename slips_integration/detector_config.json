@@ -1,0 +1,42 @@
+{
+  "blocking": {
+    "enabled": true,
+    "mode": "active",
+    "block_ips": true,
+    "block_urls": true,
+    "confidence_threshold_for_blocking": 0.7
+  },
+  "detection_thresholds": {
+    "ad_duration_max": 120,
+    "ad_duration_min": 5,
+    "ad_min_bytes": 5000,
+    "confidence_threshold": 0.75,
+    "duration_ratio_threshold": 0.3,
+    "streaming_min_bytes": 15000,
+    "streaming_min_duration": 120,
+    "streaming_min_packets": 20
+  },
+  "feature_weights": {
+    "size_importance": 1.5,
+    "timing_importance": 2.5
+  },
+  "ml_parameters": {
+    "auto_retrain": false,
+    "max_depth": 15,
+    "min_samples_for_training": 100,
+    "model_type": "random_forest",
+    "n_estimators": 100,
+    "n_jobs": -1,
+    "retrain_interval_hours": 24
+  },
+  "performance": {
+    "cache_predictions": true,
+    "cpu_cores": -1
+  },
+  "protocol_detection": {
+    "analyze_packet_sizes": true,
+    "analyze_timing_patterns": true,
+    "enable_encrypted_analysis": true,
+    "enable_quic_detection": true
+  }
+}
