@@ -503,18 +503,17 @@ class StreamAdBlocker:
 
                     seen_domains = all_domains
 
-                # Update stats in Redis
+                # Update stats in Redis (using separate key to avoid conflict with simple_ml_feeder)
                 stats_update = {
                     'total_analyzed': str(self.stats['total_analyzed']),
-                    'ads_detected': str(self.stats['ads_detected']),
-                    'detections_found': str(self.stats['ads_detected']),
+                    'stream_ads_detected': str(self.stats['ads_detected']),
                     'ips_blocked': str(self.stats['ips_blocked']),
                     'urls_blocked': str(self.stats['urls_blocked']),
-                    'legitimate_traffic': str(len(all_domains) - self.stats['ads_detected']),
+                    'legitimate_streams': str(len(all_domains) - self.stats['ads_detected']),
                     'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'blocking_status': 'Active' if blocking_enabled else 'Monitoring Only'
                 }
-                self.r.hset('ml_detector:stats', mapping=stats_update)
+                self.r.hset('stream_ad_blocker:stats', mapping=stats_update)
 
             except Exception as e:
                 print(f"❌ Error in monitoring loop: {e}")

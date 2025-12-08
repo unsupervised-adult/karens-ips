@@ -6,8 +6,8 @@ Wants=redis.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/StratosphereLinuxIPS
-ExecStart=/opt/StratosphereLinuxIPS/venv/bin/python3 -u /opt/StratosphereLinuxIPS/simple_ml_feeder.py
+WorkingDirectory=/opt/StratosphereLinuxIPS/webinterface/ml_detector
+ExecStart=/usr/bin/python3 -u /opt/StratosphereLinuxIPS/webinterface/ml_detector/realtime_stream_monitor.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
