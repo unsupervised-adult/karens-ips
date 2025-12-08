@@ -17,7 +17,10 @@ from ml_ad_classifier import MLAdClassifier
 
 class StreamAdBlocker:
     def __init__(self):
-        self.r = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
+        # Connect to DB 0 to read SLIPS data (DomainsResolved)
+        self.r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+        # Separate connection to DB 1 for writing stats (avoids conflicts with SLIPS)
+        self.r_stats = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
         self.classifier = None
         self.detected_ads = set()
         self.blocked_ips = set()
@@ -201,7 +204,7 @@ class StreamAdBlocker:
 
     def get_blocking_status(self):
         """Check if live blocking is enabled"""
-        enabled = self.r.get('ml_detector:blocking_enabled')
+        enabled = self.r_stats.get('ml_detector:blocking_enabled')
         if enabled:
             enabled = enabled.decode() if isinstance(enabled, bytes) else enabled
             return enabled == '1'
@@ -246,7 +249,7 @@ class StreamAdBlocker:
                 self.stats['ips_blocked'] += 1
 
                 # Add to Redis blacklist
-                self.r.sadd('ml_detector:blacklist:ip', ip)
+                self.r_stats.sadd('ml_detector:blacklist:ip', ip)
 
                 # Log the action
                 log_entry = {
@@ -255,8 +258,8 @@ class StreamAdBlocker:
                     'ip': ip,
                     'reason': reason
                 }
-                self.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
-                self.r.ltrim('ml_detector:action_logs', 0, 499)
+                self.r_stats.lpush('ml_detector:action_logs', json.dumps(log_entry))
+                self.r_stats.ltrim('ml_detector:action_logs', 0, 499)
 
                 print(f"🚫 BLOCKED IP: {ip} ({reason})")
                 return True
@@ -293,7 +296,7 @@ class StreamAdBlocker:
             self.stats['urls_blocked'] += 1
 
             # Add to Redis blacklist
-            self.r.sadd('ml_detector:blacklist:url', domain)
+            self.r_stats.sadd('ml_detector:blacklist:url', domain)
 
             # Log the action
             log_entry = {
@@ -302,8 +305,8 @@ class StreamAdBlocker:
                 'url': domain,
                 'reason': reason
             }
-            self.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
-            self.r.ltrim('ml_detector:action_logs', 0, 499)
+            self.r_stats.lpush('ml_detector:action_logs', json.dumps(log_entry))
+            self.r_stats.ltrim('ml_detector:action_logs', 0, 499)
 
             print(f"🚫 BLOCKED URL: {domain} ({reason})")
             return True
@@ -337,8 +340,8 @@ class StreamAdBlocker:
                 }
 
                 # Store in Redis for ML retraining
-                self.r.lpush('ml_detector:youtube_quic_patterns', json.dumps(pattern))
-                self.r.ltrim('ml_detector:youtube_quic_patterns', 0, 9999)  # Keep last 10k patterns
+                self.r_stats.lpush('ml_detector:youtube_quic_patterns', json.dumps(pattern))
+                self.r_stats.ltrim('ml_detector:youtube_quic_patterns', 0, 9999)  # Keep last 10k patterns
 
                 # Cache locally for immediate use
                 if dst_ip not in self.youtube_connection_cache:
@@ -380,8 +383,8 @@ class StreamAdBlocker:
         }
 
         # Store detection
-        self.r.lpush('ml_detector:recent_detections', json.dumps(detection))
-        self.r.ltrim('ml_detector:recent_detections', 0, 99)
+        self.r_stats.lpush('ml_detector:recent_detections', json.dumps(detection))
+        self.r_stats.ltrim('ml_detector:recent_detections', 0, 99)
 
         self.stats['ads_detected'] += 1
 
@@ -513,7 +516,7 @@ class StreamAdBlocker:
                     'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'blocking_status': 'Active' if blocking_enabled else 'Monitoring Only'
                 }
-                self.r.hset('stream_ad_blocker:stats', mapping=stats_update)
+                self.r_stats.hset('stream_ad_blocker:stats', mapping=stats_update)
 
             except Exception as e:
                 print(f"❌ Error in monitoring loop: {e}")
