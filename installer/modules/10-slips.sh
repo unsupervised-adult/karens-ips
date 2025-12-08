@@ -621,7 +621,7 @@ patch_slips_redis_db() {
     local karens_ips_dir
     karens_ips_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
     
-    local source_file="$karens_ips_dir/StratosphereLinuxIPS/slips_files/core/database/redis_db/database.py"
+    local source_file="$karens_ips_dir/slips_patches/slips_files/core/database/redis_db/database.py"
     local dest_file="$SLIPS_DIR/slips_files/core/database/redis_db/database.py"
 
     if [[ ! -f "$source_file" ]]; then
