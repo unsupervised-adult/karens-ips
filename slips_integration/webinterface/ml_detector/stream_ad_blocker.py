@@ -509,10 +509,12 @@ class StreamAdBlocker:
                 # Update stats in Redis - write to ml_detector:stats for dashboard display
                 stats_update = {
                     'total_analyzed': str(self.stats['total_analyzed']),
-                    'stream_ads_detected': str(self.stats['ads_detected']),
+                    'ads_detected': str(self.stats['ads_detected']),  # ML Dashboard expects this field name
+                    'stream_ads_detected': str(self.stats['ads_detected']),  # For backwards compatibility
                     'ips_blocked': str(self.stats['ips_blocked']),
                     'urls_blocked': str(self.stats['urls_blocked']),
-                    'legitimate_streams': str(len(all_domains) - self.stats['ads_detected']),
+                    'legitimate_traffic': str(len(all_domains) - self.stats['ads_detected']),  # ML Dashboard field
+                    'legitimate_streams': str(len(all_domains) - self.stats['ads_detected']),  # For backwards compat
                     'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'blocking_status': 'Active' if blocking_enabled else 'Monitoring Only'
                 }
