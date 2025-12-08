@@ -3,6 +3,27 @@
 Stream Ad Blocker - Real-time detection and blocking of in-stream ads
 Monitors SLIPS flow data and automatically blocks detected ad traffic
 Cross-references with blocklist database (338K+ domains) and SLIPS behavioral analysis
+
+MODERN AD DELIVERY ARCHITECTURE (2024+):
+-----------------------------------------
+YouTube SSAI (Server-Side Ad Insertion):
+  - Ads stitched into same *.googlevideo.com stream as content
+  - Media plane (video segments): identical 1.5-4MB chunks for ads + content
+  - Control plane (ad decisioning): googleads.g.doubleclick.net, pagead2.googlesyndication.com
+  - Cannot distinguish ad segments from content segments at network level
+  - DAI (Dynamic Ad Insertion) runs real-time auctions, returns unified manifest
+
+Generic HTTP/3 Sites:
+  - Control: Small JSON/protobuf ad auction requests (1-10KB) to SSP endpoints
+  - Media: Banner creatives (20-300KB) and video segments from CDNs
+  - Header bidding fires parallel requests over single QUIC connection
+  
+DETECTION STRATEGY:
+  1. Block ad decisioning control plane (doubleclick, googlesyndication, etc)
+  2. Do NOT block googlevideo.com (breaks both ads AND content)
+  3. Focus on small payload ad auction traffic, not media CDN traffic
+  4. Track connection patterns: multiple small requests = likely ad auction
+  5. Use ML to identify ad server IPs by behavioral patterns
 """
 import redis
 import json
@@ -79,6 +100,35 @@ class StreamAdBlocker:
             'tiktok.com/i18n/pixel', 'analytics.tiktok',
             'clarity.ms', 'c.bing.com', 'bat.bing.com',
             'quantserve', 'quantcast', 'chartbeat', 'kissmetrics'
+        ]
+
+        # CDN domains that carry both ads and content (NEVER block these)
+        # Blocking these breaks content delivery due to SSAI
+        self.cdn_whitelist = [
+            'googlevideo.com',
+            'youtube.com',
+            'youtu.be',
+            'cloudfront.net',
+            'akamaihd.net',
+            'fastly.net',
+            'nflxvideo.net',
+            'ttvnw.net'
+        ]
+        
+        # Ad control plane domains (safe to block - only affect ad decisioning)
+        self.ad_control_plane = [
+            'doubleclick.net',
+            'googlesyndication.com',
+            'googleadservices.com',
+            'googletagmanager.com',
+            'googletagservices.com',
+            'google-analytics.com',
+            'pagead2.googlesyndication.com',
+            'adnxs.com',
+            'adsrvr.org',
+            'criteo.com',
+            'taboola.com',
+            'outbrain.com'
         ]
 
         # Streaming service patterns
@@ -192,8 +242,24 @@ class StreamAdBlocker:
         except Exception as e:
             return 0.0, [], 0.0
     
+    def is_cdn_whitelist(self, domain):
+        """
+        Check if domain is a CDN that carries both ads and content (SSAI)
+        These should NEVER be blocked as it breaks content delivery
+        """
+        domain_lower = domain.lower()
+        return any(cdn in domain_lower for cdn in self.cdn_whitelist)
+    
+    def is_ad_control_plane(self, domain):
+        """
+        Check if domain is ad decisioning/auction control plane
+        These are safe to block - only affect ad loading, not content
+        """
+        domain_lower = domain.lower()
+        return any(ad_domain in domain_lower for ad_domain in self.ad_control_plane)
+    
     def is_ad_domain(self, domain):
-        """Check if domain matches ad patterns"""
+        """Check if domain matches ad patterns (legacy method)"""
         domain_lower = domain.lower()
         return any(pattern in domain_lower for pattern in self.ad_patterns)
 
@@ -603,13 +669,26 @@ class StreamAdBlocker:
                 print(f"⚪ Skipping block - URL {domain} is whitelisted")
                 return detection
 
-            # Determine blocking strategy based on confidence and domain type
-            is_cdn = any(cdn in domain.lower() for cdn in ['googlevideo', 'cloudfront', 'akamai', 'fastly', 'edgecast'])
-            is_known_ad_server = any(ad in domain.lower() for ad in ['doubleclick', 'googlesyndication', 'adserver', 'ads.'])
+            # CRITICAL: Never block CDN whitelist domains (SSAI content carriers)
+            if self.is_cdn_whitelist(domain):
+                print(f"⚪ CDN WHITELIST: {domain} carries both ads and content (SSAI) - detection logged only")
+                return detection
             
-            # Strategy 1: Flow-level blocking for CDN IPs (high confidence required)
-            # This drops just this specific ad flow without blocking legit content from same IP
-            if is_cdn and confidence >= 0.80:
+            # Prioritize blocking ad control plane (safe to block)
+            is_control_plane = self.is_ad_control_plane(domain)
+            is_cdn = any(cdn in domain.lower() for cdn in ['cloudfront', 'akamai', 'fastly', 'edgecast'])
+            
+            # Strategy 1: IP-level block for ad control plane (prevents ad auctions)
+            # Control plane = small payloads for ad decisioning, safe to block
+            if is_control_plane and confidence >= 0.70:
+                if self.block_ip(dst_ip, f"ad_control_plane:{method}"):
+                    blocked = True
+                    detection['block_type'] = 'ip_control_plane'
+                    print(f"🚫 AD CONTROL BLOCK: {domain} ({confidence:.0%} confidence - blocks ad auctions)")
+            
+            # Strategy 2: Flow-level blocking for other CDNs (not whitelisted)
+            # Drops specific ad flow without blocking entire IP
+            elif is_cdn and confidence >= 0.85:
                 if self.block_flow(
                     flow_data.get('src_ip', '0.0.0.0'),
                     dst_ip,
@@ -619,16 +698,8 @@ class StreamAdBlocker:
                     method
                 ):
                     blocked = True
-                    detection['block_type'] = 'flow'
-                    print(f"🎯 Flow-level block: {domain} ({confidence:.0%} confidence)")
-            
-            # Strategy 2: IP-level blocking for known ad servers (lower threshold)
-            # These IPs are dedicated ad infrastructure, safe to block entirely
-            elif is_known_ad_server and confidence >= 0.70:
-                if self.block_ip(dst_ip, method):
-                    blocked = True
-                    detection['block_type'] = 'ip'
-                    print(f"🚫 IP-level block: {domain} - known ad server")
+                    detection['block_type'] = 'flow_cdn'
+                    print(f"🎯 CDN Flow block: {domain} ({confidence:.0%} confidence)")
             
             # Strategy 3: Hybrid approach - try flow first, fallback to IP if very high confidence
             elif confidence >= 0.90:
