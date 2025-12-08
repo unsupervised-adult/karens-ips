@@ -1468,33 +1468,35 @@ class RedisDB(IoCHandler, AlertHandler, ProfileHandler, P2PHandler):
             if int(given_pid) == int(pid):
                 return name
 
-    def set_org_info(self, org, org_info, info_type):
+    def set_org_info(self, org, org_info: List[str], info_type: str):
         """
-        store ASN, IP and domains of an org in the db
+        store ASN or domains of an org in the db
         :param org: supported orgs are ('google', 'microsoft',
         'apple', 'facebook', 'twitter')
-        : param org_info: a json serialized list of asns or ips or domains
-        :param info_type: supported types are 'asn', 'domains', 'IPs'
+        : param org_info: a list of asns or ips or domains
+        :param info_type: supported types are 'asn' or 'domains'
+        NOTE: this function doesnt store org IPs, pls use set_org_ips()
+        instead
         """
-        # info will be stored in OrgInfo key {'facebook_asn': ..,
-        # 'twitter_domains': ...}
-        self.rcache.hset(
-            self.constants.ORG_INFO, f"{org}_{info_type}", org_info
-        )
+        # info will be stored in redis SETs like 'facebook_asn',
+        # 'twitter_ips', etc.
+        key = f"{org}_{info_type}"
+        if isinstance(org_info, list):
+            self.rcache.sadd(key, *org_info)
 
-    def get_org_info(self, org, info_type) -> str:
+    def get_org_info(self, org, info_type: str) -> List[str]:
         """
-        get the ASN, IP and domains of an org from the db
+        Returns the ASN or domains of an org from the db
+
         :param org: supported orgs are ('google', 'microsoft', 'apple',
          'facebook', 'twitter')
-        :param info_type: supported types are 'asn', 'domains'
-        returns a json serialized dict with info
+        :param info_type: supported types are 'asn' or 'domains'
+
+        returns a List[str] of the required info
         PS: All ASNs returned by this function are uppercase
         """
-        return (
-            self.rcache.hget(self.constants.ORG_INFO, f"{org}_{info_type}")
-            or "[]"
-        )
+        key = f"{org}_{info_type}"
+        return self.rcache.smembers(key)
 
     def get_org_ips(self, org: str) -> Dict[str, str]:
         """

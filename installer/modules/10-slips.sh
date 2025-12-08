@@ -104,20 +104,17 @@ clone_slips_repository() {
             rm -rf "$SLIPS_DIR"
         fi
         
-        # Clone SLIPS and checkout known working commit
-        # Note: Pinning to commit 97c32c2b (Dec 7, 2024) - last known working version
-        log "Cloning SLIPS and checking out commit 97c32c2b..."
+        # Clone SLIPS (latest version with new whitelist system)
+        log "Cloning SLIPS (latest version)..."
         git clone https://github.com/stratosphereips/StratosphereLinuxIPS.git || error_exit "Failed to clone SLIPS repository"
 
         cd "$SLIPS_DIR" || error_exit "Failed to change to SLIPS directory"
 
-        # Checkout specific working commit
-        git checkout 97c32c2b || error_exit "Failed to checkout commit 97c32c2b"
-        log "SLIPS pinned to commit 97c32c2b"
+        log "Using latest SLIPS with O(1) whitelist system"
 
         cd /opt || error_exit "Failed to return to /opt"
 
-        success "SLIPS repository cloned and pinned to working commit"
+        success "SLIPS repository cloned (latest version)"
 
         # Verify slips.py exists (git clone succeeded)
         if [ ! -f "$SLIPS_DIR/slips.py" ]; then
