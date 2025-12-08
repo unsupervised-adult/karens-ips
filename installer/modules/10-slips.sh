@@ -93,14 +93,6 @@ clone_slips_repository() {
         if [ -d "$SLIPS_DIR" ]; then
             warn "Found incomplete SLIPS directory, removing..."
             
-            # Save patched database.py if it exists
-            local db_backup="/tmp/database.py.backup"
-            local db_file="$SLIPS_DIR/slips_files/core/database/redis_db/database.py"
-            if [ -f "$db_file" ] && grep -q "db=1" "$db_file" 2>/dev/null; then
-                log "Backing up patched database.py..."
-                cp "$db_file" "$db_backup"
-            fi
-            
             # Unmount any loop devices first
             for mount_point in "$SLIPS_DIR/output" "$SLIPS_DIR"/*; do
                 if mountpoint -q "$mount_point" 2>/dev/null; then
@@ -638,21 +630,8 @@ patch_slips_redis_db() {
     local karens_ips_dir
     karens_ips_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
     
-    local source_file="$karens_ips_dir/slips_patches/slips_files/core/database/redis_db/database.py"
+    local source_file="$karens_ips_dir/patches/database.py"
     local dest_file="$SLIPS_DIR/slips_files/core/database/redis_db/database.py"
-    local db_backup="/tmp/database.py.backup"
-
-    # Check if we have a backup from previous install attempt
-    if [ -f "$db_backup" ]; then
-        log "Found previous patched database.py backup, restoring..."
-        if cp "$db_backup" "$dest_file"; then
-            success "Restored patched database.py from backup"
-            rm -f "$db_backup"
-            return 0
-        else
-            warn "Failed to restore backup, will apply patch from source"
-        fi
-    fi
 
     if [[ ! -f "$source_file" ]]; then
         warn "Patched database.py not found at: $source_file"
@@ -669,7 +648,6 @@ patch_slips_redis_db() {
     # Check if already patched (look for db=1 in redis connection)
     if grep -q "db=1" "$dest_file"; then
         success "SLIPS Redis DB 1 patch already applied"
-        rm -f "$db_backup"
         return 0
     fi
 
@@ -688,8 +666,6 @@ patch_slips_redis_db() {
         warn "Failed to copy patched database.py"
     fi
 
-    # Clean up backup if we got here
-    rm -f "$db_backup"
     return 0
 }
 
