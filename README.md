@@ -12,7 +12,7 @@
            Intrusion Prevention System - ML Behavioral Analysis
 ```
 
-An intelligent Intrusion Prevention System with ML-powered behavioral analysis, community blocklists, and family-friendly network security.
+An intelligent Intrusion Prevention System with ML-powered behavioral analysis, community blocklists & network security.
 
 ## Overview
 
@@ -24,7 +24,7 @@ Karen's IPS is a comprehensive network security solution that combines:
 - **Community Blocklists** - 300K+ domains from Perflyst and hagezi
 - **Modular Installer** - Easy deployment and maintenance
 
-Built with Python, machine learning, and modern security tools, it offers enterprise-grade protection for home and family networks.
+Built with Python, machine learning, and modern security tools, it offers enterprise-grade protection for home networks.
 
 **System Performance:**
 
@@ -33,7 +33,7 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 - Memory Usage: ~6GB total across all components
 - Traffic Processing: Real-time NFQUEUE packet processing (2.4M+ packets)
 - ML Analysis: 253 detections, 45.59% detection rate, 85% accuracy
-- QUIC Detection: Active for YouTube/streaming video ads
+- QUIC Detection: Active for streaming video ads
 - Log Storage: 40GB contained (20GB Suricata, 10GB SLIPS, 5GB Redis, 5GB output)
 
 ## Key Features
@@ -43,7 +43,7 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 - ✅ Real-time network monitoring via NFQUEUE bridge mode
 - ✅ ML-based behavioral threat detection (SLIPS)
 - ✅ High-performance IPS with Suricata (drop/reject capabilities)
-- ✅ Family-friendly content filtering
+- ✅ Custom content filtering
 - ✅ Automated threat blocking via nftables
 - ✅ Zeek network security monitor integration
 
@@ -53,7 +53,7 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 - ✅ **hagezi/dns-blocklists** - Pro & Native tracker blocking
 - ✅ Automatic weekly updates via systemd timer
 - ✅ Exception management (whitelist) for domains and IPs
-- ✅ IPS-level blocking (bypasses DNS-based ad blockers)
+- ✅ IPS-level blocking Inline blocking 
 - ✅ Real-time sync with Suricata datasets
 - ✅ YAML configuration for customization
 - ✅ CLI management: `ips-filter update-blocklists`, `ips-filter exception`
@@ -61,14 +61,14 @@ Built with Python, machine learning, and modern security tools, it offers enterp
 ### ML Ad Detector Dashboard
 
 - ✅ Real-time ad detection visualization
-- ✅ QUIC/HTTP3 protocol detection (YouTube, streaming video ads)
+- ✅ QUIC/HTTP3 protocol detection 
 - ✅ **Adaptive learning**: SLIPS ML engine learns ad patterns and unique signatures over time
 - ✅ **Multi-source correlation**: Cross-references blocklist DB (338K+ domains), SLIPS behavioral analysis, and temporal patterns
 - ✅ **Flow-level blocking**: Surgical drops via conntrack - blocks ad flow without affecting CDN IPs
 - ✅ **Universal video ad signatures**: Recognizes 6s bumper, 15s/30s non-skippable, skip-after-5 patterns across all platforms
-- ✅ Detection timeline charts (ads vs legitimate traffic)
+- ✅ Detection timeline charts
 - ✅ Feature importance analysis with timing/size patterns
-- ✅ Model performance metrics (45.59% detection rate, 85% accuracy)
+- ✅ Model performance metrics
 - ✅ Searchable/sortable detection tables with confidence scores
 - ✅ Auto-refresh every 5 seconds
 - ✅ Fully integrated with SLIPS Web UI
@@ -127,7 +127,7 @@ sudo ./karens-ips-installer.sh
 - **SLIPS Web UI**: `https://[SERVER-IP]` (Nginx reverse proxy with TLS + auth)
   - Default credentials: `/root/.karens-ips-credentials`
   - Direct access (localhost only): `http://127.0.0.1:55000`
-- **ML Detector**: Click "ML Detector" tab - QUIC detection, 253 detections visible
+- **ML Detector**: Click "ML Detector" tab - QUIC detection.
 - **Suricata Config**: Click "Suricata Config" tab for rules, datasets, TLS SNI management
 - **Kalipso CLI**: `sudo kalipso` (terminal interface)
 

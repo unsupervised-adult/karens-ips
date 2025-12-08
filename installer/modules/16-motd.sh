@@ -34,16 +34,9 @@ create_motd() {
         mgmt_ip=$(ip addr show "$MGMT_IFACE" 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 || echo "127.0.0.1")
     fi
 
-    # Create simplified MOTD
+    # Create simplified MOTD for internal login
     cat > /etc/motd << 'MOTD_EOF'
 
-════════════════════════════════════════════════════════════════════════════════
-██╗  ██╗ █████╗ ██████╗ ███████╗███╗   ██╗██╗███████╗    ██╗██████╗ ███████╗
-██║ ██╔╝██╔══██╗██╔══██╗██╔════╝████╗  ██║╚═╝██╔════╝    ██║██╔══██╗██╔════╝
-█████╔╝ ███████║██████╔╝█████╗  ██╔██╗ ██║   ███████╗    ██║██████╔╝███████╗
-██╔═██╗ ██╔══██║██╔══██╗██╔══╝  ██║╚██╗██║   ╚════██║    ██║██╔═══╝ ╚════██║
-██║  ██╗██║  ██║██║  ██║███████╗██║ ╚████║   ███████║    ██║██║     ███████║
-╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝   ╚══════╝    ╚═╝╚═╝     ╚══════╝
 ════════════════════════════════════════════════════════════════════════════════
            Intrusion Prevention System - ML Behavioral Analysis
 
@@ -69,8 +62,32 @@ MOTD_EOF
     chmod 644 /etc/motd
     log "MOTD created at /etc/motd"
 
-    # Copy MOTD to SSH banner
-    cp /etc/motd /etc/ssh/banner
+    # Create SSH banner with legal disclaimer
+    cat > /etc/ssh/banner << 'BANNER_EOF'
+════════════════════════════════════════════════════════════════════════════════
+
+                           AUTHORIZED ACCESS ONLY
+
+  This system is for the use of authorized users only. Individuals using
+  this computer system without authority, or in excess of their authority,
+  are subject to having all of their activities on this system monitored
+  and recorded by system personnel.
+
+  In the course of monitoring individuals improperly using this system, or
+  in the course of system maintenance, the activities of authorized users
+  may also be monitored.
+
+  Anyone using this system expressly consents to such monitoring and is
+  advised that if such monitoring reveals possible evidence of criminal
+  activity, system personnel may provide the evidence of such monitoring
+  to law enforcement officials.
+
+  Unauthorized access or use of this system is prohibited and may be
+  subject to criminal and/or civil penalties.
+
+════════════════════════════════════════════════════════════════════════════════
+
+BANNER_EOF
     chmod 644 /etc/ssh/banner
     log "SSH banner created at /etc/ssh/banner"
 
