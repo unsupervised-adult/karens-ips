@@ -1496,31 +1496,36 @@ class RedisDB(IoCHandler, AlertHandler, ProfileHandler, P2PHandler):
             or "[]"
         )
 
-    def get_org_ips(self, org):
-        org_info = self.rcache.hget(self.constants.ORG_INFO, f"{org}_IPs")
-
-        if not org_info:
-            org_info = {}
-            return org_info
-
-        try:
-            return json.loads(org_info)
-        except TypeError:
-            # it's a dict
-            return org_info
-
-    def set_org_cidrs(self, org, org_subnets):
+    def get_org_ips(self, org: str) -> Dict[str, str]:
         """
-        Store organization CIDR ranges
-        :param org: Organization name
-        :param org_subnets: List of CIDR ranges for the organization
+        returns Dict[str, str]
+            keys are subnet first octets
+            values are serialized list of cidrs
+            e.g {
+                '2401': ['2401:fa00::/42', '2401:fa00:4::/48']
+                '70': ['70.32.128.0/19','70.32.136.0/24']
+            }
         """
-        if org_subnets:
-            self.rcache.hset(
-                self.constants.ORG_INFO,
-                f"{org}_IPs",
-                json.dumps(org_subnets)
-            )
+        key = f"{org}_IPs"
+        org_info = self.rcache.hgetall(key)
+        return org_info if org_info else {}
+
+    def set_org_cidrs(self, org, org_ips: Dict[str, List[str]]):
+        """
+        stores CIDRs of an org in the db
+        :param org: supported orgs are ('google', 'microsoft',
+        'apple', 'facebook', 'twitter')
+        :param org_ips: A dict with the first octet of a cidr,
+        and the full cidr as keys.
+        something like  {
+                '2401': ['2401:fa00::/42', '2401:fa00:4::/48']
+                '70': ['70.32.128.0/19','70.32.136.0/24']
+            }
+        """
+        key = f"{org}_IPs"
+        if isinstance(org_ips, dict):
+            serializable = {str(k): json.dumps(v) for k, v in org_ips.items()}
+            self.rcache.hset(key, mapping=serializable)
 
     def set_whitelist(self, type_, whitelist_dict):
         """
