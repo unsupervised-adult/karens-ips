@@ -309,8 +309,8 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
 
-    # Authentication handled by Flask app (simple_app.py with sequential login)
-    # No auth_basic - all authentication via session-based login
+    # Authentication handled by Flask app (auth.py with bcrypt)
+    # No auth_basic - all authentication via session-based login with custom login.html
 
     # Logging
     access_log /var/log/nginx/karens-ips-access.log;
@@ -393,9 +393,9 @@ enable_nginx_service() {
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     log ""
     log "  🌐 Access URL: https://${WEBUI_IP:-localhost}"
-    log "  🔐 Login: Sequential username→password entry"
-    log "      Username: admin"
-    log "      Password: karens-ips-2025"
+    log "  🔐 Login: Session-based authentication (no popups!)"
+    log "      Default: admin / change-me-now"
+    log "      Change: See /etc/karens-ips/.password"
     log ""
     log "  Features enabled:"
     log "    ✓ TLS 1.2/1.3 encryption with modern ciphers"
