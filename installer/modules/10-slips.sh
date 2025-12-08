@@ -421,9 +421,9 @@ install_karens_ips_ml_modules() {
     
     if [[ -d "$source_webinterface_dir/ml_detector" ]]; then
         log "Installing ML detector web interface blueprint..."
-        cp -r "$source_webinterface_dir/ml_detector" "$webinterface_dir/"
-        chown -R root:root "$webinterface_dir/ml_detector"
-        chmod 755 "$webinterface_dir/ml_detector"
+        cp -r "$source_webinterface_dir/ml_detector" "$webinterface_dir/" && \
+        chown -R root:root "$webinterface_dir/ml_detector" && \
+        chmod 755 "$webinterface_dir/ml_detector" && \
         find "$webinterface_dir/ml_detector" -type f -name "*.py" -exec chmod 644 {} \;
         success "ML detector blueprint installed"
     else
@@ -433,10 +433,10 @@ install_karens_ips_ml_modules() {
     # Copy Suricata config webinterface integration
     if [[ -d "$source_webinterface_dir/suricata_config" ]]; then
         log "Installing Suricata configuration web interface blueprint..."
-        cp -r "$source_webinterface_dir/suricata_config" "$webinterface_dir/"
-        chown -R root:root "$webinterface_dir/suricata_config"
-        chmod 755 "$webinterface_dir/suricata_config"
-        find "$webinterface_dir/suricata_config" -type f -name "*.py" -exec chmod 644 {} \;
+        cp -r "$source_webinterface_dir/suricata_config" "$webinterface_dir/" && \
+        chown -R root:root "$webinterface_dir/suricata_config" && \
+        chmod 755 "$webinterface_dir/suricata_config" && \
+        find "$webinterface_dir/suricata_config" -type f -name "*.py" -exec chmod 644 {} \; && \
         find "$webinterface_dir/suricata_config" -type f -name "*.html" -exec chmod 644 {} \;
         find "$webinterface_dir/suricata_config" -type f -name "*.css" -exec chmod 644 {} \;
         find "$webinterface_dir/suricata_config" -type f -name "*.js" -exec chmod 644 {} \;
