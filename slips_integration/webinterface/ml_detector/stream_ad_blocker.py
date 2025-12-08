@@ -6,24 +6,28 @@ Cross-references with blocklist database (338K+ domains) and SLIPS behavioral an
 
 MODERN AD DELIVERY ARCHITECTURE (2024+):
 -----------------------------------------
-YouTube SSAI (Server-Side Ad Insertion):
-  - Ads stitched into same *.googlevideo.com stream as content
-  - Media plane (video segments): identical 1.5-4MB chunks for ads + content
-  - Control plane (ad decisioning): googleads.g.doubleclick.net, pagead2.googlesyndication.com
-  - Cannot distinguish ad segments from content segments at network level
-  - DAI (Dynamic Ad Insertion) runs real-time auctions, returns unified manifest
+YouTube SSAI (Server-Side Ad Insertion) - REGIONAL ROLLOUT:
+  - SSAI regions: Ads stitched into same *.googlevideo.com stream as content
+    → Cannot distinguish ad segments from content at network level
+    → Must block ad control plane only (doubleclick, googlesyndication)
+  
+  - Non-SSAI regions (CURRENT): Ads are separate video streams
+    → Ad flows have distinct characteristics (6s bumpers, 15-30s ads)
+    → ML can identify by duration + byte patterns + timing
+    → Flow-level blocking works perfectly - kills ad without affecting content
+    → This is what we're detecting and blocking!
 
 Generic HTTP/3 Sites:
   - Control: Small JSON/protobuf ad auction requests (1-10KB) to SSP endpoints
   - Media: Banner creatives (20-300KB) and video segments from CDNs
   - Header bidding fires parallel requests over single QUIC connection
   
-DETECTION STRATEGY:
+DETECTION STRATEGY (Non-SSAI regions):
   1. Block ad decisioning control plane (doubleclick, googlesyndication, etc)
-  2. Do NOT block googlevideo.com (breaks both ads AND content)
-  3. Focus on small payload ad auction traffic, not media CDN traffic
-  4. Track connection patterns: multiple small requests = likely ad auction
-  5. Use ML to identify ad server IPs by behavioral patterns
+  2. Use ML to identify separate ad streams from googlevideo.com
+  3. Drop flows matching ad patterns: 6s bumpers, 15-30s skippable, ad pods
+  4. Track connection patterns: short duration + specific byte ranges = ad
+  5. Flow-level drops preserve content stream, kill only ad stream
 """
 import redis
 import json
@@ -102,14 +106,16 @@ class StreamAdBlocker:
             'quantserve', 'quantcast', 'chartbeat', 'kissmetrics'
         ]
 
-        # CDN domains that carry both ads and content (NEVER block these)
-        # Blocking these breaks content delivery due to SSAI
+        # CDN domains that may carry both ads and content
+        # For regions WITHOUT SSAI: ads are separate streams (flow blocking works!)
+        # For regions WITH SSAI: ads stitched in same stream (flow blocking breaks content)
+        # Currently: SSAI not rolled out in user's region - enable flow blocking
         self.cdn_whitelist = [
-            'googlevideo.com',
-            'youtube.com',
-            'youtu.be',
-            'cloudfront.net',
-            'akamaihd.net',
+            # 'googlevideo.com',  # DISABLED: SSAI not active, ads are separate flows
+            # 'youtube.com',      # Safe to flow-block with ML detection
+            # 'youtu.be',
+            'cloudfront.net',     # Keep whitelisted (SSAI common on AWS)
+            'akamaihd.net',       # Keep whitelisted (Akamai often uses SSAI)
             'fastly.net',
             'nflxvideo.net',
             'ttvnw.net'
@@ -669,13 +675,14 @@ class StreamAdBlocker:
                 print(f"⚪ Skipping block - URL {domain} is whitelisted")
                 return detection
 
-            # CRITICAL: Never block CDN whitelist domains (SSAI content carriers)
+            # Check CDN whitelist (for SSAI-enabled CDNs only)
             if self.is_cdn_whitelist(domain):
-                print(f"⚪ CDN WHITELIST: {domain} carries both ads and content (SSAI) - detection logged only")
+                print(f"⚪ CDN WHITELIST: {domain} uses SSAI - detection logged only")
                 return detection
             
-            # Prioritize blocking ad control plane (safe to block)
+            # Determine domain type
             is_control_plane = self.is_ad_control_plane(domain)
+            is_youtube = 'googlevideo' in domain.lower() or 'youtube' in domain.lower()
             is_cdn = any(cdn in domain.lower() for cdn in ['cloudfront', 'akamai', 'fastly', 'edgecast'])
             
             # Strategy 1: IP-level block for ad control plane (prevents ad auctions)
@@ -686,8 +693,23 @@ class StreamAdBlocker:
                     detection['block_type'] = 'ip_control_plane'
                     print(f"🚫 AD CONTROL BLOCK: {domain} ({confidence:.0%} confidence - blocks ad auctions)")
             
-            # Strategy 2: Flow-level blocking for other CDNs (not whitelisted)
-            # Drops specific ad flow without blocking entire IP
+            # Strategy 2: Flow-level blocking for YouTube/googlevideo (NO SSAI in region)
+            # Separate ad streams detected by ML - safe to drop specific flows
+            elif is_youtube and confidence >= 0.75:
+                if self.block_flow(
+                    flow_data.get('src_ip', '0.0.0.0'),
+                    dst_ip,
+                    flow_data.get('dport', 443),
+                    flow_data.get('proto', 'HTTPS'),
+                    confidence,
+                    method
+                ):
+                    blocked = True
+                    detection['block_type'] = 'flow_youtube_ad'
+                    print(f"🎯 YOUTUBE AD FLOW DROPPED: {domain} ({confidence:.0%} - separate ad stream)")
+            
+            # Strategy 3: Flow-level blocking for other CDNs
+            # Higher confidence threshold for non-YouTube CDNs
             elif is_cdn and confidence >= 0.85:
                 if self.block_flow(
                     flow_data.get('src_ip', '0.0.0.0'),
