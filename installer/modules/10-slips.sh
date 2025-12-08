@@ -721,7 +721,7 @@ patch_slips_bridge_support() {
     return 0
 }
 
-export -f patch_slips_redis_db patch_slips_bridge_support() {
+configure_suricata_webui_permissions() {
     log "Configuring web interface permissions for Suricata management..."
     
     local sudoers_file="/etc/sudoers.d/slips-webui"
@@ -766,6 +766,7 @@ export -f configure_zeek_integration
 export -f setup_slips_directories
 export -f configure_slips_webui
 export -f install_karens_ips_ml_modules
+export -f patch_slips_redis_db
 export -f patch_slips_bridge_support
-export -f verify_slips
 export -f configure_suricata_webui_permissions
+export -f verify_slips
