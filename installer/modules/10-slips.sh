@@ -89,6 +89,11 @@ clone_slips_repository() {
         log "SLIPS repository already exists"
     fi
 
+    # Verify slips.py exists (git clone succeeded)
+    if [ ! -f "$SLIPS_DIR/slips.py" ]; then
+        error_exit "SLIPS repository cloned but slips.py not found - clone may have failed"
+    fi
+
     # Fix ownership and git permissions
     chown -R root:root "$SLIPS_DIR"
     git config --global --add safe.directory "$SLIPS_DIR"
@@ -245,6 +250,10 @@ SSL_FEEDS_EOF
 JARM_FEEDS_EOF
 
     chmod 644 config/*.csv
+
+    # Create empty whitelist.conf (SLIPS requires this file)
+    touch config/whitelist.conf
+    chmod 644 config/whitelist.conf
 
     success "SLIPS configuration created at config/slips.yaml"
 }

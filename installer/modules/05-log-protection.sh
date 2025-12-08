@@ -53,6 +53,23 @@ module_05_log_protection() {
         mkdir -p "$D"
         mount -o loop "$IMG" "$D" || error_exit "Failed to mount $IMG to $D"
 
+        # Fix ownership based on directory purpose
+        case "$D" in
+            /var/lib/redis)
+                chown -R redis:redis "$D"
+                chmod 770 "$D"
+                log "Set Redis ownership on $D"
+                ;;
+            /var/log/suricata)
+                chown -R root:root "$D"
+                chmod 755 "$D"
+                ;;
+            *)
+                chown -R root:root "$D"
+                chmod 755 "$D"
+                ;;
+        esac
+
         if ! grep -qF "$IMG $D" /etc/fstab; then
             echo "$IMG $D ext4 $FSTAB_OPTS 0 2" >> /etc/fstab
             log "Added $D to /etc/fstab"
