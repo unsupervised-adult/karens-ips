@@ -753,8 +753,6 @@ verify_services() {
     fi
 }
 
-}
-
 # Export functions
 export -f start_services
 export -f start_redis
