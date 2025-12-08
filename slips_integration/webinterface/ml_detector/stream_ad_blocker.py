@@ -506,21 +506,20 @@ class StreamAdBlocker:
 
                     seen_domains = all_domains
 
-                # Update stats in Redis - write to ml_detector:stats for dashboard display
+                # Update stats in Redis - write to dedicated stream_ad_blocker:stats key
+                # This prevents conflicts with SLIPS ML Dashboard Feeder module
                 stats_update = {
                     'total_analyzed': str(self.stats['total_analyzed']),
-                    'ads_detected': str(self.stats['ads_detected']),  # ML Dashboard expects this field name
-                    'stream_ads_detected': str(self.stats['ads_detected']),  # For backwards compatibility
+                    'ads_detected': str(self.stats['ads_detected']),
+                    'stream_ads_detected': str(self.stats['ads_detected']),
                     'ips_blocked': str(self.stats['ips_blocked']),
                     'urls_blocked': str(self.stats['urls_blocked']),
-                    'legitimate_traffic': str(len(all_domains) - self.stats['ads_detected']),  # ML Dashboard field
-                    'legitimate_streams': str(len(all_domains) - self.stats['ads_detected']),  # For backwards compat
+                    'legitimate_traffic': str(len(all_domains) - self.stats['ads_detected']),
+                    'legitimate_streams': str(len(all_domains) - self.stats['ads_detected']),
                     'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'blocking_status': 'Active' if blocking_enabled else 'Monitoring Only'
                 }
-                # Write to ml_detector:stats (for ML Dashboard web UI)
-                self.r_stats.hset('ml_detector:stats', mapping=stats_update)
-                # Also write to stream_ad_blocker:stats (for backwards compatibility)
+                # Write only to stream_ad_blocker:stats (dedicated key, no conflicts)
                 self.r_stats.hset('stream_ad_blocker:stats', mapping=stats_update)
 
             except Exception as e:
