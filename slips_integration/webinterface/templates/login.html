@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>Karen's IPS</title>
     <style>
         * {
             margin: 0;
@@ -12,8 +12,8 @@
         }
 
         body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background: #1a1a1a;
+            font-family: monospace;
+            background: #fff;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -24,34 +24,24 @@
             text-align: center;
         }
 
-        form {
-            display: inline-block;
-        }
-
-        input[type="password"] {
+        input[type="text"] {
             padding: 12px 20px;
             width: 300px;
-            border: 2px solid #444;
-            border-radius: 6px;
+            border: 1px solid #000;
+            border-radius: 0;
             font-size: 16px;
-            background: #2a2a2a;
-            color: #fff;
-            transition: border-color 0.2s;
+            font-family: monospace;
+            background: #fff;
+            color: #000;
+            text-align: center;
         }
 
-        input[type="password"]:focus {
-            outline: none;
-            border-color: #666;
+        input[type="text"]:focus {
+            outline: 2px solid #000;
         }
 
         .error {
-            color: #ff6b6b;
-            font-size: 14px;
-            margin-bottom: 15px;
-        }
-
-        .success {
-            color: #51cf66;
+            color: #f00;
             font-size: 14px;
             margin-bottom: 15px;
         }
@@ -59,17 +49,51 @@
 </head>
 <body>
     <div class="container">
-        {% if error == 'too_many_attempts' %}
-        <div class="error">Too many failed attempts. Locked out for {{ lockout_time // 60 }} minutes.</div>
-        {% elif request.args.get('error') == '1' %}
-        <div class="error">Invalid password{% if request.args.get('attempts_left') %} ({{ request.args.get('attempts_left') }} attempts left){% endif %}</div>
-        {% endif %}
-        {% if request.args.get('changed') == '1' %}
-        <div class="success">Password changed successfully</div>
-        {% endif %}
-        <form method="POST">
-            <input type="password" name="password" placeholder="Password" required autofocus autocomplete="current-password" {% if error == 'too_many_attempts' %}disabled{% endif %}>
-        </form>
+        <div id="error" class="error" style="display: none;"></div>
+        <input type="text" id="input" placeholder="" autofocus>
     </div>
+
+    <script>
+        const input = document.getElementById('input');
+        const errorDiv = document.getElementById('error');
+        let step = 'username';
+
+        input.addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                const value = input.value.trim();
+                if (!value) return;
+
+                try {
+                    const response = await fetch('/auth', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({step, value})
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        if (result.next === 'password') {
+                            step = 'password';
+                            input.value = '';
+                            input.type = 'password';
+                            errorDiv.style.display = 'none';
+                        } else if (result.next === 'dashboard') {
+                            window.location.href = '/dashboard';
+                        }
+                    } else {
+                        errorDiv.textContent = result.message || 'Access denied';
+                        errorDiv.style.display = 'block';
+                        input.value = '';
+                        step = 'username';
+                        input.type = 'text';
+                    }
+                } catch (err) {
+                    errorDiv.textContent = 'Connection error';
+                    errorDiv.style.display = 'block';
+                }
+            }
+        });
+    </script>
 </body>
 </html>
