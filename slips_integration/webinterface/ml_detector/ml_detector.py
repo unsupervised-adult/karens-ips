@@ -8,10 +8,14 @@ import os
 import subprocess
 import csv
 import io
+import redis
 from datetime import datetime, timedelta
 from typing import Dict, List
 from ..database.database import db
 from slips_files.common.slips_utils import utils
+
+# Create separate Redis connection to DB 1 for stream_ad_blocker stats
+redis_db1 = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
 
 # Add src directory to path for importing exception_manager
 sys.path.insert(0, '/opt/StratosphereLinuxIPS/../../../')
@@ -196,7 +200,7 @@ def get_stream_stats():
     Returns: Stream-specific detection stats from stream_ad_blocker service
     """
     try:
-        stats_raw = db.rdb.r.hgetall("stream_ad_blocker:stats")
+        stats_raw = redis_db1.hgetall("stream_ad_blocker:stats")
 
         if stats_raw:
             stats = {k.decode() if isinstance(k, bytes) else k:
