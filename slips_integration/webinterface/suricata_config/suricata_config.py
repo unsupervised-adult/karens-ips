@@ -788,14 +788,13 @@ def view_tls_dataset():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        # Get recent manually added domains (limit to 100 for performance)
+        # Get all domains (limit to 1000 for performance)
         cursor.execute("""
-            SELECT domain, source FROM blocked_domains 
-            WHERE source LIKE '%manual%' 
+            SELECT domain FROM blocked_domains 
             ORDER BY domain 
-            LIMIT 100
+            LIMIT 1000
         """)
-        manual_domains = cursor.fetchall()
+        all_domains = cursor.fetchall()
         
         # Get total count
         cursor.execute("SELECT COUNT(*) FROM blocked_domains")
@@ -803,14 +802,14 @@ def view_tls_dataset():
         
         conn.close()
         
-        domains = [{'domain': d[0], 'source': d[1]} for d in manual_domains]
+        domains = [{'domain': d[0]} for d in all_domains]
         
         return jsonify({
             'success': True, 
             'domains': domains, 
-            'manual_count': len(domains),
+            'count': len(domains),
             'total_count': total_count,
-            'message': f'Showing {len(domains)} manually added domains (Total in database: {total_count:,})'
+            'message': f'Showing {len(domains)} of {total_count:,} blocked domains'
         })
             
     except Exception as e:
