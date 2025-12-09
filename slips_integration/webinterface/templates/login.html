@@ -58,7 +58,7 @@
 </head>
 <body>
     <div class="container">
-        <img src="/static/images/logo.svg" alt="Karen's IPS" class="logo">
+        <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="Karen's IPS" class="logo">
         <div id="error" class="error" style="display: none;"></div>
         <label for="input" style="display: none;">Authentication input</label>
         <input type="text" id="input" placeholder="Enter username" title="Enter your username" autofocus>
