@@ -215,15 +215,15 @@
             </div>
 
             <div class="config-section">
-                <h3>TLS SNI Blocking Rules</h3>
-                <p>Generate Suricata drop rules from blocked domains database for true IPS inline blocking.</p>
+                <h3>Dataset-Based Domain Blocking</h3>
+                <p>Uses efficient O(1) hash table lookup with 3 Suricata rules (DNS/HTTP/TLS) instead of 345K+ individual rules.</p>
                 <div id="tls-rules-status" style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em;">
                     <div style="margin-bottom: 5px;"><strong>Domains in Database:</strong> <span id="tls-domains-count">-</span></div>
-                    <div style="margin-bottom: 5px;"><strong>Rules Generated:</strong> <span id="tls-rules-count">-</span></div>
+                    <div style="margin-bottom: 5px;"><strong>Dataset Entries:</strong> <span id="tls-rules-count">-</span> <span style="color: #666; font-size: 0.85em;">(3 rules + hash table)</span></div>
                     <div style="margin-bottom: 5px;"><strong>Last Updated:</strong> <span id="tls-rules-updated">Never</span></div>
                     <div><strong>Status:</strong> <span id="tls-rules-sync-status">-</span></div>
                 </div>
-                <button onclick="generateTlsSniRules()" class="btn-primary">Generate TLS SNI Rules</button>
+                <button onclick="generateTlsSniRules()" class="btn-primary">Generate Dataset</button>
                 <button onclick="checkTlsRulesStatus()" class="btn-secondary" style="margin-left: 10px;">Check Status</button>
             </div>
         </div>
