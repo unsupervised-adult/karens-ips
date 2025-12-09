@@ -25,6 +25,15 @@ def create_app():
 
 app = create_app()
 
+# Fix static_url_path for blueprints to use relative paths
+# SLIPS blueprints use absolute paths like "/analysis/static" which get prepended
+# with url_prefix causing /analysis/analysis/static/ duplication
+analysis.static_url_path = "/static"
+general.static_url_path = "/static"
+documentation.static_url_path = "/static"
+ml_detector.static_url_path = "/static"
+suricata_bp.static_url_path = "/static"
+
 # Register blueprints - MUST be outside if __name__ == "__main__"
 # because webinterface.sh runs with "python3 -m webinterface.app"
 app.register_blueprint(auth_bp)
