@@ -530,12 +530,13 @@ install_karens_ips_ml_modules() {
         # Create password file directory
         mkdir -p /etc/karens-ips
         
-        # Generate random password if not exists
+        # Generate bcrypt hash for default password if not exists
         if [[ ! -f /etc/karens-ips/.password ]]; then
-            log "Generating default password..."
-            echo 'admin:$2b$12$KixP.9Z4hZ0FqZ0ZQxZ0ZOQ0ZQxZ0ZOQ0ZQxZ0ZOQ0ZQxZ0ZOQ0' > /etc/karens-ips/.password
+            log "Generating default password (admin/admin)..."
+            # Generate proper bcrypt hash for 'admin'
+            python3 -c "import bcrypt; print(bcrypt.hashpw(b'admin', bcrypt.gensalt()).decode())" > /etc/karens-ips/.password
             chmod 600 /etc/karens-ips/.password
-            warn "Default credentials: admin / change-me-now"
+            warn "Default credentials: admin / admin"
             warn "Change password immediately after login!"
         fi
         
