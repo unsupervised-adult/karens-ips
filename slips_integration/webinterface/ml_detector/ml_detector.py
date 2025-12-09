@@ -136,7 +136,7 @@ def get_stats():
         stats = {
             "total_analyzed": f"{packets:,}" if packets > 0 else f"{total_profiles:,}",
             "ads_detected": str(total_evidence),
-            "legitimate_traffic": f"{packets - total_evidence:,}" if packets > 0 else str(total_profiles - total_evidence),
+            "legitimate_traffic": f"{packets - total_evidence:,}" if packets > 0 else "N/A",
             "accuracy": "94.2%",
             "detection_rate": f"{(total_evidence / packets * 100):.2f}%" if packets > 0 else "0.00%",
             "last_update": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
