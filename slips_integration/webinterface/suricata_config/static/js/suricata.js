@@ -1068,11 +1068,11 @@ async function removeTlsDomain(domain) {
 
 // TLS SNI Rule Generation Functions
 async function generateTlsSniRules() {
-    if (!confirm('Generate Suricata TLS SNI blocking rules from the blocked domains database?\n\nThis will create drop rules for all domains in the database and reload Suricata.\n\nThis may take several minutes for large databases.')) {
+    if (!confirm('Generate Suricata dataset from blocked domains database?\n\nThis creates an efficient hash table for DNS/HTTP/TLS blocking.\n\nThis may take a minute for large databases.')) {
         return;
     }
 
-    showNotification('Generating TLS SNI rules... This may take a few minutes.', 'info');
+    showNotification('Generating dataset... This uses efficient O(1) hash lookups.', 'info');
 
     try {
         const response = await fetch('/suricata/api/tls-sni/generate-rules', {
@@ -1110,22 +1110,22 @@ async function checkTlsRulesStatus() {
 
             // Update status display
             document.getElementById('tls-domains-count').textContent = status.domains_in_database.toLocaleString();
-            document.getElementById('tls-rules-count').textContent = status.rules_generated.toLocaleString();
-            document.getElementById('tls-rules-updated').textContent = status.rules_last_updated || 'Never';
+            document.getElementById('tls-rules-count').textContent = status.dataset_entries.toLocaleString();
+            document.getElementById('tls-rules-updated').textContent = status.dataset_last_updated || 'Never';
 
             // Set status color
             const statusEl = document.getElementById('tls-rules-sync-status');
             if (!status.rules_file_exists) {
                 statusEl.textContent = 'Not Generated';
                 statusEl.style.color = '#dc3545';
-            } else if (status.rules_up_to_date) {
-                statusEl.textContent = `Up to Date (${status.rules_file_size_mb} MB)`;
+            } else if (status.dataset_up_to_date) {
+                statusEl.textContent = `Up to Date (${status.dataset_file_size_mb} MB dataset)`;
                 statusEl.style.color = '#28a745';
             } else if (status.needs_regeneration) {
                 statusEl.textContent = 'Needs Regeneration';
                 statusEl.style.color = '#ffc107';
             } else {
-                statusEl.textContent = `${status.rules_file_size_mb} MB`;
+                statusEl.textContent = `${status.dataset_file_size_mb} MB dataset`;
                 statusEl.style.color = '#666';
             }
         }

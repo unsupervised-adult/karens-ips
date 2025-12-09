@@ -125,8 +125,8 @@
             </div>
 
             <div class="config-section">
-                <h3>TLS/HTTPS Domain Blocking (SNI)</h3>
-                <p>Block domains via TLS Server Name Indication. Uses Suricata datasets for efficient matching.</p>
+                <h3>Domain Blocking (DNS/HTTP/TLS)</h3>
+                <p>Block domains across all protocols using efficient Suricata datasets (O(1) hash lookup). Covers DNS queries, HTTP hosts, and TLS SNI.</p>
                 
                 <div class="form-group tls-form">
                     <input type="text" id="tls-domain" placeholder="example.com or ads.tracking.net" class="tls-domain-input">
@@ -151,9 +151,9 @@
                 </div>
 
                 <div id="tls-sni-rules" style="margin-top: 20px;">
-                    <h4>TLS SNI Rules</h4>
+                    <h4>Dataset Status</h4>
                     <div id="tls-rules-list">
-                        <p>Loading...</p>
+                        <p>Loading dataset status...</p>
                     </div>
                 </div>
             </div>

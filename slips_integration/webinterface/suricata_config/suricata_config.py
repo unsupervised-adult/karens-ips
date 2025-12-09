@@ -842,15 +842,16 @@ def sync_database_to_suricata():
 @suricata_bp.route('/api/tls-sni/generate-rules', methods=['POST'])
 def generate_tls_sni_rules():
     """
-    Generate Suricata drop rules from blocked domains database
-    This creates true IPS inline blocking based on TLS SNI
+    Generate Suricata dataset from blocked domains database
+    Uses efficient dataset keyword for DNS/HTTP/TLS blocking
     """
     try:
         import sqlite3
 
         # Path to the generation script
-        script_path = '/opt/StratosphereLinuxIPS/generate_suricata_rules.py'
-        rules_file = '/var/lib/suricata/rules/ml-detector-blocking.rules'
+        script_path = '/opt/StratosphereLinuxIPS/generate_dataset.py'
+        dataset_file = '/var/lib/suricata/datasets/blocked-domains.lst'
+        rules_file = '/var/lib/suricata/rules/ml-detector-dataset-blocking.rules'
 
         # Check if database exists
         if not os.path.exists(DB_PATH):
@@ -869,8 +870,8 @@ def generate_tls_sni_rules():
         # Check if script exists, if not return error with instruction
         if not os.path.exists(script_path):
             return jsonify({
-                'error': 'Rule generation script not found',
-                'message': 'Please deploy the generate_suricata_rules.py script to /opt/StratosphereLinuxIPS/'
+                'error': 'Dataset generation script not found',
+                'message': 'Please deploy the generate_dataset.py script to /opt/StratosphereLinuxIPS/'
             }), 500
 
         # Execute the generation script
@@ -882,43 +883,46 @@ def generate_tls_sni_rules():
         )
 
         if result.returncode == 0:
-            # Get generated rules count
-            rules_count = 0
-            if os.path.exists(rules_file):
-                with open(rules_file, 'r') as f:
-                    rules_count = sum(1 for line in f if line.strip() and not line.startswith('#'))
+            # Get dataset entry count
+            dataset_entries = 0
+            if os.path.exists(dataset_file):
+                with open(dataset_file, 'r') as f:
+                    dataset_entries = sum(1 for line in f if line.strip())
 
             return jsonify({
                 'success': True,
-                'message': f'Generated {rules_count} TLS SNI blocking rules from {domain_count} domains',
+                'message': f'Generated dataset with {dataset_entries} domains (efficient O(1) lookup)',
                 'details': {
                     'domains_in_db': domain_count,
-                    'rules_generated': rules_count,
+                    'dataset_entries': dataset_entries,
+                    'dataset_file': dataset_file,
                     'rules_file': rules_file,
+                    'approach': 'Suricata dataset (3 rules + 1 hash table)',
                     'output': result.stdout
                 }
             })
         else:
             return jsonify({
-                'error': 'Rule generation failed',
+        return jsonify({'error': 'Dataset generation failed',
                 'details': result.stderr,
                 'stdout': result.stdout
             }), 500
 
     except subprocess.TimeoutExpired:
-        return jsonify({'error': 'Rule generation timed out (too many domains)'}), 500
+        return jsonify({'error': 'Dataset generation timed out'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @suricata_bp.route('/api/tls-sni/rules-status')
 def get_tls_sni_rules_status():
     """
-    Get status of TLS SNI blocking rules
+    Get status of dataset-based blocking
     """
     try:
         import sqlite3
 
-        rules_file = '/var/lib/suricata/rules/ml-detector-blocking.rules'
+        dataset_file = '/var/lib/suricata/datasets/blocked-domains.lst'
+        rules_file = '/var/lib/suricata/rules/ml-detector-dataset-blocking.rules'
 
         # Get domain count from database
         domain_count = 0
@@ -929,30 +933,34 @@ def get_tls_sni_rules_status():
             domain_count = cursor.fetchone()[0]
             conn.close()
 
-        # Get rules count
-        rules_count = 0
-        rules_file_size = 0
-        rules_last_updated = None
+        # Get dataset count
+        dataset_entries = 0
+        dataset_file_size = 0
+        dataset_last_updated = None
 
-        if os.path.exists(rules_file):
-            with open(rules_file, 'r') as f:
-                rules_count = sum(1 for line in f if line.strip() and not line.startswith('#'))
-            rules_file_size = os.path.getsize(rules_file)
-            rules_last_updated = datetime.fromtimestamp(os.path.getmtime(rules_file)).strftime('%Y-%m-%d %H:%M:%S')
+        if os.path.exists(dataset_file):
+            with open(dataset_file, 'r') as f:
+                dataset_entries = sum(1 for line in f if line.strip())
+            dataset_file_size = os.path.getsize(dataset_file)
+            dataset_last_updated = datetime.fromtimestamp(os.path.getmtime(dataset_file)).strftime('%Y-%m-%d %H:%M:%S')
 
-        # Check if rules are up to date
-        rules_up_to_date = rules_count > 0 and rules_count == domain_count
+        # Check if dataset is up to date
+        dataset_up_to_date = dataset_entries > 0 and dataset_entries == domain_count
+        
+        # Check if rules file exists (should be static 3 rules)
+        rules_exist = os.path.exists(rules_file)
 
         return jsonify({
             'success': True,
             'status': {
                 'domains_in_database': domain_count,
-                'rules_generated': rules_count,
-                'rules_file_size_mb': round(rules_file_size / (1024 * 1024), 2),
-                'rules_last_updated': rules_last_updated,
-                'rules_up_to_date': rules_up_to_date,
-                'rules_file_exists': os.path.exists(rules_file),
-                'needs_regeneration': not rules_up_to_date
+                'dataset_entries': dataset_entries,
+                'dataset_file_size_mb': round(dataset_file_size / (1024 * 1024), 2),
+                'dataset_last_updated': dataset_last_updated,
+                'dataset_up_to_date': dataset_up_to_date,
+                'rules_file_exists': rules_exist,
+                'blocking_method': 'Suricata Dataset (3 rules + hash table)',
+                'needs_regeneration': not dataset_up_to_date
             }
         })
     except Exception as e:
