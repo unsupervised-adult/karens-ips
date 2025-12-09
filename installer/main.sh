@@ -239,15 +239,7 @@ main_install() {
         fi
     fi
 
-    # Phase 14: ML Detector Dashboard
-    if [[ "${INSTALL_ML_DETECTOR:-true}" == "true" ]]; then
-        if command -v install_ml_detector_dashboard &>/dev/null; then
-            log "Phase 14: Installing ML Detector Dashboard..."
-            install_ml_detector_dashboard
-        else
-            warn "Module install_ml_detector_dashboard not found, skipping..."
-        fi
-    fi
+    # Phase 14: ML Detector Dashboard (deployed with SLIPS web interface)
 
     # Phase 15: Network Interfaces
     if command -v setup_interfaces &>/dev/null; then
