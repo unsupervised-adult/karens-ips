@@ -1,0 +1,24 @@
+[Unit]
+Description=SLIPS ↔ Suricata Dataset Synchronization
+Documentation=https://github.com/unsupervised-adult/karens-ips
+After=network.target redis-server.service suricata.service slips.service
+Requires=redis-server.service suricata.service
+PartOf=slips.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/StratosphereLinuxIPS
+ExecStart=/opt/StratosphereLinuxIPS/venv/bin/python3 /opt/StratosphereLinuxIPS/slips_integration/slips_suricata_dataset_sync.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+Environment="PYTHONUNBUFFERED=1"
+Environment="REDIS_HOST=localhost"
+Environment="REDIS_PORT=6379"
+
+[Install]
+WantedBy=multi-user.target

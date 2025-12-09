@@ -139,6 +139,20 @@ install_stream_ad_blocker_service() {
 
     log "stream-ad-blocker service enabled (start via web UI)"
     success "stream-ad-blocker service installed"
+    
+    # Install SLIPS ↔ Suricata dataset sync service
+    log "Installing SLIPS ↔ Suricata dataset sync service..."
+    local sync_service_source="$PROJECT_ROOT/deployment/systemd/slips-suricata-sync.service"
+    local sync_service_dest="/etc/systemd/system/slips-suricata-sync.service"
+    
+    if [[ -f "$sync_service_source" ]]; then
+        cp "$sync_service_source" "$sync_service_dest"
+        systemctl daemon-reload
+        systemctl enable slips-suricata-sync.service
+        success "SLIPS ↔ Suricata dataset sync service installed"
+    else
+        warn "slips-suricata-sync.service not found at: $sync_service_source"
+    fi
 }
 
 # ============================================================================

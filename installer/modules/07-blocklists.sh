@@ -506,6 +506,12 @@ add_dataset_rules_to_config() {
     # Add after rule-files: line
     sed -i '/^rule-files:/a\  - ml-detector-dataset-blocking.rules' "$suricata_yaml"
     
+    # Add SLIPS integration rules if not present
+    if ! grep -q "slips-integration.rules" "$suricata_yaml"; then
+        sed -i '/^rule-files:/a\  - slips-integration.rules' "$suricata_yaml"
+        log "Added SLIPS integration rules to suricata.yaml"
+    fi
+    
     success "Dataset rules added to Suricata configuration"
 }
 

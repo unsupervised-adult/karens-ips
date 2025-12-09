@@ -216,6 +216,17 @@ start_ml_detector_services() {
     else
         log "Stream ad blocker service not installed (optional)"
     fi
+    
+    # Start SLIPS ↔ Suricata dataset sync
+    if [[ -f /etc/systemd/system/slips-suricata-sync.service ]]; then
+        if systemctl start slips-suricata-sync.service 2>/dev/null; then
+            success "SLIPS ↔ Suricata dataset sync service started"
+        else
+            warn "SLIPS ↔ Suricata dataset sync service failed to start"
+        fi
+    else
+        log "SLIPS ↔ Suricata dataset sync service not installed (optional)"
+    fi
 
     if [[ -f /etc/systemd/system/dns-labeler.service ]]; then
         if systemctl start dns-labeler.service 2>/dev/null; then
