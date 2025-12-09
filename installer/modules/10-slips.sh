@@ -504,18 +504,30 @@ install_karens_ips_ml_modules() {
         warn "Suricata configuration blueprint not found at $source_webinterface_dir/suricata_config"
     fi
     
-    # Install integrated app.py with authentication and ML detector
-    if [[ -f "$source_webinterface_dir/app.py" ]]; then
-        log "Installing ML detector integrated app.py..."
-        # Backup existing app.py if it exists
-        if [[ -f "$webinterface_dir/app.py" ]]; then
-            cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.backup" 2>/dev/null || true
+    # Patch app.py to add authentication
+    if [[ -f "$webinterface_dir/app.py" ]]; then
+        log "Patching app.py to add authentication..."
+        
+        # Backup existing app.py
+        cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.backup" 2>/dev/null || true
+        
+        # Add auth import and blueprint registration if not already present
+        if ! grep -q "from .auth import" "$webinterface_dir/app.py"; then
+            # Add import after other imports
+            sed -i '/^from flask import/a from .auth import auth_bp, login_required' "$webinterface_dir/app.py"
+            
+            # Register auth blueprint (find where other blueprints are registered)
+            sed -i '/app\.register_blueprint/i app.register_blueprint(auth_bp)' "$webinterface_dir/app.py" | head -1
+            
+            # Add login_required to index route
+            sed -i 's/@app\.route("\/")/& \n@login_required/' "$webinterface_dir/app.py"
+            
+            success "App.py patched with authentication"
+        else
+            log "App.py already patched with authentication"
         fi
-        cp "$source_webinterface_dir/app.py" "$webinterface_dir/app.py"
-        chmod 644 "$webinterface_dir/app.py"
-        success "ML detector integrated app.py installed"
     else
-        warn "app.py not found at $source_webinterface_dir/app.py"
+        warn "app.py not found at $webinterface_dir/app.py"
     fi
 
     # Install auth.py authentication module
