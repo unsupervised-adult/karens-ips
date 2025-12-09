@@ -9,7 +9,7 @@ import re
 suricata_bp = Blueprint('suricata', __name__, 
                        template_folder='templates',
                        static_folder='static',
-                       static_url_path='/suricata/static')
+                       static_url_path='/static')
 
 SURICATA_YAML = "/etc/suricata/suricata.yaml"
 RULES_DIR = "/var/lib/suricata/rules"

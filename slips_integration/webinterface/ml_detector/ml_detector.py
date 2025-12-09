@@ -33,7 +33,7 @@ ml_detector = Blueprint(
     "ml_detector",
     __name__,
     static_folder="static",
-    static_url_path="/ml_detector/static",
+    static_url_path="/static",
     template_folder="templates",
 )
 
