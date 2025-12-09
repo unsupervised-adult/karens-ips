@@ -6,7 +6,9 @@ Enterprise-grade Intrusion Prevention System combining ML behavioral analysis wi
 
 - **Behavioral Analysis** - ML-powered threat detection with adaptive learning (SLIPS)
 - **High-Performance IPS** - Suricata 8.0 in NFQUEUE bridge mode
-- **Dataset Intelligence** - 350K+ domain patterns with O(1) hash lookup
+- **Dataset Intelligence** - 350K+ domain patterns (hagezi/perflyst) with O(1) hash lookup
+- **TLS SNI Inspection** - Deep packet inspection at TLS handshake (bypasses encrypted DNS)
+- **DNS Dataset Integration** - Unified blocklist database synced to Suricata datasets
 - **Bidirectional Correlation** - SLIPS ↔ Suricata threat intelligence sync
 - **Unified Dashboard** - Network flows, telemetry analysis, configuration management
 - **Extensible Rules** - 12+ free threat intelligence sources
@@ -49,10 +51,10 @@ journalctl -fu slips
 
 **Configure threat feeds:**
 
-1. Web UI → Suricata tab → Pattern Intelligence
-2. Import threat intelligence feeds
-3. Sync to detection engine
-4. Generate optimized datasets
+1. Web UI → Suricata tab → DNS Blocklists
+2. Import hagezi (Pro/Normal) or perflyst (SmartTV/Android) lists
+3. Click "Sync to Suricata" to update dataset
+4. Configuration tab → "Generate Dataset" for TLS SNI rules
 
 ## Web UI
 
@@ -80,7 +82,9 @@ Internet → br0 (bridge) → NFQUEUE → Suricata (datasets) → SLIPS (ML) →
 
 **Dataset approach:**
 - 3 Suricata rules (DNS/HTTP/TLS) reference 1 hash table
-- O(1) lookup for 350K+ domains
+- O(1) lookup for 350K+ domains (hagezi Pro, perflyst SmartTV/Android)
+- TLS SNI inspection blocks HTTPS traffic at handshake
+- DNS dataset integration with SQLite backend
 - RFC1918 exemptions (won't block local DNS)
 
 ## Rule Sources
@@ -130,7 +134,9 @@ suricatasc -c "dataset-list"
 
 **LLM integration:** Configuration tab → Intelligence Settings (OpenAI/Ollama)
 
-**Threat feeds:** Detection Engine → Pattern Intelligence → Import → Sync
+**DNS blocklists:** Suricata tab → DNS Blocklists → hagezi (Pro/Pro++/Ultimate) or perflyst (SmartTV/Android/FireTV)
+
+**TLS SNI blocking:** Configuration tab → Generate Dataset (creates DNS/HTTP/TLS rules from unified database)
 
 **Exception management:** Operations → Manual Exception Entry
 
