@@ -572,8 +572,8 @@ install_karens_ips_ml_modules() {
     # Install SLIPS ↔ Suricata dataset sync
     log "Installing SLIPS ↔ Suricata dataset sync..."
     cp "$PROJECT_ROOT/slips_integration/slips_suricata_dataset_sync.py" \
-        "$slips_dir/slips_integration/"
-    chmod +x "$slips_dir/slips_integration/slips_suricata_dataset_sync.py"
+        "$SLIPS_DIR/slips_integration/"
+    chmod +x "$SLIPS_DIR/slips_integration/slips_suricata_dataset_sync.py"
     success "SLIPS ↔ Suricata dataset sync installed"
 
     # Install nftables blocking module (replaces iptables)
