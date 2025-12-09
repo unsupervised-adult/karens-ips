@@ -86,6 +86,15 @@ console.log("ML Detector JS: Script loaded");
             initializeMLDetector();
         }
         
+        // Force initialize after delay to ensure stats load even if tab events don't fire
+        setTimeout(function() {
+            console.log("ML Detector: Force initialization check");
+            if ($('#nav-ml-detector-tab').length > 0 && !isInitialized) {
+                console.log("ML Detector: Forcing initialization");
+                initializeMLDetector();
+            }
+        }, 1000);
+        
         // Cleanup on page unload
         $(window).on('beforeunload', function() {
             if (refreshInterval) {
