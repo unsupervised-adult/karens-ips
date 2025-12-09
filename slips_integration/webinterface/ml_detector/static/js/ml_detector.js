@@ -682,7 +682,7 @@ function saveSettings() {
         ml_parameters: {
             n_estimators: parseInt($('#n_estimators').val()),
             max_depth: parseInt($('#max_depth').val()),
-            model_type: $('#model_type_select').val()),
+            model_type: $('#model_type_select').val(),
             n_jobs: parseInt($('#cpu_cores').val()),
             auto_retrain: $('#auto_retrain').is(':checked'),
             retrain_interval_hours: parseInt($('#retrain_interval').val()),
