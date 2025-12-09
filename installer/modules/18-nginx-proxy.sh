@@ -201,6 +201,14 @@ configure_authentication() {
         log "Updating auth.py and login.html..."
         cp "$source_webinterface_dir/auth.py" "$webinterface_dir/auth.py" 2>/dev/null || true
         cp "$source_webinterface_dir/templates/login.html" "$webinterface_dir/templates/login.html" 2>/dev/null || true
+        
+        # Restart web UI to load updated files
+        if systemctl is-active --quiet slips-webui; then
+            log "Restarting slips-webui to load updated authentication..."
+            systemctl restart slips-webui
+            sleep 2
+        fi
+        
         success "Web interface authentication files updated"
     fi
 
