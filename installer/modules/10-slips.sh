@@ -634,7 +634,7 @@ verify_slips() {
 }
 
 patch_slips_redis_db() {
-    log "Installing SLIPS Redis DB 1 patch..."
+    log "Installing SLIPS whitelist compatibility patch..."
 
     local karens_ips_dir
     karens_ips_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -644,32 +644,32 @@ patch_slips_redis_db() {
 
     if [[ ! -f "$source_file" ]]; then
         warn "Patched database.py not found at: $source_file"
-        warn "Skipping Redis DB 1 patch"
+        warn "Skipping whitelist patch"
         return 0
     fi
 
     if [[ ! -f "$dest_file" ]]; then
         warn "Destination database.py not found at: $dest_file"
-        warn "Skipping Redis DB 1 patch"
+        warn "Skipping whitelist patch"
         return 0
     fi
 
-    # Check if already patched (look for db=1 in redis connection)
-    if grep -q "db=1" "$dest_file"; then
-        success "SLIPS Redis DB 1 patch already applied"
+    # Check if already patched (look for new sadd whitelist method)
+    if grep -q "self.rcache.sadd(key, \*org_info)" "$dest_file"; then
+        success "SLIPS whitelist patch already applied"
         return 0
     fi
 
     log "Backing up original database.py..."
     cp "$dest_file" "${dest_file}.backup"
 
-    log "Installing patched database.py for Redis DB 1..."
+    log "Installing patched database.py with new whitelist methods..."
     if cp "$source_file" "$dest_file"; then
-        success "Redis DB 1 patch installed successfully"
-        if grep -q "db=1" "$dest_file"; then
-            success "✓ Redis DB 1 patch verification successful"
+        success "Patched database.py installed successfully"
+        if grep -q "self.rcache.sadd(key, \*org_info)" "$dest_file"; then
+            success "✓ Whitelist patch verification successful"
         else
-            warn "File copied but verification failed"
+            warn "File copied but verification failed (sadd method not found)"
         fi
     else
         warn "Failed to copy patched database.py"
