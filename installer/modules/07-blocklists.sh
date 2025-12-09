@@ -476,12 +476,37 @@ sync_to_suricata() {
             fi
             
             success "Suricata dataset generated"
+            
+            # Add dataset rules to suricata.yaml if not already present
+            add_dataset_rules_to_config
         else
             warn "Dataset generator not found"
         fi
     else
         warn "Blocklist manager not found, skipping Suricata sync"
     fi
+}
+
+add_dataset_rules_to_config() {
+    local suricata_yaml="/etc/suricata/suricata.yaml"
+    
+    if [[ ! -f "$suricata_yaml" ]]; then
+        warn "Suricata config not found, skipping rule-files update"
+        return 1
+    fi
+    
+    # Check if dataset rules already configured
+    if grep -q "ml-detector-dataset-blocking.rules" "$suricata_yaml"; then
+        log "Dataset rules already configured in suricata.yaml"
+        return 0
+    fi
+    
+    log "Adding dataset rules to suricata.yaml..."
+    
+    # Add after rule-files: line
+    sed -i '/^rule-files:/a\  - ml-detector-dataset-blocking.rules' "$suricata_yaml"
+    
+    success "Dataset rules added to Suricata configuration"
 }
 
 show_blocklist_stats() {
