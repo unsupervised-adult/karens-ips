@@ -780,20 +780,38 @@ def add_tls_sni_domain():
 @suricata_bp.route('/api/tls-sni/view-dataset', methods=['POST'])
 def view_tls_dataset():
     try:
-        if not os.path.exists(IPS_FILTER_DB):
+        import sqlite3
+        
+        if not os.path.exists(DB_PATH):
             return jsonify({'error': 'Blocklist database not found'}), 404
         
-        result = subprocess.run([
-            IPS_FILTER_DB,
-            '--db-path', DB_PATH,
-            '--export'
-        ], capture_output=True, text=True, timeout=30)
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
         
-        if result.returncode == 0:
-            domains = [line.strip() for line in result.stdout.split('\n') if line.strip()]
-            return jsonify({'success': True, 'domains': domains, 'count': len(domains)})
-        else:
-            return jsonify({'error': 'Failed to read blocklist database'}), 500
+        # Get recent manually added domains (limit to 100 for performance)
+        cursor.execute("""
+            SELECT domain, source FROM blocked_domains 
+            WHERE source LIKE '%manual%' 
+            ORDER BY domain 
+            LIMIT 100
+        """)
+        manual_domains = cursor.fetchall()
+        
+        # Get total count
+        cursor.execute("SELECT COUNT(*) FROM blocked_domains")
+        total_count = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        domains = [{'domain': d[0], 'source': d[1]} for d in manual_domains]
+        
+        return jsonify({
+            'success': True, 
+            'domains': domains, 
+            'manual_count': len(domains),
+            'total_count': total_count,
+            'message': f'Showing {len(domains)} manually added domains (Total in database: {total_count:,})'
+        })
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
