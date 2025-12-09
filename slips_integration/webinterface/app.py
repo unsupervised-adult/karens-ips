@@ -16,7 +16,7 @@ from .auth import auth_bp, login_required
 
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder='static', static_url_path='/static')
     app.config["JSON_SORT_KEYS"] = False  # disable sorting of timewindows
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(32))
     app.config["PERMANENT_SESSION_LIFETIME"] = 3600  # 1 hour session
