@@ -205,7 +205,17 @@ start_ips_filter_web() {
 }
 
 start_ml_detector_services() {
-    log "Starting ML Detector labeling services..."
+    log "Starting ML Detector services..."
+
+    if [[ -f /etc/systemd/system/stream-ad-blocker.service ]]; then
+        if systemctl start stream-ad-blocker.service 2>/dev/null; then
+            success "Stream ad blocker service started"
+        else
+            warn "Stream ad blocker service failed to start"
+        fi
+    else
+        log "Stream ad blocker service not installed (optional)"
+    fi
 
     if [[ -f /etc/systemd/system/dns-labeler.service ]]; then
         if systemctl start dns-labeler.service 2>/dev/null; then
