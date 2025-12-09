@@ -903,7 +903,7 @@ def generate_tls_sni_rules():
             })
         else:
             return jsonify({
-        return jsonify({'error': 'Dataset generation failed',
+                'error': 'Dataset generation failed',
                 'details': result.stderr,
                 'stdout': result.stdout
             }), 500
