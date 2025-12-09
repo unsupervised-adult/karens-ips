@@ -944,8 +944,8 @@ def get_tls_sni_rules_status():
             dataset_file_size = os.path.getsize(dataset_file)
             dataset_last_updated = datetime.fromtimestamp(os.path.getmtime(dataset_file)).strftime('%Y-%m-%d %H:%M:%S')
 
-        # Check if dataset is up to date
-        dataset_up_to_date = dataset_entries > 0 and dataset_entries == domain_count
+        # Check if dataset is up to date (within 5% is acceptable due to encoding/deduplication)
+        dataset_up_to_date = dataset_entries > 0 and dataset_entries >= (domain_count * 0.95)
         
         # Check if rules file exists (should be static 3 rules)
         rules_exist = os.path.exists(rules_file)
