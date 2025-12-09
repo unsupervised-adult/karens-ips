@@ -113,32 +113,27 @@ def get_stats():
         
         # Count evidence (detections) across all profiles (evidence stored as Redis hashes)
         total_evidence = 0
+        total_flows = 0
         for profile_key in profile_keys:
             evidence_key = f"{profile_key}_evidence"
             evidence_count = slips_redis.hlen(evidence_key) if slips_redis.exists(evidence_key) else 0
             if evidence_count: total_evidence += evidence_count
+            
+            # Count total flows per profile (from timeline hash)
+            for tw_key in slips_redis.keys(f"{profile_key}_timewindow*_timeline"):
+                tw_flows = slips_redis.hlen(tw_key) if slips_redis.exists(tw_key) else 0
+                total_flows += tw_flows
         
-        # Get Suricata packet stats
-        packets = 0
-        stats_log = '/var/log/suricata/stats.log'
-        if os.path.exists(stats_log):
-            with open(stats_log, 'r') as f:
-                for line in f:
-                    if 'decoder.pkts' in line and '| Total |' in line:
-                        parts = line.split('|')
-                        if len(parts) >= 3:
-                            try:
-                                packets = int(parts[2].strip())
-                            except ValueError:
-                                pass
+        # Calculate legitimate flows (flows without evidence)
+        legitimate_flows = max(0, total_flows - total_evidence) if total_flows > 0 else 0
         
         # Build stats from SLIPS data
         stats = {
-            "total_analyzed": f"{packets:,}" if packets > 0 else f"{total_profiles:,}",
+            "total_analyzed": f"{total_flows:,}" if total_flows > 0 else f"{total_profiles:,}",
             "ads_detected": str(total_evidence),
-            "legitimate_traffic": f"{packets - total_evidence:,}" if packets > 0 else "N/A",
+            "legitimate_traffic": f"{legitimate_flows:,}",
             "accuracy": "94.2%",
-            "detection_rate": f"{(total_evidence / packets * 100):.2f}%" if packets > 0 else "0.00%",
+            "detection_rate": f"{(total_evidence / total_flows * 100):.2f}%" if total_flows > 0 else "0.00%",
             "last_update": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             "status": "Active - SLIPS Behavioral Analysis" if total_profiles > 0 else "Waiting for traffic"
         }
