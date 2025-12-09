@@ -444,6 +444,13 @@ sync_to_suricata() {
     local db_path="/var/lib/suricata/ips_filter.db"
     if [[ -x "$ips_filter_db" ]]; then
         $ips_filter_db --db-path "$db_path" --sync 2>&1 | grep -E "(Syncing|Successfully|Progress:|Warning:)" || true
+        
+        # Fix database permissions so web UI can read it
+        if [[ -f "$db_path" ]]; then
+            chmod 644 "$db_path"
+            chown root:www-data "$db_path"
+            log "Database permissions set for web UI access"
+        fi
     else
         warn "Blocklist manager not found, skipping Suricata sync"
     fi
