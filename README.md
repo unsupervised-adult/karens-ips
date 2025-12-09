@@ -137,9 +137,9 @@ suricatasc -c "dataset-list"
 ## Requirements
 
 - Ubuntu 24.04 LTS
-- 8GB+ RAM
-- 2+ CPU cores
-- Bridge interface (br0)
+- 16GB+ RAM (32GB recommended)
+- 8+ CPU cores (ML processing intensive)
+- 3 network interfaces (management + bridge pair)
 
 ## License
 
