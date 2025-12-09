@@ -504,13 +504,9 @@ install_karens_ips_ml_modules() {
         warn "Suricata configuration blueprint not found at $source_webinterface_dir/suricata_config"
     fi
     
-    # Install our integrated app.py with authentication and ML detector
+    # Install our complete app.py with all integrations (like it was working yesterday)
     if [[ -f "$source_webinterface_dir/app.py" ]]; then
-        log "Installing integrated app.py with authentication..."
-        # Backup existing app.py if it exists
-        if [[ -f "$webinterface_dir/app.py" ]]; then
-            cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.slips_original" 2>/dev/null || true
-        fi
+        log "Installing integrated app.py with authentication and custom modules..."
         cp "$source_webinterface_dir/app.py" "$webinterface_dir/app.py"
         chmod 644 "$webinterface_dir/app.py"
         success "Integrated app.py installed"
@@ -518,7 +514,7 @@ install_karens_ips_ml_modules() {
         warn "app.py not found at $source_webinterface_dir/app.py"
     fi
     
-    # Copy our app.html template that uses url_for correctly
+    # Install our app.html template
     if [[ -f "$source_webinterface_dir/templates/app.html" ]]; then
         log "Installing app.html template..."
         cp "$source_webinterface_dir/templates/app.html" "$webinterface_dir/templates/app.html"

@@ -191,25 +191,14 @@ AUTH_PAGE_EOF
 configure_authentication() {
     log_subsection "Authentication Setup"
 
-    # Ensure latest auth.py and login.html are deployed
-    local karens_ips_dir
-    karens_ips_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-    local source_webinterface_dir="$karens_ips_dir/slips_integration/webinterface"
-    local webinterface_dir="/opt/StratosphereLinuxIPS/modules/kalipso/kalipso"
-
-    if [[ -f "$source_webinterface_dir/auth.py" ]] && [[ -d "$webinterface_dir" ]]; then
-        log "Updating auth.py and login.html..."
-        cp "$source_webinterface_dir/auth.py" "$webinterface_dir/auth.py" 2>/dev/null || true
-        cp "$source_webinterface_dir/templates/login.html" "$webinterface_dir/templates/login.html" 2>/dev/null || true
-        
-        # Restart web UI to load updated files
-        if systemctl is-active --quiet slips-webui; then
-            log "Restarting slips-webui to load updated authentication..."
-            systemctl restart slips-webui
-            sleep 2
-        fi
-        
-        success "Web interface authentication files updated"
+    # Authentication files already deployed in SLIPS installation phase
+    # Just verify they exist
+    local webinterface_dir="/opt/StratosphereLinuxIPS/webinterface"
+    
+    if [[ -f "$webinterface_dir/auth.py" ]]; then
+        success "Authentication module verified at $webinterface_dir/auth.py"
+    else
+        warn "Authentication module not found - may have been deployed elsewhere"
     fi
 
     local htpasswd_file="/etc/nginx/.htpasswd"
