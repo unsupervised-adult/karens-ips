@@ -1,15 +1,15 @@
 # Karen's IPS
 
-Hybrid Intrusion Prevention System combining ML behavioral analysis (SLIPS) with signature-based detection (Suricata).
+Enterprise-grade Intrusion Prevention System combining ML behavioral analysis with signature-based detection for network security and traffic intelligence.
 
 ## Features
 
-- **SLIPS** - ML behavioral threat detection with adaptive learning
-- **Suricata 8.0** - High-performance IPS in NFQUEUE bridge mode
-- **Dataset Blocking** - 350K+ domains with O(1) hash lookup (3 rules + hash table)
-- **SLIPS ↔ Suricata Sync** - Bidirectional IP blocking correlation
-- **Web UI** - SLIPS dashboard, ML detector, Suricata config, LLM integration
-- **12 Free Rule Sources** - ET Open, abuse.ch, tgreen/hunting, stamus/lateral, etc.
+- **Behavioral Analysis** - ML-powered threat detection with adaptive learning (SLIPS)
+- **High-Performance IPS** - Suricata 8.0 in NFQUEUE bridge mode
+- **Dataset Intelligence** - 350K+ domain patterns with O(1) hash lookup
+- **Bidirectional Correlation** - SLIPS ↔ Suricata threat intelligence sync
+- **Unified Dashboard** - Network flows, telemetry analysis, configuration management
+- **Extensible Rules** - 12+ free threat intelligence sources
 
 ## Installation
 
@@ -22,12 +22,12 @@ sudo ./karens-ips-installer.sh
 **Time:** 15-30 minutes
 
 **What gets installed:**
-- Suricata 8.0 (NFQUEUE bridge mode)
-- SLIPS ML engine with Redis
-- Dataset-based domain blocking
-- Web UI with nginx reverse proxy
-- Community blocklists (hagezi, perflyst)
-- SystemD services
+- Suricata 8.0 (NFQUEUE inline mode)
+- SLIPS ML behavioral engine
+- Dataset-based pattern matching
+- Web management interface
+- Threat intelligence feeds
+- SystemD service integration
 
 ## Quick Start
 
@@ -47,26 +47,26 @@ systemctl restart suricata
 journalctl -fu slips
 ```
 
-**Import blocklists:**
+**Configure threat feeds:**
 
-1. Open web UI → Suricata tab → DNS Blocklists
-2. Click "Pro" or "Normal" to import hagezi lists
-3. Click "Sync to Suricata" to apply
-4. Generate dataset: Configuration tab → "Generate Dataset"
+1. Web UI → Suricata tab → Pattern Intelligence
+2. Import threat intelligence feeds
+3. Sync to detection engine
+4. Generate optimized datasets
 
-## Web UI Tabs
+## Web UI
 
-**SLIPS** - Network flows, behavioral analysis, evidence viewer
+**Network Analysis** - Flow visualization, behavioral profiling, evidence correlation
 
-**ML Detector** - Ad detection stats, QUIC analysis, model performance
+**Intelligence** - Telemetry analysis, protocol inspection, pattern detection
 
-**Suricata** - Rules, datasets, blocklists, CLI commands
+**Detection Engine** - Rule management, dataset configuration, source feeds
 
-**Configuration** - HOME_NET, dataset generation, LLM settings
+**Configuration** - Network topology, dataset generation, LLM integration
 
-**Actions** - Reload rules, update sources, whitelist IPs
+**Operations** - Rule updates, source management, exception handling
 
-**Database** - Query blocked domains, manage sources, sync to Suricata
+**Database** - Pattern queries, feed management, synchronization
 
 ## Architecture
 
@@ -128,11 +128,11 @@ suricatasc -c "dataset-list"
 
 **HOME_NET:** Set in web UI → Configuration tab
 
-**LLM integration:** Configuration tab → LLM Settings (OpenAI/Ollama)
+**LLM integration:** Configuration tab → Intelligence Settings (OpenAI/Ollama)
 
-**Blocklists:** Suricata tab → DNS Blocklists → Import → Sync
+**Threat feeds:** Detection Engine → Pattern Intelligence → Import → Sync
 
-**Whitelist:** Actions tab → Manual Whitelist Entry
+**Exception management:** Operations → Manual Exception Entry
 
 ## Requirements
 
@@ -149,54 +149,8 @@ GPL-2.0
 
 - SLIPS by Stratosphere Laboratory
 - Suricata by OISF
-- Blocklists by hagezi, perflyst
+- Threat intelligence by hagezi, perflyst
 
-**Add custom blocks:**
-
-```bash
-# Block specific domain
-ips-filter add malicious-site.com malware
-
-# Import domain list
-ips-filter import-list /path/to/domains.txt ads
-
-# Sync to Suricata (happens automatically)
-ips-filter sync
-```
-
-**Whitelist false positives:**
-
-```bash
-# Whitelist domain
-ips-filter exception add domain trusted-site.com "Business application"
-
-# Whitelist IP
-ips-filter exception add ip 192.168.1.100 "Internal server"
-
-# List all exceptions
-ips-filter exception list
-```
-
-**Update blocklists:**
-
-```bash
-# Manual update (normally runs weekly via systemd timer)
-ips-filter update-blocklists
-
-# View blocklist sources and counts
-ips-filter stats
-
-# Check update schedule
-systemctl list-timers blocklist-update.timer
-```
-
-### TLS SNI Blocking
-
-Block domains at TLS handshake level (bypasses DNS):
-
-**Via Web UI:**
-
-1. Navigate to "Suricata Config" tab
 ## Troubleshooting
 
 **Services not starting:**
@@ -232,14 +186,3 @@ systemctl restart ips-interfaces.service
 ## Documentation
 
 - [installer/README.md](installer/README.md) - Full installer documentation
-
-## License
-
-GPL-2.0
-
-## Credits
-
-- SLIPS by Stratosphere Laboratory
-- Suricata by OISF
-- Blocklists by hagezi, perflyst
-- **Feature Importance**: ML model feature weights visualization
