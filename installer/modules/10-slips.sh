@@ -91,20 +91,26 @@ clone_slips_repository() {
     else
         # Remove incomplete/invalid installation
         if [ -d "$SLIPS_DIR" ]; then
-            warn "Found incomplete SLIPS installation (missing slips.py), removing..."
-            
-            # Unmount any loop devices first (safety check)
-            local unmounted=0
-            for mount_point in "$SLIPS_DIR/output" "$SLIPS_DIR"/*; do
-                if mountpoint -q "$mount_point" 2>/dev/null; then
-                    log "Unmounting $mount_point..."
-                    umount "$mount_point" 2>/dev/null || true
-                    unmounted=1
-                fi
-            done
-            
-            [[ $unmounted -eq 0 ]] && log "No mounted filesystems found, proceeding with removal"
-            rm -rf "$SLIPS_DIR"
+            # Check if only output directory exists (created by log protection module)
+            local dir_count=$(find "$SLIPS_DIR" -mindepth 1 -maxdepth 1 -type d | wc -l)
+            if [ "$dir_count" -eq 1 ] && [ -d "$SLIPS_DIR/output" ] && [ ! -f "$SLIPS_DIR/slips.py" ]; then
+                log "Found only output directory (created by log protection), keeping structure"
+            else
+                warn "Found incomplete SLIPS installation (missing slips.py), removing..."
+                
+                # Unmount any loop devices first (safety check)
+                local unmounted=0
+                for mount_point in "$SLIPS_DIR/output" "$SLIPS_DIR"/*; do
+                    if mountpoint -q "$mount_point" 2>/dev/null; then
+                        log "Unmounting $mount_point..."
+                        umount "$mount_point" 2>/dev/null || true
+                        unmounted=1
+                    fi
+                done
+                
+                [[ $unmounted -eq 0 ]] && log "No mounted filesystems found, proceeding with removal"
+                rm -rf "$SLIPS_DIR"
+            fi
         fi
         
         # Clone SLIPS (latest version with new whitelist system)
