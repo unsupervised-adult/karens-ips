@@ -194,6 +194,15 @@ import_community_blocklists() {
         warn "Blocklist manager script not found in src/, stats will be unavailable"
     fi
 
+    # Install TLS SNI rule generator
+    if [[ -f "$PROJECT_ROOT/slips_integration/generate_suricata_rules.py" ]]; then
+        cp "$PROJECT_ROOT/slips_integration/generate_suricata_rules.py" "$SLIPS_DIR/generate_suricata_rules.py"
+        chmod 755 "$SLIPS_DIR/generate_suricata_rules.py"
+        success "TLS SNI rule generator installed"
+    else
+        warn "TLS SNI rule generator not found, web UI rule generation will be unavailable"
+    fi
+
     # Create blocklists directory
     create_dir "$BLOCKLISTS_DIR" "root:root" "755"
     cd "$BLOCKLISTS_DIR"
