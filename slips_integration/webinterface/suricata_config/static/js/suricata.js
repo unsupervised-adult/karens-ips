@@ -807,32 +807,36 @@ async function loadRuleSources() {
             return;
         }
         
-        let html = '<table class="data-table"><thead><tr>';
-        html += '<th>Source</th><th>Summary</th><th>License</th><th>Status</th><th>Action</th>';
-        html += '</tr></thead><tbody>';
+        let html = '<div style="display: grid; gap: 12px;">';
         
         data.sources.forEach(source => {
             const needsSubscription = source.subscription || source.license === 'Commercial';
-            html += '<tr>';
-            html += `<td><strong>${escapeHtml(source.name)}</strong></td>`;
-            html += `<td>${escapeHtml(source.summary || 'N/A')}</td>`;
-            html += `<td>${escapeHtml(source.license || 'Unknown')}</td>`;
-            html += `<td>${source.enabled ? '<span style="color: green;">✓ Enabled</span>' : '<span style="color: gray;">Disabled</span>'}</td>`;
-            html += '<td>';
+            const isFree = !needsSubscription;
+            
+            html += '<div style="display: flex; align-items: center; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid ' + (isFree ? '#2196F3' : '#ccc') + ';">';
+            html += '<div style="flex: 1;">';
+            html += `<div style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(source.name)}</div>`;
+            html += `<div style="font-size: 0.9em; color: #666;">${escapeHtml(source.summary || 'N/A')}</div>`;
+            if (!isFree) {
+                html += '<div style="font-size: 0.85em; color: #999; margin-top: 4px;">⚠️ Requires Subscription</div>';
+            }
+            html += '</div>';
+            html += '<div style="margin-left: 20px;">';
             
             if (needsSubscription && !source.enabled) {
-                html += '<span style="color: #999; font-size: 0.9em;">Requires Subscription</span>';
+                html += '<span style="color: #999; font-size: 0.9em;">Premium</span>';
             } else {
-                html += `<button onclick="toggleRuleSource('${escapeHtml(source.name)}', ${!source.enabled})" class="${source.enabled ? 'btn-danger' : 'btn-primary'}">`;
-                html += source.enabled ? 'Disable' : 'Enable';
-                html += '</button>';
+                html += `<label class="toggle-switch" title="${source.enabled ? 'Disable' : 'Enable'} ${escapeHtml(source.name)}">`;
+                html += `<input type="checkbox" ${source.enabled ? 'checked' : ''} onchange="toggleRuleSource('${escapeHtml(source.name)}', this.checked)">`;
+                html += '<span class="toggle-slider"></span>';
+                html += '</label>';
             }
             
-            html += '</td>';
-            html += '</tr>';
+            html += '</div>';
+            html += '</div>';
         });
         
-        html += '</tbody></table>';
+        html += '</div>';
         sourcesEl.innerHTML = html;
     } catch (error) {
         console.error('Failed to load rule sources:', error);
