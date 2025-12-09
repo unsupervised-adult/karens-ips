@@ -71,6 +71,11 @@
     margin: 0;
 }
 
+.stat-value {
+    font-size: 3rem;
+    font-weight: 700;
+}
+
 /* Charts */
 canvas {
     max-height: 250px;
