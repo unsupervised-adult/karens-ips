@@ -504,30 +504,25 @@ install_karens_ips_ml_modules() {
         warn "Suricata configuration blueprint not found at $source_webinterface_dir/suricata_config"
     fi
     
-    # Patch app.py to add authentication
-    if [[ -f "$webinterface_dir/app.py" ]]; then
-        log "Patching app.py to add authentication..."
-        
-        # Backup existing app.py
-        cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.backup" 2>/dev/null || true
-        
-        # Add auth import and blueprint registration if not already present
-        if ! grep -q "from .auth import" "$webinterface_dir/app.py"; then
-            # Add import after other imports
-            sed -i '/^from flask import/a from .auth import auth_bp, login_required' "$webinterface_dir/app.py"
-            
-            # Register auth blueprint (find where other blueprints are registered)
-            sed -i '/app\.register_blueprint/i app.register_blueprint(auth_bp)' "$webinterface_dir/app.py" | head -1
-            
-            # Add login_required to index route
-            sed -i 's/@app\.route("\/")/& \n@login_required/' "$webinterface_dir/app.py"
-            
-            success "App.py patched with authentication"
-        else
-            log "App.py already patched with authentication"
+    # Install our integrated app.py with authentication and ML detector
+    if [[ -f "$source_webinterface_dir/app.py" ]]; then
+        log "Installing integrated app.py with authentication..."
+        # Backup existing app.py if it exists
+        if [[ -f "$webinterface_dir/app.py" ]]; then
+            cp "$webinterface_dir/app.py" "$webinterface_dir/app.py.slips_original" 2>/dev/null || true
         fi
+        cp "$source_webinterface_dir/app.py" "$webinterface_dir/app.py"
+        chmod 644 "$webinterface_dir/app.py"
+        success "Integrated app.py installed"
     else
-        warn "app.py not found at $webinterface_dir/app.py"
+        warn "app.py not found at $source_webinterface_dir/app.py"
+    fi
+    
+    # Copy our app.html template that uses url_for correctly
+    if [[ -f "$source_webinterface_dir/templates/app.html" ]]; then
+        log "Installing app.html template..."
+        cp "$source_webinterface_dir/templates/app.html" "$webinterface_dir/templates/app.html"
+        chmod 644 "$webinterface_dir/templates/app.html"
     fi
 
     # Install auth.py authentication module
