@@ -218,7 +218,54 @@ Real-time protocol inspection for syndication networks and telemetry:
 - Features used
 - Last training date
 
-## QUIC/HTTP3 Stream Analysis Engine
+### SLIPS ↔ Suricata Dataset Synchronization
+
+The `slips_suricata_dataset_sync.py` service provides bidirectional integration between SLIPS behavioral analysis and Suricata signature-based detection.
+
+**How It Works:**
+
+1. **SLIPS → Suricata**: When SLIPS detects malicious behavior (C&C, port scans, malware), blocked IPs are added to `/var/lib/suricata/datasets/slips-blocked-ips.lst`
+2. **Suricata → SLIPS**: High-priority Suricata alerts (severity 1-2) are fed back to SLIPS for behavioral correlation
+3. **Combined Detection**: Both systems share intelligence for higher confidence blocking decisions
+
+**Dataset Files:**
+- `slips-blocked-ips.lst` - IPs blocked by SLIPS behavioral analysis
+- `suricata-detected-ips.lst` - IPs detected by Suricata signatures
+- `blocked-domains.lst` - Domains from blocklist DB (existing)
+
+**Suricata Integration Rules:**
+
+```suricata
+# Auto-generated in /var/lib/suricata/rules/slips-integration.rules
+drop ip $EXTERNAL_NET any -> $HOME_NET any (msg:"SLIPS Blocked IP (Behavioral)"; ip.src; dataset:isset,slips-blocked-ips; sid:9000001;)
+drop ip $HOME_NET any -> $EXTERNAL_NET any (msg:"SLIPS Blocked IP Destination"; ip.dst; dataset:isset,slips-blocked-ips; sid:9000002;)
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"Suricata + SLIPS Correlated Threat"; ip.src; dataset:isset,suricata-detected-ips; sid:9000003;)
+```
+
+**Service Management:**
+
+```bash
+# Start service
+sudo systemctl start slips-suricata-sync
+
+# Enable on boot
+sudo systemctl enable slips-suricata-sync
+
+# Check status
+sudo systemctl status slips-suricata-sync
+
+# View logs
+sudo journalctl -fu slips-suricata-sync
+```
+
+**Statistics:**
+
+Check Redis for sync statistics:
+```bash
+redis-cli HGETALL slips_suricata_sync:stats
+```
+
+### QUIC/HTTP3 Stream Analysis Engine
 
 The stream_ad_blocker.py service provides real-time QUIC stream analysis and filtering for syndication networks and telemetry endpoints.
 
