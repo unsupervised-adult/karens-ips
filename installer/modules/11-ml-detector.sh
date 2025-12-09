@@ -153,6 +153,23 @@ install_stream_ad_blocker_service() {
     else
         warn "slips-suricata-sync.service not found at: $sync_service_source"
     fi
+    
+    # Prepopulate Redis with ML detector initial data
+    prepopulate_ml_detector_redis
+}
+
+prepopulate_ml_detector_redis() {
+    log "Prepopulating Redis with ML detector data..."
+    
+    local prepop_script="$SLIPS_DIR/webinterface/ml_detector/prepopulate_redis.py"
+    
+    if [[ -f "$prepop_script" ]]; then
+        python3 "$prepop_script" 2>&1 | grep -v "^$" || warn "Failed to prepopulate Redis data"
+        success "ML detector Redis data initialized"
+    else
+        warn "Prepopulation script not found at: $prepop_script"
+        log "Dashboard may show 'Not Running' until services generate data"
+    fi
 }
 
 # ============================================================================
@@ -198,4 +215,5 @@ export -f install_ml_detector_service
 export -f copy_ml_feeder_script
 export -f install_stream_monitor_service
 export -f install_stream_ad_blocker_service
+export -f prepopulate_ml_detector_redis
 export -f verify_ml_detector
