@@ -27,7 +27,7 @@ app = create_app()
 
 # Register blueprints - MUST be outside if __name__ == "__main__"
 # because webinterface.sh runs with "python3 -m webinterface.app"
-app.register_blueprint(auth_bp, url_prefix="/auth")
+app.register_blueprint(auth_bp)
 app.register_blueprint(analysis, url_prefix="/analysis")
 app.register_blueprint(general, url_prefix="/general")
 app.register_blueprint(documentation, url_prefix="/documentation")
