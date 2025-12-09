@@ -818,8 +818,18 @@ class StreamAdBlocker:
                             detection_sources.append("Pattern:ad_domain")
                             confidence_scores.append(0.75)
 
-                        # Skip if no initial indicators
+                        # Log legitimate traffic for timeline
                         if not detection_sources:
+                            # This is legitimate traffic - log it for timeline
+                            timeline_entry = {
+                                'timestamp': datetime.now().isoformat(),
+                                'hour': datetime.now().strftime('%H:00'),
+                                'classification': 'legitimate',
+                                'confidence': 0.95,
+                                'method': 'clean_domain'
+                            }
+                            self.r_stats.lpush('ml_detector:timeline', json.dumps(timeline_entry))
+                            self.r_stats.ltrim('ml_detector:timeline', 0, 999)
                             continue
 
                         # Get flow data if available

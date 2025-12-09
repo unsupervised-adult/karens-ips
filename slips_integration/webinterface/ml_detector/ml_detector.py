@@ -475,19 +475,44 @@ def get_detection_timeline():
     Returns: Time-series data of detections from stream-ad-blocker (DB 1)
     """
     try:
+        from collections import defaultdict
+        from datetime import datetime, timedelta
+        
         # Fetch detection timeline from Redis DB 1 (stream-ad-blocker)
         timeline_data = redis_db1.lrange("ml_detector:timeline", 0, 999)
 
-        data = []
+        # Aggregate by hour
+        hourly_data = defaultdict(lambda: {'ads': 0, 'legitimate': 0})
+        
         for entry in timeline_data:
             try:
                 if isinstance(entry, bytes):
                     entry = entry.decode()
                 timeline_entry = json.loads(entry)
-                data.append(timeline_entry)
+                
+                hour = timeline_entry.get('hour', '')
+                classification = timeline_entry.get('classification', '')
+                
+                if hour and classification == 'ad':
+                    hourly_data[hour]['ads'] += 1
+                elif hour and classification == 'legitimate':
+                    hourly_data[hour]['legitimate'] += 1
+                    
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.warning(f"Skipping malformed timeline entry: {str(e)}")
                 continue
+
+        # Convert to chart format (last 24 hours)
+        now = datetime.now()
+        data = []
+        for i in range(23, -1, -1):
+            hour_time = now - timedelta(hours=i)
+            hour_label = hour_time.strftime('%H:00')
+            data.append({
+                'time': hour_label,
+                'ads': hourly_data[hour_label]['ads'],
+                'legitimate': hourly_data[hour_label]['legitimate']
+            })
 
         return jsonify({"data": data})
     except Exception as e:
