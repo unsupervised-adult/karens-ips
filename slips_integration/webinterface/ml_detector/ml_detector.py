@@ -111,12 +111,12 @@ def get_stats():
         profile_keys = slips_redis.keys('profile_*')
         total_profiles = len(profile_keys)
         
-        # Count evidence (detections) across all profiles
+        # Count evidence (detections) across all profiles (evidence stored as Redis hashes)
         total_evidence = 0
         for profile_key in profile_keys:
             evidence_key = f"{profile_key}_evidence"
-            evidence_count = slips_redis.scard(evidence_key)
-            total_evidence += evidence_count
+            evidence_count = slips_redis.hlen(evidence_key) if slips_redis.exists(evidence_key) else 0
+            if evidence_count: total_evidence += evidence_count
         
         # Get Suricata packet stats
         packets = 0
