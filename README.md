@@ -9,7 +9,10 @@ Enterprise-grade Intrusion Prevention System combining ML behavioral analysis wi
 - **Dataset Intelligence** - 350K+ domain patterns (hagezi/perflyst) with O(1) hash lookup
 - **TLS SNI Inspection** - Deep packet inspection at TLS handshake (bypasses encrypted DNS)
 - **DNS Dataset Integration** - Unified blocklist database synced to Suricata datasets
+- **Manual Domain Blocking** - Add/view individual domains via web UI with SQLite backend
+- **LLM Intelligence** - OpenAI/Ollama integration for threat analysis and evidence correlation
 - **Bidirectional Correlation** - SLIPS ↔ Suricata threat intelligence sync
+- **Real-Time Dashboard** - Live flow statistics, ML detector metrics, behavioral profiling
 - **Unified Dashboard** - Network flows, telemetry analysis, configuration management
 - **Extensible Rules** - 12+ free threat intelligence sources
 
@@ -58,17 +61,21 @@ journalctl -fu slips
 
 ## Web UI
 
+**Dashboard** - Real-time network statistics, system health monitoring
+
+**ML Detector** - Live flow analysis (29K+ flows), suspicious activity tracking, behavioral metrics
+
 **Network Analysis** - Flow visualization, behavioral profiling, evidence correlation
 
-**Intelligence** - Telemetry analysis, protocol inspection, pattern detection
+**Intelligence** - Telemetry analysis, protocol inspection, pattern detection, LLM-powered threat analysis
 
-**Detection Engine** - Rule management, dataset configuration, source feeds
+**Suricata Config** - Rule management, dataset configuration, source feeds, manual domain blocking
 
-**Configuration** - Network topology, dataset generation, LLM integration
+**Configuration** - Network topology, dataset generation, LLM integration (OpenAI/Ollama)
 
 **Operations** - Rule updates, source management, exception handling
 
-**Database** - Pattern queries, feed management, synchronization
+**User Management** - Password changes, session management, authentication settings
 
 ## Architecture
 
@@ -132,9 +139,20 @@ suricatasc -c "dataset-list"
 
 **HOME_NET:** Set in web UI → Configuration tab
 
-**LLM integration:** Configuration tab → Intelligence Settings (OpenAI/Ollama)
+**LLM integration:** Configuration tab → Intelligence Settings
+- OpenAI API key for GPT-4 analysis
+- Ollama local models (llama3.2, mistral, etc.)
+- Automatic threat correlation and evidence analysis
 
-**DNS blocklists:** Suricata tab → DNS Blocklists → hagezi (Pro/Pro++/Ultimate) or perflyst (SmartTV/Android/FireTV)
+**DNS blocklists:** Suricata Config tab → DNS Blocklists
+- hagezi (Pro/Pro++/Ultimate) - 350K+ domains
+- perflyst (SmartTV/Android/FireTV) - Tracking prevention
+- Automatic sync to Suricata datasets
+
+**Manual domain blocking:** Suricata Config tab → Add TLS SNI Domain
+- Add individual domains to blocklist
+- View manually added domains (reads SQLite directly)
+- Instant dataset regeneration and Suricata reload
 
 **TLS SNI blocking:** Configuration tab → Generate Dataset (creates DNS/HTTP/TLS rules from unified database)
 
