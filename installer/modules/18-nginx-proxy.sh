@@ -57,10 +57,20 @@ install_nginx() {
     fi
 
     log "Installing nginx and required packages..."
-    apt-get install -y nginx apache2-utils || {
-        error "Failed to install nginx"
-        return 1
-    }
+    
+    # Wait for dpkg lock to be released (up to 5 minutes)
+    local wait_time=0
+    local max_wait=300
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+        if [ $wait_time -ge $max_wait ]; then
+            error_exit "Failed to acquire dpkg lock after ${max_wait}s - another package manager is running"
+        fi
+        log "Waiting for package manager lock... (${wait_time}s)"
+        sleep 10
+        wait_time=$((wait_time + 10))
+    done
+    
+    apt-get install -y nginx apache2-utils || error_exit "Failed to install nginx"
 
     success "Nginx installed successfully"
 }
@@ -90,7 +100,7 @@ configure_ssl_certificate() {
         -out "$cert_file" \
         -subj "/C=US/ST=State/L=City/O=Karen's IPS/CN=${WEBUI_IP:-localhost}" \
         2>&1 | grep -v "^+" || {
-        error "Failed to generate SSL certificate"
+        warn "Failed to generate SSL certificate"
         return 1
     }
 
@@ -233,7 +243,7 @@ configure_authentication() {
 
     log "Creating authentication file..."
     htpasswd -bc "$htpasswd_file" "$username" "$password" || {
-        error "Failed to create authentication file"
+        warn "Failed to create authentication file"
         return 1
     }
 
@@ -377,7 +387,7 @@ NGINX_CONFIG_EOF
     if nginx -t 2>&1 | grep -q "successful"; then
         success "Nginx configuration valid"
     else
-        error "Nginx configuration test failed"
+        warn "Nginx configuration test failed"
         nginx -t
         return 1
     fi
@@ -389,7 +399,7 @@ enable_nginx_service() {
     log "Starting and enabling Nginx..."
     systemctl enable nginx || warn "Failed to enable nginx"
     systemctl restart nginx || {
-        error "Failed to start nginx"
+        warn "Failed to start nginx"
         systemctl status nginx --no-pager
         return 1
     }
