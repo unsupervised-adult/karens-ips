@@ -77,10 +77,15 @@ verify_services_status() {
 verify_suricata_config() {
     log "Suricata configuration test:"
 
-    if suricata -T -c /etc/suricata/suricata.yaml >/dev/null 2>&1; then
+    local test_output
+    test_output=$(suricata -T -c /etc/suricata/suricata.yaml 2>&1)
+    
+    if echo "$test_output" | grep -q "Configuration provided was successfully loaded"; then
         success "  Configuration test passed"
     else
         warn "  Configuration test failed"
+        log "  Errors:"
+        echo "$test_output" | grep -E "ERROR|Warning" | sed 's/^/    /'
     fi
 }
 
