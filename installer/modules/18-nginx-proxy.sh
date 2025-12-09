@@ -273,11 +273,6 @@ create_nginx_config() {
 # SPDX-FileCopyrightText: 2025 Karen's IPS
 # SPDX-License-Identifier: GPL-2.0-only
 
-# Rate limiting zones
-limit_req_zone $binary_remote_addr zone=login_limit:10m rate=5r/m;
-limit_req_zone $binary_remote_addr zone=general_limit:10m rate=30r/m;
-limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/m;
-
 # HTTP -> HTTPS redirect
 server {
     listen 80;
@@ -333,9 +328,15 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_buffering off;
 
+    # Static files - no rate limiting, with caching
+    location ~ ^/(analysis|general|ml_detector|suricata|documentation)/static/ {
+        proxy_pass http://WEBUI_IP:WEBUI_PORT;
+        expires 1h;
+        add_header Cache-Control "public, immutable";
+    }
+
     # Root location - proxy to Flask app
     location / {
-        limit_req zone=general_limit burst=10 nodelay;
         proxy_pass http://WEBUI_IP:WEBUI_PORT;
     }
 
@@ -347,9 +348,8 @@ server {
         proxy_set_header Connection "upgrade";
     }
 
-    # API endpoints with stricter rate limiting
+    # API endpoints
     location /api/ {
-        limit_req zone=api_limit burst=5 nodelay;
         proxy_pass http://WEBUI_IP:WEBUI_PORT;
     }
 
@@ -410,7 +410,6 @@ enable_nginx_service() {
     log "  Features enabled:"
     log "    ✓ TLS 1.2/1.3 encryption with modern ciphers"
     log "    ✓ Flask session-based authentication (no popups!)"
-    log "    ✓ Rate limiting (30 req/min general, 10 req/min API)"
     log "    ✓ Security headers (HSTS, X-Frame-Options, CSP)"
     log "    ✓ Auto HTTP->HTTPS redirect"
     log "    ✓ WebSocket support for real-time updates"
