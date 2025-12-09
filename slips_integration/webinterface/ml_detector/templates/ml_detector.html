@@ -621,6 +621,142 @@
                 </div>
               </div>
 
+              <!-- LLM Configuration -->
+              <div class="row mb-4">
+                <div class="col-12">
+                  <h6 class="text-primary border-bottom pb-2">🤖 LLM Enhancement (Alert Summarization & Risk Assessment)</h6>
+                  <small class="text-muted">OpenAI-compatible API for incident analysis and threat intelligence summarization</small>
+                </div>
+                <div class="col-md-12 mb-3">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="llm_enabled">
+                    <label class="form-check-label" for="llm_enabled">
+                      <strong>Enable LLM Analysis</strong>
+                    </label>
+                  </div>
+                  <small class="text-muted">Provides AI-powered alert summarization, behavior analysis, and risk prioritization</small>
+                </div>
+                <div class="col-md-6">
+                  <label for="llm_endpoint" class="form-label">
+                    <i class="bi bi-cloud"></i> API Endpoint URL
+                    <small class="text-muted">(OpenAI-compatible)</small>
+                  </label>
+                  <input type="url" class="form-control" id="llm_endpoint" 
+                         placeholder="https://api.openai.com/v1 or http://localhost:11434/v1"
+                         title="OpenAI API, Ollama, or compatible endpoint">
+                  <small class="text-muted">Examples: OpenAI, Ollama (http://localhost:11434/v1), or custom API</small>
+                </div>
+                <div class="col-md-6">
+                  <label for="llm_api_key" class="form-label">
+                    <i class="bi bi-key"></i> API Key
+                    <small class="text-muted">(optional for local Ollama)</small>
+                  </label>
+                  <input type="password" class="form-control" id="llm_api_key" 
+                         placeholder="sk-... (leave empty for Ollama)"
+                         title="API key for OpenAI or compatible service">
+                  <small class="text-muted">Required for OpenAI, optional for Ollama/local models</small>
+                </div>
+              </div>
+
+              <div class="row mb-4">
+                <div class="col-md-4">
+                  <label for="llm_model" class="form-label">
+                    <i class="bi bi-cpu"></i> Model Name
+                  </label>
+                  <select class="form-select" id="llm_model">
+                    <optgroup label="OpenAI Models">
+                      <option value="gpt-4o">GPT-4o (Recommended)</option>
+                      <option value="gpt-4o-mini" selected>GPT-4o-mini (Fast & Cheap)</option>
+                      <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                    </optgroup>
+                    <optgroup label="Local Ollama Models">
+                      <option value="qwen2.5:3b">Qwen 2.5 3B (Recommended)</option>
+                      <option value="qwen2.5:1.5b">Qwen 2.5 1.5B (Faster)</option>
+                      <option value="llama3.2:3b">Llama 3.2 3B</option>
+                      <option value="phi4:latest">Phi-4 Mini</option>
+                      <option value="gemma2:2b">Gemma 2 2B</option>
+                    </optgroup>
+                    <optgroup label="Custom">
+                      <option value="custom">Custom Model</option>
+                    </optgroup>
+                  </select>
+                  <small class="text-muted">Choose model or select "Custom" to type manually</small>
+                </div>
+                <div class="col-md-4" id="llm_custom_model_container" style="display: none;">
+                  <label for="llm_custom_model" class="form-label">
+                    Custom Model Name
+                  </label>
+                  <input type="text" class="form-control" id="llm_custom_model" 
+                         placeholder="model-name:tag"
+                         title="Custom model identifier">
+                </div>
+                <div class="col-md-4">
+                  <label for="llm_max_tokens" class="form-label">
+                    Max Tokens (Response)
+                  </label>
+                  <input type="number" class="form-control" id="llm_max_tokens" 
+                         min="256" max="16384" step="256" value="2048">
+                  <small class="text-muted">Shorter = faster, longer = detailed</small>
+                </div>
+                <div class="col-md-4">
+                  <label for="llm_temperature" class="form-label">
+                    Temperature
+                    <small class="text-muted">(creativity)</small>
+                  </label>
+                  <input type="range" class="form-range" id="llm_temperature" 
+                         min="0" max="1" step="0.1" value="0.3">
+                  <div class="text-center" id="llm_temperature_value">0.3</div>
+                  <small class="text-muted">Lower = focused, higher = creative</small>
+                </div>
+              </div>
+
+              <div class="row mb-4">
+                <div class="col-12">
+                  <h6 class="text-primary border-bottom pb-2">🎯 LLM Analysis Features</h6>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="llm_alert_summarization" checked>
+                    <label class="form-check-label" for="llm_alert_summarization">
+                      Alert Summarization
+                    </label>
+                  </div>
+                  <small class="text-muted">Generate human-readable alert summaries</small>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="llm_behavior_analysis" checked>
+                    <label class="form-check-label" for="llm_behavior_analysis">
+                      Behavior Analysis
+                    </label>
+                  </div>
+                  <small class="text-muted">Analyze flow patterns and identify behaviors</small>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="llm_risk_assessment" checked>
+                    <label class="form-check-label" for="llm_risk_assessment">
+                      Risk Assessment
+                    </label>
+                  </div>
+                  <small class="text-muted">Prioritize incidents by severity and impact</small>
+                </div>
+              </div>
+
+              <div class="row mb-4">
+                <div class="col-md-6">
+                  <button type="button" class="btn btn-primary w-100" id="test_llm_connection">
+                    <i class="bi bi-wifi"></i> Test LLM Connection
+                  </button>
+                  <small class="text-muted">Verify API endpoint and model availability</small>
+                </div>
+                <div class="col-md-6">
+                  <div id="llm_connection_status" class="alert alert-info mt-2" style="display: none;">
+                    <strong>Status:</strong> <span id="llm_status_text">Not tested</span>
+                  </div>
+                </div>
+              </div>
+
               <!-- Training Settings -->
               <div class="row mb-4">
                 <div class="col-12">

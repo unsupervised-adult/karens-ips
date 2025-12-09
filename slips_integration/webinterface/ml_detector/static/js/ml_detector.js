@@ -589,6 +589,7 @@ function populateForm(config) {
     const dt = config.detection_thresholds || {};
     const pd = config.protocol_detection || {};
     const ml = config.ml_parameters || {};
+    const llm = config.llm_config || {};
     
     $('#streaming_min_duration').val(dt.streaming_min_duration || 120);
     $('#ad_duration_min').val(dt.ad_duration_min || 5);
@@ -619,6 +620,24 @@ function populateForm(config) {
     $('#retrain_interval').val(ml.retrain_interval_hours || 24);
     $('#min_training_samples').val(ml.min_samples_for_training || 100);
     
+    // LLM Configuration
+    $('#llm_enabled').prop('checked', llm.enabled || false);
+    $('#llm_endpoint').val(llm.endpoint || 'https://api.openai.com/v1');
+    $('#llm_api_key').val(llm.api_key || '');
+    $('#llm_model').val(llm.model || 'gpt-4o-mini');
+    if (llm.model === 'custom' || !['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'qwen2.5:3b', 'qwen2.5:1.5b', 'llama3.2:3b', 'phi4:latest', 'gemma2:2b'].includes(llm.model)) {
+        $('#llm_model').val('custom');
+        $('#llm_custom_model').val(llm.model || '');
+        $('#llm_custom_model_container').show();
+    }
+    $('#llm_max_tokens').val(llm.max_tokens || 2048);
+    const llmTemp = llm.temperature !== undefined ? llm.temperature : 0.3;
+    $('#llm_temperature').val(llmTemp);
+    $('#llm_temperature_value').text(llmTemp);
+    $('#llm_alert_summarization').prop('checked', llm.features?.alert_summarization !== false);
+    $('#llm_behavior_analysis').prop('checked', llm.features?.behavior_analysis !== false);
+    $('#llm_risk_assessment').prop('checked', llm.features?.risk_assessment !== false);
+    
     const perf = config.performance || {};
     $('#cache_predictions').prop('checked', perf.cache_predictions !== false);
 }
@@ -632,6 +651,8 @@ $('#confidence_threshold').on('input', function() {
 });
 
 function saveSettings() {
+    const llmModel = $('#llm_model').val() === 'custom' ? $('#llm_custom_model').val() : $('#llm_model').val();
+    
     const config = {
         detection_thresholds: {
             streaming_min_duration: parseFloat($('#streaming_min_duration').val()),
@@ -652,11 +673,24 @@ function saveSettings() {
         ml_parameters: {
             n_estimators: parseInt($('#n_estimators').val()),
             max_depth: parseInt($('#max_depth').val()),
-            model_type: $('#model_type_select').val(),
+            model_type: $('#model_type_select').val()),
             n_jobs: parseInt($('#cpu_cores').val()),
             auto_retrain: $('#auto_retrain').is(':checked'),
             retrain_interval_hours: parseInt($('#retrain_interval').val()),
             min_samples_for_training: parseInt($('#min_training_samples').val())
+        },
+        llm_config: {
+            enabled: $('#llm_enabled').is(':checked'),
+            endpoint: $('#llm_endpoint').val(),
+            api_key: $('#llm_api_key').val(),
+            model: llmModel,
+            max_tokens: parseInt($('#llm_max_tokens').val()),
+            temperature: parseFloat($('#llm_temperature').val()),
+            features: {
+                alert_summarization: $('#llm_alert_summarization').is(':checked'),
+                behavior_analysis: $('#llm_behavior_analysis').is(':checked'),
+                risk_assessment: $('#llm_risk_assessment').is(':checked')
+            }
         },
         feature_weights: currentConfig.feature_weights || {},
         performance: {
@@ -726,6 +760,50 @@ function restartMonitor() {
         error: function(xhr, status, error) {
             console.error('Error restarting monitor:', error);
             showStatus('Failed to restart monitor', 'danger');
+        }
+    });
+}
+
+function testLLMConnection() {
+    const endpoint = $('#llm_endpoint').val();
+    const apiKey = $('#llm_api_key').val();
+    const model = $('#llm_model').val() === 'custom' ? $('#llm_custom_model').val() : $('#llm_model').val();
+    
+    if (!endpoint) {
+        $('#llm_connection_status').show().removeClass('alert-success alert-danger').addClass('alert-warning');
+        $('#llm_status_text').text('Please enter an API endpoint URL');
+        return;
+    }
+    
+    $('#llm_connection_status').show().removeClass('alert-success alert-danger alert-warning').addClass('alert-info');
+    $('#llm_status_text').html('<i class="spinner-border spinner-border-sm"></i> Testing connection...');
+    $('#test_llm_connection').prop('disabled', true);
+    
+    $.ajax({
+        url: '/ml_detector/test_llm',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            endpoint: endpoint,
+            api_key: apiKey,
+            model: model
+        }),
+        timeout: 30000,
+        success: function(data) {
+            if (data.success) {
+                $('#llm_connection_status').removeClass('alert-info alert-danger alert-warning').addClass('alert-success');
+                $('#llm_status_text').html(`<i class="bi bi-check-circle-fill"></i> Connection successful!<br><small>${data.message}</small>`);
+            } else {
+                $('#llm_connection_status').removeClass('alert-info alert-success alert-warning').addClass('alert-danger');
+                $('#llm_status_text').html(`<i class="bi bi-x-circle-fill"></i> Connection failed:<br><small>${data.error}</small>`);
+            }
+        },
+        error: function(xhr, status, error) {
+            $('#llm_connection_status').removeClass('alert-info alert-success alert-warning').addClass('alert-danger');
+            $('#llm_status_text').html(`<i class="bi bi-x-circle-fill"></i> Connection error:<br><small>${error || 'Network error'}</small>`);
+        },
+        complete: function() {
+            $('#test_llm_connection').prop('disabled', false);
         }
     });
 }
@@ -1213,6 +1291,21 @@ $(document).ready(function() {
     $('#preset_conservative').on('click', () => applyPreset('conservative'));
     $('#preset_short_videos').on('click', () => applyPreset('short_videos'));
     $('#preset_quic').on('click', () => applyPreset('quic_optimized'));
+
+    // LLM Configuration handlers
+    $('#llm_model').on('change', function() {
+        if ($(this).val() === 'custom') {
+            $('#llm_custom_model_container').show();
+        } else {
+            $('#llm_custom_model_container').hide();
+        }
+    });
+
+    $('#llm_temperature').on('input', function() {
+        $('#llm_temperature_value').text($(this).val());
+    });
+
+    $('#test_llm_connection').on('click', testLLMConnection);
 
     // Alerts & Actions event handlers
     $('#live_blocking_toggle').on('change', toggleBlocking);

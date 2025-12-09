@@ -311,6 +311,87 @@ def update_settings():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@ml_detector.route("/test_llm", methods=["POST"])
+def test_llm_connection():
+    """Test LLM API connection"""
+    try:
+        from openai import OpenAI
+        import time
+        
+        data = request.get_json()
+        endpoint = data.get('endpoint', 'https://api.openai.com/v1')
+        api_key = data.get('api_key', '')
+        model = data.get('model', 'gpt-4o-mini')
+        
+        if not endpoint:
+            return jsonify({"success": False, "error": "Endpoint URL is required"}), 400
+        
+        # For Ollama, api_key can be empty
+        if not api_key and 'ollama' not in endpoint.lower():
+            return jsonify({"success": False, "error": "API key is required for non-Ollama endpoints"}), 400
+        
+        # Initialize OpenAI client with custom endpoint
+        client = OpenAI(
+            base_url=endpoint,
+            api_key=api_key if api_key else "ollama"  # Ollama doesn't need real key
+        )
+        
+        # Test with a simple completion
+        start_time = time.time()
+        try:
+            completion = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "Respond with 'OK' if you can see this message."}
+                ],
+                max_tokens=10,
+                temperature=0.1
+            )
+            
+            response_time = time.time() - start_time
+            response_text = completion.choices[0].message.content
+            
+            return jsonify({
+                "success": True,
+                "message": f"Model: {model}<br>Response time: {response_time:.2f}s<br>Response: {response_text}",
+                "model": model,
+                "response_time": response_time
+            })
+        
+        except Exception as api_error:
+            error_msg = str(api_error)
+            if "model_not_found" in error_msg or "does not exist" in error_msg:
+                return jsonify({
+                    "success": False,
+                    "error": f"Model '{model}' not found. For Ollama, run: ollama pull {model}"
+                }), 404
+            elif "Connection" in error_msg or "connect" in error_msg.lower():
+                return jsonify({
+                    "success": False,
+                    "error": f"Cannot connect to {endpoint}. Ensure service is running."
+                }), 503
+            elif "unauthorized" in error_msg.lower() or "authentication" in error_msg.lower():
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid API key. Check your credentials."
+                }), 401
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": f"API Error: {error_msg}"
+                }), 500
+                
+    except ImportError:
+        return jsonify({
+            "success": False,
+            "error": "OpenAI library not installed. Run: pip install openai"
+        }), 500
+    except Exception as e:
+        logger.error(f"Error testing LLM connection: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @ml_detector.route("/settings/preset/<preset_name>", methods=["POST"])
 def apply_preset(preset_name):
     """Apply a preset configuration"""
