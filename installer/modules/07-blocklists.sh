@@ -194,13 +194,22 @@ import_community_blocklists() {
         warn "Blocklist manager script not found in src/, stats will be unavailable"
     fi
 
-    # Install TLS SNI rule generator
-    if [[ -f "$PROJECT_ROOT/slips_integration/generate_suricata_rules.py" ]]; then
-        cp "$PROJECT_ROOT/slips_integration/generate_suricata_rules.py" "$SLIPS_DIR/generate_suricata_rules.py"
-        chmod 755 "$SLIPS_DIR/generate_suricata_rules.py"
-        success "TLS SNI rule generator installed"
+    # Install dataset generator (efficient replacement for individual rules)
+    if [[ -f "$PROJECT_ROOT/slips_integration/generate_dataset.py" ]]; then
+        cp "$PROJECT_ROOT/slips_integration/generate_dataset.py" "$SLIPS_DIR/generate_dataset.py"
+        chmod 755 "$SLIPS_DIR/generate_dataset.py"
+        success "Dataset generator installed"
     else
-        warn "TLS SNI rule generator not found, web UI rule generation will be unavailable"
+        warn "Dataset generator not found"
+    fi
+    
+    # Deploy dataset-based blocking rules
+    if [[ -f "$PROJECT_ROOT/deployment/suricata-rules/ml-detector-dataset-blocking.rules" ]]; then
+        mkdir -p /var/lib/suricata/rules
+        cp "$PROJECT_ROOT/deployment/suricata-rules/ml-detector-dataset-blocking.rules" /var/lib/suricata/rules/
+        success "Dataset blocking rules deployed"
+    else
+        warn "Dataset blocking rules not found"
     fi
 
     # Create blocklists directory
@@ -450,6 +459,25 @@ sync_to_suricata() {
             chmod 644 "$db_path"
             chown root:www-data "$db_path"
             log "Database permissions set for web UI access"
+        fi
+        
+        # Generate Suricata dataset (single file, memory efficient)
+        log "Generating Suricata dataset from blocklist..."
+        
+        if [[ -x "$SLIPS_DIR/generate_dataset.py" ]]; then
+            mkdir -p /var/lib/suricata/datasets
+            python3 "$SLIPS_DIR/generate_dataset.py" 2>&1 | grep -v "^$"
+            
+            # Set permissions for Suricata to read
+            if [[ -f "/var/lib/suricata/datasets/blocked-domains.lst" ]]; then
+                chmod 644 /var/lib/suricata/datasets/blocked-domains.lst
+                chown root:suricata /var/lib/suricata/datasets/blocked-domains.lst
+                log "Dataset permissions set for Suricata"
+            fi
+            
+            success "Suricata dataset generated"
+        else
+            warn "Dataset generator not found"
         fi
     else
         warn "Blocklist manager not found, skipping Suricata sync"
