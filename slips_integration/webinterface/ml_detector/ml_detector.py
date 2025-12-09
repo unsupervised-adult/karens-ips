@@ -119,9 +119,9 @@ def get_stats():
             evidence_count = slips_redis.hlen(evidence_key) if slips_redis.exists(evidence_key) else 0
             if evidence_count: total_evidence += evidence_count
             
-            # Count total flows per profile (from timeline hash)
+            # Count total flows per profile (from timeline sorted sets - zsets)
             for tw_key in slips_redis.keys(f"{profile_key}_timewindow*_timeline"):
-                tw_flows = slips_redis.hlen(tw_key) if slips_redis.exists(tw_key) else 0
+                tw_flows = slips_redis.zcard(tw_key) if slips_redis.exists(tw_key) else 0
                 total_flows += tw_flows
         
         # Calculate legitimate flows (flows without evidence)
