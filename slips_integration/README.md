@@ -135,6 +135,8 @@ If you prefer to install manually:
 
 3. **Access the dashboard:**
    - Open browser to `http://localhost:55000`
+   - Login with default credentials: `admin` / `admin`
+   - **Change password immediately** via user menu (top right) → Change Password
    - Click the "ML Detector" tab
    - Dashboard auto-refreshes every 5 seconds
 
