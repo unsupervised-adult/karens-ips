@@ -24,6 +24,13 @@
             text-align: center;
         }
 
+        .logo {
+            width: 120px;
+            height: auto;
+            margin-bottom: 40px;
+            display: inline-block;
+        }
+
         input[type="text"],
         input[type="password"] {
             padding: 12px 20px;
@@ -51,6 +58,7 @@
 </head>
 <body>
     <div class="container">
+        <img src="/static/images/logo.svg" alt="Karen's IPS" class="logo">
         <div id="error" class="error" style="display: none;"></div>
         <label for="input" style="display: none;">Authentication input</label>
         <input type="text" id="input" placeholder="Enter username" title="Enter your username" autofocus>
