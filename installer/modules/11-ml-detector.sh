@@ -71,6 +71,30 @@ install_stream_monitor_service() {
     # Ensure destination directory exists
     mkdir -p "$(dirname "$script_dest")"
 
+    # Copy ML detector template to main templates directory (Flask requirement)
+    log "Copying ML detector template to main templates directory..."
+    local ml_template_source="$PROJECT_ROOT/slips_integration/webinterface/ml_detector/templates/ml_detector.html"
+    local ml_template_dest="$SLIPS_DIR/webinterface/templates/ml_detector.html"
+    if [[ -f "$ml_template_source" ]]; then
+        cp "$ml_template_source" "$ml_template_dest"
+        log "ml_detector.html template copied"
+    else
+        warn "ml_detector.html template not found at: $ml_template_source"
+    fi
+
+    # Copy logo to static/images directory
+    log "Installing logo..."
+    local logo_source="$PROJECT_ROOT/slips_integration/webinterface/static/images/logo.svg"
+    local logo_dest="$SLIPS_DIR/webinterface/static/images/logo.svg"
+    mkdir -p "$(dirname "$logo_dest")"
+    if [[ -f "$logo_source" ]]; then
+        cp "$logo_source" "$logo_dest"
+        chown www-data:www-data "$logo_dest" 2>/dev/null || true
+        log "logo.svg installed"
+    else
+        warn "logo.svg not found at: $logo_source"
+    fi
+
     # Ensure the Python script is installed
     if [[ -f "$script_source" ]] && [[ ! -f "$script_dest" ]]; then
         cp "$script_source" "$script_dest"
