@@ -102,6 +102,25 @@
             <div class="config-section">
                 <h3>Rule Sources</h3>
                 <p>Enable or disable threat intelligence rule sources. Changes require rule update (~30-60 seconds).</p>
+                
+                <div style="background: #e7f3ff; border-left: 4px solid #2196F3; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+                    <strong>🆓 Free Sources Available:</strong>
+                    <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
+                        <li><strong>et/open</strong> - Emerging Threats Open (default, comprehensive)</li>
+                        <li><strong>oisf/trafficid</strong> - Traffic identification rules</li>
+                        <li><strong>abuse.ch/sslbl-blacklist</strong> - SSL/TLS threat intel</li>
+                        <li><strong>abuse.ch/sslbl-ja3</strong> - JA3 fingerprint detection</li>
+                        <li><strong>abuse.ch/feodotracker</strong> - Botnet C2 detection</li>
+                        <li><strong>abuse.ch/urlhaus</strong> - Malicious URL blocking</li>
+                        <li><strong>etnetera/aggressive</strong> - IP blacklist</li>
+                        <li><strong>tgreen/hunting</strong> - Threat hunting rules</li>
+                        <li><strong>stamus/lateral</strong> - Lateral movement detection</li>
+                        <li><strong>pawpatrules</strong> - Community IDS/IPS rules</li>
+                        <li><strong>ptrules/open</strong> - Positive Technologies ruleset</li>
+                        <li><strong>aleksibovellan/nmap</strong> - NMAP scan detection</li>
+                    </ul>
+                </div>
+
                 <div id="rule-sources-list">
                     <p>Loading rule sources...</p>
                 </div>
@@ -279,6 +298,23 @@
                     <input type="text" id="manual-whitelist-ip" placeholder="192.168.1.100 or 10.0.0.0/24" style="flex: 2;">
                     <button onclick="whitelistManualIP()" class="btn-primary">Whitelist IP</button>
                 </div>
+            </div>
+
+            <div class="action-card" style="background: #f8f9fa;">
+                <h3>CLI Commands Reference</h3>
+                <p style="margin-bottom: 15px;">Common suricata-update commands for SSH/terminal access:</p>
+                <div style="font-family: monospace; font-size: 0.9em; line-height: 1.8;">
+                    <div style="margin-bottom: 8px;"><code style="background: #fff; padding: 4px 8px; border-radius: 3px;">sudo suricata-update list-sources</code> - Show all available rule sources</div>
+                    <div style="margin-bottom: 8px;"><code style="background: #fff; padding: 4px 8px; border-radius: 3px;">sudo suricata-update list-enabled-sources</code> - Show enabled sources</div>
+                    <div style="margin-bottom: 8px;"><code style="background: #fff; padding: 4px 8px; border-radius: 3px;">sudo suricata-update enable-source SOURCE</code> - Enable a rule source</div>
+                    <div style="margin-bottom: 8px;"><code style="background: #fff; padding: 4px 8px; border-radius: 3px;">sudo suricata-update disable-source SOURCE</code> - Disable a rule source</div>
+                    <div style="margin-bottom: 8px;"><code style="background: #fff; padding: 4px 8px; border-radius: 3px;">sudo suricata-update</code> - Download and merge all enabled sources</div>
+                    <div style="margin-bottom: 8px;"><code style="background: #fff; padding: 4px 8px; border-radius: 3px;">sudo systemctl reload suricata</code> - Apply new rules without downtime</div>
+                    <div><code style="background: #fff; padding: 4px 8px; border-radius: 3px;">sudo systemctl restart suricata</code> - Full restart (brief downtime)</div>
+                </div>
+                <p style="margin-top: 15px; font-size: 0.9em; color: #666;">
+                    <strong>Example:</strong> <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">sudo suricata-update enable-source abuse.ch/urlhaus && sudo suricata-update && sudo systemctl reload suricata</code>
+                </p>
             </div>
         </div>
 

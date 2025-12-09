@@ -1083,7 +1083,9 @@ async function generateTlsSniRules() {
         const data = await response.json();
         if (data.success) {
             showNotification(data.message, 'success');
-            checkTlsRulesStatus(); // Refresh status
+            
+            // Wait a moment for filesystem to sync, then refresh status
+            setTimeout(() => checkTlsRulesStatus(), 500);
 
             // Show details
             if (data.details) {
