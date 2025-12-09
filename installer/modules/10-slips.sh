@@ -504,12 +504,12 @@ install_karens_ips_ml_modules() {
         warn "Suricata configuration blueprint not found at $source_webinterface_dir/suricata_config"
     fi
     
-    # Install our complete app.py with all integrations (like it was working yesterday)
+    # Install our complete app.py with all integrations and static path fixes
     if [[ -f "$source_webinterface_dir/app.py" ]]; then
         log "Installing integrated app.py with authentication and custom modules..."
         cp "$source_webinterface_dir/app.py" "$webinterface_dir/app.py"
         chmod 644 "$webinterface_dir/app.py"
-        success "Integrated app.py installed"
+        success "Integrated app.py installed (includes static path duplication fix)"
     else
         warn "app.py not found at $source_webinterface_dir/app.py"
     fi
