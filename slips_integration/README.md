@@ -275,15 +275,50 @@ redis-cli HGETALL slips_suricata_sync:stats
 
 ### QUIC/HTTP3 Stream Analysis Engine
 
-The stream_ad_blocker.py service provides real-time QUIC stream analysis and filtering for syndication networks and telemetry endpoints.
+The stream_ad_blocker.py service provides real-time QUIC stream analysis and filtering with **dual focus**:
+
+1. **Video Stream Ad Filtering** - Detects and blocks video advertisements in YouTube, Twitch, and streaming platforms
+2. **Syndication Network Blocking** - Filters advertising syndication networks and telemetry endpoints
 
 ### Features
 
-- **Protocol**: QUIC (UDP port 443) stream inspection
-- **Detection**: Machine learning model trained on QUIC flow patterns
+- **Protocol**: QUIC (UDP port 443) and HTTP/3 stream inspection
+- **Video Ad Detection**: Identifies video ads by temporal patterns (duration, bitrate, packet sequences)
+- **Detection Methods**:
+  - Pattern matching for universal ad signatures (bumper ads, skippable ads, ad pods)
+  - ML classifier for flow-based behavioral analysis
+  - LLM enhancement for intelligent reasoning on borderline cases
 - **Action**: Automatic IP blocking via nftables or monitoring-only mode
 - **Statistics**: Real-time stats to Redis DB 1 for dashboard display
 - **Dual Database**: Reads SLIPS data from DB 0, writes stats to DB 1
+
+### Video Ad Detection Capabilities
+
+**Supported Platforms:**
+- YouTube (QUIC-based video delivery)
+- Twitch (live streaming ads)
+- Embedded video players (advertising syndication)
+- Any QUIC/HTTP3 video service
+
+**Ad Pattern Recognition:**
+- **Bumper Ads**: 6-second non-skippable pre-roll ads
+- **Skippable Ads**: 15-90 second ads with skip button at 5s
+- **Non-Skippable Ads**: 15-30 second forced viewing ads
+- **Ad Pods**: Sequential ad blocks (2x30s, 3x30s, 4x30s patterns)
+- **Mid-Roll Ads**: Ads appearing during video playback
+- **Ad Telemetry**: Tracking beacons and analytics pings
+
+**Detection Methodology:**
+1. **Temporal Analysis**: Matches flow duration to known ad length standards
+2. **Bitrate Profiling**: Distinguishes ad streams from content by bitrate patterns
+3. **Sequence Detection**: Identifies consecutive ad deliveries (ad pod patterns)
+4. **ML Classification**: 8-feature model for flow behavioral analysis
+5. **LLM Reasoning**: Intelligent analysis for uncertain cases with explainable decisions
+
+**Why QUIC Requires Special Handling:**
+- Traditional DNS/SNI filtering doesn't work (SNI encrypted in QUIC)
+- Must analyze flow characteristics: duration, bitrate, packet patterns, temporal sequences
+- Requires behavioral analysis rather than domain-based blocking
 
 ### Service Management
 
@@ -347,15 +382,40 @@ redis-cli HGETALL ml_detector:llm_settings
 
 **How LLM Enhancement Works:**
 
-1. Stream blocker captures QUIC flow
-2. ML classifier analyzes flow patterns
+1. Stream blocker captures QUIC flow (video stream)
+2. ML classifier analyzes flow patterns:
+   - Flow duration (matches ad length standards: 6s, 15s, 30s?)
+   - Bitrate (ad streams vs content streams have different profiles)
+   - Packet count and timing patterns
+   - ASN/IP reputation
 3. If ML confidence is borderline (0.60-0.85):
-   - Calls LLM endpoint with flow details
-   - LLM analyzes duration, bitrate, packet patterns
-   - Compares against known video ad signatures
+   - Calls LLM endpoint with enriched flow details
+   - LLM prompt includes:
+     - Flow characteristics (duration, bitrate, packet size)
+     - Known video ad patterns (bumper, skippable, ad pods)
+     - DNS history and IP context
+     - Temporal patterns (is this part of an ad sequence?)
+   - LLM analyzes against video ad signatures
    - Returns classification with explainable reasoning
 4. Combines ML + LLM confidence for final decision
 5. Stores LLM reasoning in Redis for dashboard display
+
+**Example Video Ad Detection:**
+```
+Flow: 142.250.71.72:443 (googlevideo.com)
+Duration: 6.1 seconds
+Bitrate: 12 Kbps
+Packets: 35
+
+ML Analysis: 0.75 confidence (borderline)
+LLM Analysis: "Short duration (6s) and low bitrate suggest bumper ad 
+              rather than video content. Matches YouTube's 6-second 
+              non-skippable ad pattern."
+LLM Confidence: 0.85
+Combined: 0.80 → BLOCK
+
+Result: Ad blocked, content continues uninterrupted
+```
 
 ### Verification
 
@@ -425,6 +485,78 @@ curl -X POST http://localhost:55000/ml_detector/analyze_flow_with_llm \
   "reasoning": "The flow exhibits key indicators of ad tracking/analytics. The short duration (6 seconds) and low bitrate (12 Kbps) suggest ad telemetry rather than video content.",
   "recommended_action": "block"
 }
+```
+
+### Video Stream Filtering Best Practices
+
+**For YouTube Ad Blocking:**
+
+1. **Enable LLM Enhancement**: Essential for accurate QUIC flow classification
+   ```bash
+   redis-cli HSET ml_detector:llm_settings enabled '1' \
+     endpoint 'http://your-ollama:1234/v1' \
+     model 'ibm/granite-4-h-tiny'
+   ```
+
+2. **Monitor Detection Patterns**:
+   ```bash
+   # Watch for ad pod sequences (multiple ads in a row)
+   sudo journalctl -u stream-ad-blocker -f | grep "ad_pod"
+   
+   # Check if legitimate content is being blocked (false positives)
+   redis-cli LRANGE stream_blocker:llm_reasoning 0 10 | jq '.reasoning'
+   ```
+
+3. **Tune Confidence Thresholds**: Edit `ml_ad_classifier.py`
+   ```python
+   # Lower threshold = more aggressive blocking (may have false positives)
+   # Higher threshold = more conservative (may miss some ads)
+   BLOCKING_THRESHOLD = 0.75  # Default: 0.75 (75% confidence)
+   ```
+
+**Classification Types:**
+
+| Classification | Description | Action |
+|----------------|-------------|--------|
+| `video_ad` | Confirmed video advertisement | Block immediately |
+| `ad_telemetry` | Ad tracking/analytics beacon | Block immediately |
+| `ad_pod` | Sequential ad delivery pattern | Block all flows in sequence |
+| `legitimate_video` | Actual content stream | Allow |
+| `uncertain` | Cannot determine (low confidence) | Allow (fail-safe) |
+
+**Avoiding False Positives:**
+
+- **Short Content Videos**: 6-second TikToks, Instagram Reels might match bumper ad patterns
+  - Solution: Whitelist trusted social media IPs or ASNs
+  
+- **Live Stream Segments**: Some live streams use 6-15s chunks
+  - Solution: ML learns to distinguish by bitrate (content = higher bitrate)
+  
+- **Video Previews**: Trailer/preview clips can be 15-30s
+  - Solution: LLM considers context (preview bitrate higher than ads)
+
+**Performance Tuning:**
+
+```bash
+# For high-traffic environments (100+ Mbps video streams)
+# Adjust analysis interval in stream_ad_blocker.py
+Environment="ANALYSIS_INTERVAL=30"  # Check flows every 30s (default: 10s)
+
+# For low-latency requirements (gaming streams, video calls)
+Environment="BLOCKING_MODE=monitoring"  # Log only, don't block
+```
+
+**Monitoring Effectiveness:**
+
+```bash
+# Check blocking effectiveness
+redis-cli -n 1 HGET stream_ad_blocker:stats ads_detected
+redis-cli -n 1 HGET stream_ad_blocker:stats legitimate_traffic
+
+# Calculate block rate
+echo "scale=2; $(redis-cli -n 1 HGET stream_ad_blocker:stats ads_detected) / \
+$(redis-cli -n 1 HGET stream_ad_blocker:stats total_analyzed) * 100" | bc
+# Expected: 5-15% for typical YouTube viewing
 ```
 
 ## Troubleshooting
