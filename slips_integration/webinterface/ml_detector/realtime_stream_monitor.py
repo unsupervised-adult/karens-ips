@@ -13,7 +13,7 @@ import sys
 
 class RealtimeStreamMonitor:
     def __init__(self):
-        self.r = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
+        self.r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
         self.running = True
         self.seen_profiles = set()
         self.flow_history = defaultdict(list)
