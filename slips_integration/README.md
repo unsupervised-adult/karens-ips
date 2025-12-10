@@ -312,6 +312,51 @@ Environment="REDIS_HOST=localhost"
 Environment="REDIS_PORT=6379"
 ```
 
+### LLM Integration
+
+The stream blocker integrates with LLM (Large Language Model) for intelligent flow analysis on borderline cases where ML confidence is uncertain (0.60-0.85).
+
+**Supported Models:**
+
+- **IBM Granite 4-h-tiny**: Fast, efficient, good for real-time analysis (recommended)
+- **Qwen 3-4B**: More detailed reasoning but slower
+- **Custom Ollama models**: Any model compatible with OpenAI API
+
+**Configure LLM via Redis:**
+
+```bash
+# Enable LLM with IBM Granite model (recommended)
+redis-cli HSET ml_detector:llm_settings \
+  enabled '1' \
+  endpoint 'http://your-ollama-server:1234/v1' \
+  api_key '' \
+  model 'ibm/granite-4-h-tiny'
+
+# Verify configuration
+redis-cli HGETALL ml_detector:llm_settings
+```
+
+**Or configure via Web UI:**
+
+1. Navigate to ML Detector tab
+2. Click "Settings" or "Configure LLM"
+3. Enable LLM integration
+4. Enter Ollama endpoint URL
+5. Select model: `ibm/granite-4-h-tiny`
+6. Save settings
+
+**How LLM Enhancement Works:**
+
+1. Stream blocker captures QUIC flow
+2. ML classifier analyzes flow patterns
+3. If ML confidence is borderline (0.60-0.85):
+   - Calls LLM endpoint with flow details
+   - LLM analyzes duration, bitrate, packet patterns
+   - Compares against known video ad signatures
+   - Returns classification with explainable reasoning
+4. Combines ML + LLM confidence for final decision
+5. Stores LLM reasoning in Redis for dashboard display
+
 ### Verification
 
 Check real-time statistics:
@@ -351,8 +396,35 @@ Monitor live LLM analysis (real-time):
 # Watch LLM-enhanced detections in real-time
 watch -n 1 'redis-cli -n 1 HGET stream_ad_blocker:stats llm_enhanced_detections'
 
-# Stream live LLM reasoning logs
-redis-cli --csv LRANGE stream_blocker:llm_reasoning 0 0 | jq
+# View most recent LLM analysis with reasoning
+redis-cli LINDEX stream_blocker:llm_reasoning 0 | jq
+
+# Test LLM endpoint directly (debugging)
+curl -X POST http://localhost:55000/ml_detector/analyze_flow_with_llm \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "daddr": "142.250.71.72",
+    "dport": 443,
+    "packets": 35,
+    "bytes": 9500,
+    "duration": 6.1,
+    "dns_history": ["googlevideo.com"],
+    "ml_confidence": 0.75
+  }' | jq
+```
+
+**Example LLM Response:**
+
+```json
+{
+  "success": true,
+  "classification": "ad_telemetry",
+  "confidence": 0.85,
+  "ml_confidence": 0.75,
+  "combined_confidence": 0.80,
+  "reasoning": "The flow exhibits key indicators of ad tracking/analytics. The short duration (6 seconds) and low bitrate (12 Kbps) suggest ad telemetry rather than video content.",
+  "recommended_action": "block"
+}
 ```
 
 ## Troubleshooting
