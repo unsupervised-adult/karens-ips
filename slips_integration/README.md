@@ -421,48 +421,90 @@ Result: Ad blocked, content continues uninterrupted
 
 Once the system identifies ad flows with high confidence, it implements **progressive inline blocking** across multiple layers:
 
-#### Layer 1: nftables IP Blocking (Immediate)
+#### Layer 1: Suricata Flow-Based Blocking (Immediate + Precise)
 
-When confidence > 0.85, the IP is added to nftables blocked set for instant packet dropping:
+**⚠️ Critical: Block FLOWS not IPs** - Prevents collateral damage to CDNs serving both ads and legitimate content
 
-```bash
-# Automatic blocking by stream-ad-blocker service
-sudo nft add element inet home blocked4 { 142.250.71.72 }
+Suricata inspects QUIC flows using the same techniques as HTTP/2, analyzing flow characteristics in real-time:
 
-# View currently blocked IPs
-sudo nft list set inet home blocked4
+**Flow Inspection Methods:**
 
-# Remove IP if false positive
-sudo nft delete element inet home blocked4 { 142.250.71.72 }
-```
+1. **QUIC Flow Tracking**: Suricata maintains stateful flow tables for UDP/443 (QUIC)
+2. **Temporal Pattern Matching**: Flow duration, packet rate, bitrate analysis
+3. **Dynamic Dataset Injection**: ML/LLM-detected flows added to Suricata datasets via `suricatasc`
 
-**Effect**: All future packets from/to this IP are dropped at kernel level (fastest blocking)
-
-#### Layer 2: Suricata Dataset Integration
-
-High-confidence IPs are added to Suricata's dataset for signature-based correlation:
+**Real-Time Flow Blocking:**
 
 ```bash
-# Added to dataset file
-echo "142.250.71.72" >> /var/lib/suricata/datasets/llm-blocked-ips.lst
+# Automatic flow blocking by stream-ad-blocker service
+# Uses suricatasc to inject flow patterns dynamically
 
-# Suricata rule automatically triggers
-drop ip $EXTERNAL_NET any -> $HOME_NET any (msg:"LLM-Detected Video Ad IP"; ip.src; dataset:isset,llm-blocked-ips; sid:9100001;)
+# Add flow to dynamic dataset (runtime injection)
+echo '{"command": "dataset-add", "arguments": {"setname": "llm-blocked-flows", "settype": "md5", "datavalue": "10.10.1.100:54321->142.250.71.72:443:udp"}}' | sudo suricatasc -c
+
+# Persistent dataset file
+echo "10.10.1.100:54321->142.250.71.72:443:udp" >> /var/lib/suricata/datasets/llm-blocked-flows.lst
+
+# View currently blocked flows
+cat /var/lib/suricata/datasets/llm-blocked-flows.lst | tail -20
+
+# Remove flow if false positive
+echo '{"command": "dataset-remove", "arguments": {"setname": "llm-blocked-flows", "settype": "md5", "datavalue": "10.10.1.100:54321->142.250.71.72:443:udp"}}' | sudo suricatasc -c
 ```
 
-**Effect**: Suricata logs the block, feeds back to SLIPS for behavioral correlation
+**Suricata Rules for QUIC Flow Blocking:**
 
-#### Layer 3: SLIPS Evidence Correlation
+```suricata
+# /var/lib/suricata/rules/llm-video-ad-blocking.rules
 
-Blocked IPs are fed into SLIPS as evidence for behavioral analysis:
+# Flow-based blocking using flow tuple matching
+drop udp any any -> any 443 (msg:"LLM-Detected Video Ad Flow (QUIC)"; \
+    flow:to_server,established; \
+    dataset:isset,llm-blocked-flows,type md5; \
+    flowbits:set,video.ad.blocked; \
+    sid:9100001; rev:1;)
+
+# Bidirectional flow blocking (return traffic)
+drop udp any 443 -> any any (msg:"LLM-Detected Video Ad Flow Return (QUIC)"; \
+    flow:to_client,established; \
+    flowbits:isset,video.ad.blocked; \
+    sid:9100002; rev:1;)
+
+# Temporal pattern-based blocking (bumper ad duration)
+drop udp any any -> any 443 (msg:"QUIC Flow Matches Bumper Ad Pattern"; \
+    flow:to_server; \
+    flow.age:>=5,<8; \
+    flow.bytes_toserver:>5000,<15000; \
+    classtype:policy-violation; \
+    sid:9100010; rev:1;)
+
+# Ad pod sequence detection (multiple short flows)
+alert udp any any -> any 443 (msg:"Potential Ad Pod Sequence Detected"; \
+    flow:to_server; \
+    flow.age:<10; \
+    detection_filter:track by_src, count 3, seconds 60; \
+    threshold:type both, track by_src, count 3, seconds 60; \
+    sid:9100020; rev:1;)
+```
+
+**Effect**: 
+- Only the specific ad flow is dropped (5-tuple: src_ip:src_port -> dst_ip:dst_port:protocol)
+- Other connections to same CDN IP continue normally
+- Content delivery from Google/YouTube CDN unaffected
+- Surgical precision prevents false positives
+- Same inspection methodology as HTTP/2 (stateful flow tracking)
+
+#### Layer 2: SLIPS Evidence Correlation
+
+Blocked flows are fed into SLIPS as evidence for behavioral analysis:
 
 ```bash
-# SLIPS correlates with other behavioral indicators
-# If IP shows multiple bad behaviors, confidence increases
-redis-cli HSET slips:blocked_ips 142.250.71.72 "llm_video_ad:0.85:2025-12-10"
+# SLIPS correlates flow patterns with other behavioral indicators
+# If same flow tuple repeats with ad characteristics, confidence increases
+redis-cli HSET slips:blocked_flows "10.10.1.100:54321->142.250.71.72:443:udp" "llm_video_ad:0.85:2025-12-10"
 ```
 
-**Effect**: Future flows from this IP start with negative reputation, faster detection
+**Effect**: Future flows matching this pattern start with negative reputation, faster detection
 
 #### Progressive Blocking Flow
 
@@ -485,14 +527,16 @@ redis-cli HSET slips:blocked_ips 142.250.71.72 "llm_video_ad:0.85:2025-12-10"
    ├─ ML: 0.82 (pattern reinforced)
    ├─ LLM: 0.90 confidence  
    ├─ Combined: 0.86 → CONFIDENCE THRESHOLD EXCEEDED
-   └─ Action: INLINE BLOCK
-       ├─ nftables: Immediate kernel-level drop
-       ├─ Suricata: Dataset blocking + logging
-       └─ SLIPS: Evidence correlation
+   └─ Action: INLINE FLOW BLOCK
+       ├─ Suricata: Dynamic dataset injection via suricatasc
+       ├─ Flow tuple added to llm-blocked-flows dataset
+       ├─ Bidirectional flow blocking (request + response)
+       └─ SLIPS: Evidence correlation for pattern learning
 
-4. Future Flows (IP Blocked)
-   ├─ All packets from 142.250.71.72 dropped instantly
-   ├─ No LLM analysis needed (IP already in blocklist)
+4. Future Flows (Flow Pattern Blocked)
+   ├─ Matching flow tuples dropped instantly by Suricata
+   ├─ No LLM analysis needed (flow pattern already in dataset)
+   ├─ Other flows to same CDN IP continue normally
    └─ Periodic review (24h) for false positive check
 ```
 
@@ -508,20 +552,23 @@ The system learns and adapts:
 #### Monitoring Blocking Layers
 
 ```bash
-# Layer 1: nftables blocks
-sudo nft list set inet home blocked4 | wc -l
+# Layer 1: Suricata flow blocks
+wc -l /var/lib/suricata/datasets/llm-blocked-flows.lst
 
-# Layer 2: Suricata dataset blocks
-wc -l /var/lib/suricata/datasets/llm-blocked-ips.lst
+# View dynamic dataset contents
+echo '{"command": "dataset-dump", "arguments": {"setname": "llm-blocked-flows"}}' | sudo suricatasc -c | jq
 
-# Layer 3: SLIPS evidence
-redis-cli HLEN slips:blocked_ips
+# Layer 2: SLIPS evidence
+redis-cli HLEN slips:blocked_flows
 
 # LLM-enhanced blocks specifically
 redis-cli -n 1 HGET stream_ad_blocker:stats llm_enhanced_detections
 
-# Total inline blocks across all layers
-tail -100 /var/log/suricata/fast.log | grep -c "LLM-Detected"
+# Total inline flow blocks
+tail -100 /var/log/suricata/fast.log | grep -c "LLM-Detected Video Ad Flow"
+
+# Suricata flow statistics
+sudo suricatasc -c dump-counters | grep -E "(flow\.|tcp\.|udp\.)"
 ```
 
 #### Safety Mechanisms
@@ -566,39 +613,45 @@ redis-cli LRANGE stream_blocker:llm_reasoning 0 4
 redis-cli HGETALL ml_detector:llm_stats
 ```
 
-View blocked IPs in nftables (inline blocking):
+View blocked flows in Suricata (inline blocking):
 
 ```bash
-# View all blocked IPs across layers
-sudo nft list set inet home blocked4
+# View all blocked flows
+cat /var/lib/suricata/datasets/llm-blocked-flows.lst | tail -20
 
-# Count total blocked IPs
-sudo nft list set inet home blocked4 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | wc -l
+# Count total blocked flows
+wc -l /var/lib/suricata/datasets/llm-blocked-flows.lst
 
-# Check if specific IP is blocked
-sudo nft list set inet home blocked4 | grep "142.250.71.72"
+# Check if specific flow is blocked
+grep "10.10.1.100:54321->142.250.71.72:443:udp" /var/lib/suricata/datasets/llm-blocked-flows.lst
 
-# Real-time blocking events
-sudo nft monitor | grep blocked4
+# Real-time Suricata flow blocking events
+tail -f /var/log/suricata/fast.log | grep "LLM-Detected Video Ad Flow"
+
+# Suricata dataset statistics via socket command
+echo '{"command": "dataset-dump", "arguments": {"setname": "llm-blocked-flows"}}' | sudo suricatasc -c | jq '.message | length'
 ```
 
-Verify inline blocking is working:
+Verify inline flow blocking is working:
 
 ```bash
-# Test if blocked IP is actually dropped
-ping -c 3 142.250.71.72
-# Should timeout if inline blocking active
-
-# Watch packet drops in real-time
-sudo tcpdump -i any -nn host 142.250.71.72
-# Should show no packets after blocking
+# Watch QUIC flow analysis in real-time
+sudo tcpdump -i any -nn 'udp port 443' -v | grep -A 5 "QUIC"
 
 # Suricata inline blocking stats
 tail -100 /var/log/suricata/stats.log | grep -E "ips\.(accepted|blocked|rejected)"
 # Expected output:
 # ips.accepted    | 45231
-# ips.blocked     | 342  ← Inline blocks
+# ips.blocked     | 342  ← Inline flow blocks
 # ips.rejected    | 0
+
+# Flow-specific stats
+sudo suricatasc -c dump-counters | grep -E "flow\.(udp|tcp)"
+# Shows total flows tracked, blocked, allowed
+
+# Test specific flow blocking
+sudo tcpdump -i any -nn 'host 142.250.71.72 and udp port 443' -c 10
+# Should show drops for blocked flow tuples, normal traffic for others
 ```
 
 Monitor live LLM analysis (real-time):
