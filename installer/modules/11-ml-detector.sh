@@ -23,6 +23,9 @@ install_ml_detector_service() {
 
     log "Installing ML Detector monitoring service..."
 
+    # Install Python dependencies for LLM integration
+    install_ml_detector_dependencies
+
     # Copy simple ML feeder script to SLIPS directory
     copy_ml_feeder_script
 
@@ -38,6 +41,18 @@ install_ml_detector_service() {
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+install_ml_detector_dependencies() {
+    log "Installing Python dependencies for LLM integration..."
+    
+    # Install openai library in SLIPS venv for LLM analysis features
+    if [[ -d "$SLIPS_DIR/venv" ]]; then
+        "$SLIPS_DIR/venv/bin/pip" install openai >/dev/null 2>&1
+        success "OpenAI library installed in SLIPS venv"
+    else
+        warn "SLIPS venv not found, skipping openai installation"
+    fi
+}
 
 copy_ml_feeder_script() {
     log "Copying ML feeder script to SLIPS directory..."
