@@ -17,7 +17,7 @@ CUSTOM_RULES = "/etc/suricata/rules/custom.rules"
 EVE_JSON = "/var/log/suricata/eve.json"
 BLOCKLISTS_DIR = "/var/lib/suricata/blocklists"
 IPS_FILTER_DB = "/opt/ips-filter-db.py"
-DB_PATH = "/var/lib/ips-filter/ips.db"
+DB_PATH = "/var/lib/suricata/ips_filter.db"
 
 @suricata_bp.route('/')
 def index():
