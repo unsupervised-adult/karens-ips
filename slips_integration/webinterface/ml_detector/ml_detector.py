@@ -281,6 +281,9 @@ def test_llm_connection():
         import time
         
         data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "Invalid JSON request"}), 400
+            
         endpoint = data.get('endpoint', 'https://api.openai.com/v1')
         api_key = data.get('api_key', '')
         model = data.get('model', 'gpt-4o-mini')
@@ -288,9 +291,10 @@ def test_llm_connection():
         if not endpoint:
             return jsonify({"success": False, "error": "Endpoint URL is required"}), 400
         
-        # For Ollama, api_key can be empty
-        if not api_key and 'ollama' not in endpoint.lower():
-            return jsonify({"success": False, "error": "API key is required for non-Ollama endpoints"}), 400
+        # For Ollama and custom endpoints, api_key can be empty
+        # Only require api_key for OpenAI's official endpoint
+        if not api_key and 'api.openai.com' in endpoint.lower():
+            return jsonify({"success": False, "error": "API key is required for OpenAI endpoints"}), 400
         
         # Initialize OpenAI client with custom endpoint
         client = OpenAI(
