@@ -35,6 +35,9 @@ install_slips() {
     # Configure SLIPS
     configure_slips
 
+    # Patch SLIPS profiler bug (localnet_cache null check)
+    patch_slips_profiler_bug
+
     # Download GeoIP databases for enrichment
     download_geoip_databases
 
@@ -191,6 +194,37 @@ setup_slips_venv() {
     fi
 
     deactivate
+}
+
+patch_slips_profiler_bug() {
+    log "Patching SLIPS profiler localnet_cache bug (v1.1.16 regression)..."
+
+    cd "$SLIPS_DIR" || error_exit "Failed to change to SLIPS directory"
+
+    local profiler_file="slips_files/core/profiler.py"
+
+    if [[ ! -f "$profiler_file" ]]; then
+        warn "Profiler file not found at $profiler_file - skipping patch"
+        return
+    fi
+
+    # Patch 1: Add null check before 'in' operator at line ~441
+    sed -i 's/        if flow\.interface in self\.localnet_cache:/        if self.localnet_cache and flow.interface in self.localnet_cache:/' "$profiler_file"
+
+    # Patch 2: Wrap for loop in null check and fix indentation at lines ~600-609
+    # This fixes the localnet_cache.items() error by adding if check and proper indentation
+    sed -i '/^            for interface, local_net in self\.localnet_cache\.items():$/,/^                self\.print(to_print)$/ {
+        s/^            for interface, local_net in self\.localnet_cache\.items():$/            if self.localnet_cache:\n                for interface, local_net in self.localnet_cache.items():/
+        /^            if self\.localnet_cache:$/! {
+            /^                self\.db\.set_local_network/s/^                /                    /
+            /^                to_print = /s/^                /                    /
+            /^                if interface != "default":/s/^                /                    /
+            /^                    to_print += /s/^                    /                        /
+            /^                self\.print(to_print)/s/^                /                    /
+        }
+    }' "$profiler_file"
+
+    success "SLIPS profiler bug patched"
 }
 
 configure_slips() {
@@ -790,6 +824,7 @@ export -f check_zeek_availability
 export -f clone_slips_repository
 export -f setup_slips_venv
 export -f configure_slips
+export -f patch_slips_profiler_bug
 export -f download_geoip_databases
 export -f install_kalipso
 export -f configure_zeek_integration
