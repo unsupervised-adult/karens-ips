@@ -52,6 +52,7 @@ class StreamAdBlocker:
         self.detected_ads = set()
         self.blocked_ips = set()
         self.blocked_urls = set()
+        self.blocked_flows = set()
         self.stats = {
             'ads_detected': 0,
             'ips_blocked': 0,
@@ -499,6 +500,83 @@ class StreamAdBlocker:
             print(f"⚠️  Flow drop failed: {e}")
             return False
     
+    def block_flow_via_suricata(self, src_ip, src_port, dst_ip, dst_port, proto='udp', reason='LLM-detected video ad'):
+        """
+        Block specific flow tuple via Suricata dynamic dataset injection
+        CRITICAL: Blocks FLOW not IP - prevents CDN collateral damage
+        
+        Flow tuple format: src_ip:src_port->dst_ip:dst_port:protocol
+        Uses suricatasc socket command for runtime dataset injection
+        """
+        flow_tuple = f"{src_ip}:{src_port}->{dst_ip}:{dst_port}:{proto}"
+        
+        # Check if flow already blocked
+        if flow_tuple in self.blocked_flows:
+            return True
+        
+        try:
+            # Create dataset directory if needed
+            dataset_dir = '/var/lib/suricata/datasets'
+            dataset_file = f'{dataset_dir}/llm-blocked-flows.lst'
+            
+            # Ensure directory exists
+            subprocess.run(['sudo', 'mkdir', '-p', dataset_dir], 
+                          capture_output=True, text=True, check=False)
+            
+            # Add flow to persistent dataset file
+            append_cmd = f'echo "{flow_tuple}" | sudo tee -a {dataset_file}'
+            result = subprocess.run(append_cmd, shell=True, 
+                                  capture_output=True, text=True, check=False)
+            
+            # Inject into live Suricata via suricatasc
+            dataset_add_cmd = {
+                "command": "dataset-add",
+                "arguments": {
+                    "setname": "llm-blocked-flows",
+                    "settype": "md5",
+                    "datavalue": flow_tuple
+                }
+            }
+            
+            inject_cmd = f"echo '{json.dumps(dataset_add_cmd)}' | sudo suricatasc -c"
+            inject_result = subprocess.run(inject_cmd, shell=True,
+                                          capture_output=True, text=True, check=False)
+            
+            if inject_result.returncode == 0 or 'already exists' in inject_result.stdout.lower():
+                self.blocked_flows.add(flow_tuple)
+                self.stats['flows_dropped'] += 1
+                self.stats['cdn_flow_blocks'] += 1
+                
+                # Store in Redis for monitoring
+                self.r_stats.sadd('stream_blocker:blocked_flows', flow_tuple)
+                
+                # Log the flow block
+                log_entry = {
+                    'timestamp': datetime.now().isoformat(),
+                    'action': 'suricata_flow_block',
+                    'flow': flow_tuple,
+                    'src_ip': src_ip,
+                    'src_port': src_port,
+                    'dst_ip': dst_ip,
+                    'dst_port': dst_port,
+                    'protocol': proto,
+                    'reason': reason
+                }
+                self.r_stats.lpush('ml_detector:flow_blocks', json.dumps(log_entry))
+                self.r_stats.ltrim('ml_detector:flow_blocks', 0, 999)
+                
+                print(f"🚫 FLOW BLOCKED (Suricata): {flow_tuple} ({reason})")
+                return True
+            else:
+                print(f"⚠️  Suricata flow injection warning: {inject_result.stderr}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error blocking flow via Suricata: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
     def block_ip(self, ip, reason):
         """
         Block entire IP using nftables (uses blocked4 set from main IPS config)
@@ -706,35 +784,38 @@ class StreamAdBlocker:
             
             # Strategy 2: Flow-level blocking for YouTube/googlevideo (NO SSAI in region)
             # Separate ad streams detected by ML - safe to drop specific flows
+            # Uses Suricata flow-based blocking for surgical precision
             elif is_youtube and confidence >= 0.75:
-                if self.block_flow(
+                # Use Suricata flow blocking (prevents CDN collateral damage)
+                if self.block_flow_via_suricata(
                     flow_data.get('src_ip', '0.0.0.0'),
+                    flow_data.get('sport', 0),
                     dst_ip,
                     flow_data.get('dport', 443),
-                    flow_data.get('proto', 'HTTPS'),
-                    confidence,
-                    method
+                    flow_data.get('proto', 'udp').lower(),
+                    f"youtube_ad_flow:{method}:{confidence:.2f}"
                 ):
                     blocked = True
-                    detection['block_type'] = 'flow_youtube_ad'
-                    print(f"🎯 YOUTUBE AD FLOW DROPPED: {domain} ({confidence:.0%} - separate ad stream)")
+                    detection['block_type'] = 'suricata_flow_youtube_ad'
+                    print(f"🚫 YOUTUBE AD FLOW BLOCKED (Suricata): {domain} ({confidence:.0%} - separate ad stream)")
             
             # Strategy 3: Flow-level blocking for other CDNs
             # Higher confidence threshold for non-YouTube CDNs
             elif is_cdn and confidence >= 0.85:
-                if self.block_flow(
+                # Use Suricata flow blocking (prevents CDN collateral damage)
+                if self.block_flow_via_suricata(
                     flow_data.get('src_ip', '0.0.0.0'),
+                    flow_data.get('sport', 0),
                     dst_ip,
                     flow_data.get('dport', 443),
-                    flow_data.get('proto', 'HTTPS'),
-                    confidence,
-                    method
+                    flow_data.get('proto', 'udp').lower(),
+                    f"cdn_ad_flow:{method}:{confidence:.2f}"
                 ):
                     blocked = True
-                    detection['block_type'] = 'flow_cdn'
-                    print(f"🎯 CDN Flow block: {domain} ({confidence:.0%} confidence)")
+                    detection['block_type'] = 'suricata_flow_cdn'
+                    print(f"🚫 CDN AD FLOW BLOCKED (Suricata): {domain} ({confidence:.0%} confidence)")
             
-            # Strategy 3: Hybrid approach - try flow first, fallback to IP if very high confidence
+            # Strategy 4: Hybrid approach - try flow first, fallback to IP if very high confidence
             elif confidence >= 0.90:
                 # Try flow-level first (less aggressive)
                 if self.block_flow(

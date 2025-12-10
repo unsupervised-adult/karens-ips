@@ -1,0 +1,73 @@
+# LLM-Enhanced Video Ad Flow Blocking Rules
+# Flow-based blocking for QUIC video ad streams
+# Blocks specific flow tuples (5-tuple) not entire IPs
+# Prevents CDN collateral damage (YouTube/Google use same IPs for ads and content)
+
+# Flow-based blocking using dynamic dataset
+# Dataset populated by stream_ad_blocker.py via suricatasc
+drop udp any any -> any 443 (msg:"LLM-Detected Video Ad Flow (QUIC)"; \
+    flow:to_server,established; \
+    dataset:isset,llm-blocked-flows,type md5; \
+    flowbits:set,video.ad.blocked; \
+    classtype:policy-violation; \
+    sid:9100001; rev:1;)
+
+# Bidirectional flow blocking (return traffic from ad server)
+drop udp any 443 -> any any (msg:"LLM-Detected Video Ad Flow Return (QUIC)"; \
+    flow:to_client,established; \
+    flowbits:isset,video.ad.blocked; \
+    classtype:policy-violation; \
+    sid:9100002; rev:1;)
+
+# Temporal pattern-based blocking (bumper ad duration signature)
+# Bumper ads are typically 5-8 seconds with specific byte patterns
+drop udp any any -> any 443 (msg:"QUIC Flow Matches Bumper Ad Pattern (6s)"; \
+    flow:to_server,established; \
+    flow.age:>=5,<8; \
+    flow.bytes_toserver:>5000,<15000; \
+    classtype:policy-violation; \
+    sid:9100010; rev:1;)
+
+# Ad pod sequence detection (multiple short ads in a row)
+# YouTube often serves 2x30s or 3x30s ad pods
+alert udp any any -> any 443 (msg:"Potential Ad Pod Sequence Detected (QUIC)"; \
+    flow:to_server,established; \
+    flow.age:<10; \
+    detection_filter:track by_src, count 3, seconds 60; \
+    threshold:type both, track by_src, count 3, seconds 60; \
+    classtype:policy-violation; \
+    sid:9100020; rev:1;)
+
+# Non-skippable ad pattern (15-30 second duration)
+drop udp any any -> any 443 (msg:"QUIC Flow Matches Non-Skippable Ad Pattern (15-30s)"; \
+    flow:to_server,established; \
+    flow.age:>=14,<32; \
+    flow.bytes_toserver:>50000,<200000; \
+    classtype:policy-violation; \
+    sid:9100011; rev:1;)
+
+# Skippable ad pattern (longer duration, skip button at 5s)
+alert udp any any -> any 443 (msg:"Potential Skippable Ad Flow (QUIC)"; \
+    flow:to_server,established; \
+    flow.age:>=15,<91; \
+    flow.bytes_toserver:>100000,<1000000; \
+    classtype:policy-violation; \
+    sid:9100012; rev:1;)
+
+# Ad telemetry beacons (very small payloads)
+drop udp any any -> any 443 (msg:"Ad Telemetry Beacon Detected (QUIC)"; \
+    flow:to_server,established; \
+    flow.age:<3; \
+    flow.bytes_toserver:<5000; \
+    content:"|00|"; offset:0; depth:1; \
+    classtype:policy-violation; \
+    sid:9100030; rev:1;)
+
+# High-frequency short flows (ad impression tracking)
+alert udp any any -> any 443 (msg:"High-Frequency Ad Tracking Pattern (QUIC)"; \
+    flow:to_server; \
+    flow.age:<5; \
+    detection_filter:track by_src, count 5, seconds 10; \
+    threshold:type both, track by_src, count 5, seconds 10; \
+    classtype:policy-violation; \
+    sid:9100040; rev:1;)
