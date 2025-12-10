@@ -1022,7 +1022,8 @@ async function viewTlsDataset() {
                     listEl.innerHTML = '<p>No domains in blocklist yet.</p>';
                 } else {
                     let html = `<p><strong>${data.count} domains blocked</strong></p><ul style="list-style: none; padding: 0;">`;
-                    data.domains.forEach(domain => {
+                    data.domains.forEach(domainObj => {
+                        const domain = domainObj.domain || domainObj;
                         html += `<li style="padding: 5px; border-bottom: 1px solid #ddd;">`;
                         html += `<span>${escapeHtml(domain)}</span>`;
                         html += `<button onclick="removeTlsDomain('${escapeHtml(domain)}')" class="btn-danger" style="float: right; padding: 2px 8px; font-size: 0.85em;">Remove</button>`;
