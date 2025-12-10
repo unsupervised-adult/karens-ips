@@ -1245,8 +1245,9 @@ function retrainModel() {
             },
             error: function(xhr, status, error) {
                 btn.prop('disabled', false).html('Retrain Model Now');
+                const errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : error;
                 $('#action_status').html(
-                    '<div class="alert alert-danger">Failed to retrain model: ' + error + '</div>'
+                    '<div class="alert alert-danger">Failed to retrain model: ' + errorMsg + '</div>'
                 );
             }
         });
