@@ -417,6 +417,128 @@ Combined: 0.80 → BLOCK
 Result: Ad blocked, content continues uninterrupted
 ```
 
+### Multi-Layer Blocking Architecture
+
+Once the system identifies ad flows with high confidence, it implements **progressive inline blocking** across multiple layers:
+
+#### Layer 1: nftables IP Blocking (Immediate)
+
+When confidence > 0.85, the IP is added to nftables blocked set for instant packet dropping:
+
+```bash
+# Automatic blocking by stream-ad-blocker service
+sudo nft add element inet home blocked4 { 142.250.71.72 }
+
+# View currently blocked IPs
+sudo nft list set inet home blocked4
+
+# Remove IP if false positive
+sudo nft delete element inet home blocked4 { 142.250.71.72 }
+```
+
+**Effect**: All future packets from/to this IP are dropped at kernel level (fastest blocking)
+
+#### Layer 2: Suricata Dataset Integration
+
+High-confidence IPs are added to Suricata's dataset for signature-based correlation:
+
+```bash
+# Added to dataset file
+echo "142.250.71.72" >> /var/lib/suricata/datasets/llm-blocked-ips.lst
+
+# Suricata rule automatically triggers
+drop ip $EXTERNAL_NET any -> $HOME_NET any (msg:"LLM-Detected Video Ad IP"; ip.src; dataset:isset,llm-blocked-ips; sid:9100001;)
+```
+
+**Effect**: Suricata logs the block, feeds back to SLIPS for behavioral correlation
+
+#### Layer 3: SLIPS Evidence Correlation
+
+Blocked IPs are fed into SLIPS as evidence for behavioral analysis:
+
+```bash
+# SLIPS correlates with other behavioral indicators
+# If IP shows multiple bad behaviors, confidence increases
+redis-cli HSET slips:blocked_ips 142.250.71.72 "llm_video_ad:0.85:2025-12-10"
+```
+
+**Effect**: Future flows from this IP start with negative reputation, faster detection
+
+#### Progressive Blocking Flow
+
+```
+1. Initial Detection (First Flow)
+   ├─ Duration: 6.1s, Bitrate: 12 Kbps
+   ├─ ML: 0.75 (borderline) → Triggers LLM
+   ├─ LLM: "Bumper ad pattern" → 0.85 confidence
+   └─ Combined: 0.80 → ALLOW (learning phase)
+
+2. Second Occurrence (Same IP, Similar Pattern)
+   ├─ Duration: 6.0s, Bitrate: 11 Kbps  
+   ├─ ML: 0.78 (learned from feedback)
+   ├─ LLM: 0.87 confidence
+   ├─ Combined: 0.825
+   └─ Action: ADD TO MONITORING LIST
+
+3. Third Occurrence (Pattern Confirmed)
+   ├─ Duration: 6.2s, Bitrate: 12 Kbps
+   ├─ ML: 0.82 (pattern reinforced)
+   ├─ LLM: 0.90 confidence  
+   ├─ Combined: 0.86 → CONFIDENCE THRESHOLD EXCEEDED
+   └─ Action: INLINE BLOCK
+       ├─ nftables: Immediate kernel-level drop
+       ├─ Suricata: Dataset blocking + logging
+       └─ SLIPS: Evidence correlation
+
+4. Future Flows (IP Blocked)
+   ├─ All packets from 142.250.71.72 dropped instantly
+   ├─ No LLM analysis needed (IP already in blocklist)
+   └─ Periodic review (24h) for false positive check
+```
+
+#### Adaptive Learning
+
+The system learns and adapts:
+
+- **Week 1**: Analyzes every borderline flow with LLM, blocks cautiously
+- **Week 2**: ML model improves from feedback, fewer LLM calls needed
+- **Week 3**: Known ad IP patterns blocked immediately at nftables
+- **Week 4**: Self-tuning confidence thresholds based on accuracy
+
+#### Monitoring Blocking Layers
+
+```bash
+# Layer 1: nftables blocks
+sudo nft list set inet home blocked4 | wc -l
+
+# Layer 2: Suricata dataset blocks
+wc -l /var/lib/suricata/datasets/llm-blocked-ips.lst
+
+# Layer 3: SLIPS evidence
+redis-cli HLEN slips:blocked_ips
+
+# LLM-enhanced blocks specifically
+redis-cli -n 1 HGET stream_ad_blocker:stats llm_enhanced_detections
+
+# Total inline blocks across all layers
+tail -100 /var/log/suricata/fast.log | grep -c "LLM-Detected"
+```
+
+#### Safety Mechanisms
+
+**False Positive Protection:**
+- First detection: Log only, no block (confidence < 0.85)
+- Second detection: Monitor and track (confidence 0.80-0.85)
+- Third detection: Block after pattern confirmation (confidence > 0.85)
+- Auto-unblock after 24h if no further detections
+- User feedback loop via dashboard (mark as incorrect)
+
+**Content Protection:**
+- Content streams have consistent high bitrate (> 1000 Kbps)
+- Ad streams have variable/low bitrate (5-50 Kbps)
+- Duration clustering distinguishes ads from short content
+- IP reputation considers ASN (Google/CDN trusted higher)
+
 ### Verification
 
 Check real-time statistics:
@@ -444,10 +566,39 @@ redis-cli LRANGE stream_blocker:llm_reasoning 0 4
 redis-cli HGETALL ml_detector:llm_stats
 ```
 
-View blocked IPs in nftables:
+View blocked IPs in nftables (inline blocking):
 
 ```bash
-sudo nft list set inet filter blocked_ips
+# View all blocked IPs across layers
+sudo nft list set inet home blocked4
+
+# Count total blocked IPs
+sudo nft list set inet home blocked4 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | wc -l
+
+# Check if specific IP is blocked
+sudo nft list set inet home blocked4 | grep "142.250.71.72"
+
+# Real-time blocking events
+sudo nft monitor | grep blocked4
+```
+
+Verify inline blocking is working:
+
+```bash
+# Test if blocked IP is actually dropped
+ping -c 3 142.250.71.72
+# Should timeout if inline blocking active
+
+# Watch packet drops in real-time
+sudo tcpdump -i any -nn host 142.250.71.72
+# Should show no packets after blocking
+
+# Suricata inline blocking stats
+tail -100 /var/log/suricata/stats.log | grep -E "ips\.(accepted|blocked|rejected)"
+# Expected output:
+# ips.accepted    | 45231
+# ips.blocked     | 342  ← Inline blocks
+# ips.rejected    | 0
 ```
 
 Monitor live LLM analysis (real-time):
