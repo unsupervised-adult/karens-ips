@@ -326,12 +326,33 @@ redis-cli -n 1 HGETALL stream_ad_blocker:stats
 # ips_blocked: 5
 # blocking_status: Active
 # last_update: 2025-12-08 06:08:18
+# llm_enhanced_detections: 12
+```
+
+Check LLM analysis results:
+
+```bash
+# View recent LLM analyses with reasoning
+redis-cli LRANGE stream_blocker:llm_reasoning 0 4
+
+# View LLM statistics
+redis-cli HGETALL ml_detector:llm_stats
 ```
 
 View blocked IPs in nftables:
 
 ```bash
 sudo nft list set inet filter blocked_ips
+```
+
+Monitor live LLM analysis (real-time):
+
+```bash
+# Watch LLM-enhanced detections in real-time
+watch -n 1 'redis-cli -n 1 HGET stream_ad_blocker:stats llm_enhanced_detections'
+
+# Stream live LLM reasoning logs
+redis-cli --csv LRANGE stream_blocker:llm_reasoning 0 0 | jq
 ```
 
 ## Troubleshooting
