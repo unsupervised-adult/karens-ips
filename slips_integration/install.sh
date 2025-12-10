@@ -67,6 +67,18 @@ fi
 cp -r "$SCRIPT_DIR/webinterface/ml_detector" "$ML_DETECTOR_DEST"
 echo -e "${GREEN}✓${NC} ML Detector blueprint installed"
 
+# Copy Suricata Config blueprint
+echo "Installing Suricata Config blueprint..."
+SURICATA_CONFIG_DEST="$SLIPS_PATH/webinterface/suricata_config"
+
+if [ -d "$SURICATA_CONFIG_DEST" ]; then
+    echo -e "${YELLOW}Warning: Suricata Config already exists. Removing old version...${NC}"
+    rm -rf "$SURICATA_CONFIG_DEST"
+fi
+
+cp -r "$SCRIPT_DIR/webinterface/suricata_config" "$SURICATA_CONFIG_DEST"
+echo -e "${GREEN}✓${NC} Suricata Config blueprint installed"
+
 # Install stream_ad_blocker.py service
 echo "Installing stream ad blocker service..."
 if [ -f "$SCRIPT_DIR/webinterface/ml_detector/stream_ad_blocker.py" ]; then
