@@ -358,6 +358,172 @@ def test_llm_connection():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@ml_detector.route("/analyze_flow_with_llm", methods=["POST"])
+def analyze_flow_with_llm():
+    """
+    LLM-enhanced QUIC/HTTP3 flow analysis for video ad detection
+    Uses Ollama to provide intelligent classification with reasoning
+    """
+    try:
+        from openai import OpenAI
+        
+        # Get LLM settings from Redis
+        llm_settings = db.rdb.r.hgetall('ml_detector:llm_settings')
+        if not llm_settings or not llm_settings.get('enabled') == '1':
+            return jsonify({"success": False, "error": "LLM analysis not enabled"}), 400
+        
+        endpoint = llm_settings.get('endpoint', '')
+        api_key = llm_settings.get('api_key', '')
+        model = llm_settings.get('model', 'qwen/qwen3-4b-thinking-2507')
+        
+        if not endpoint:
+            return jsonify({"success": False, "error": "LLM endpoint not configured"}), 400
+        
+        # Get flow data from request
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "Invalid JSON request"}), 400
+        
+        # Extract flow characteristics
+        flow = {
+            'daddr': data.get('daddr', 'unknown'),
+            'dport': data.get('dport', 443),
+            'packets': data.get('packets', 0),
+            'bytes': data.get('bytes', 0),
+            'duration': data.get('duration', 0),
+            'asn': data.get('asn', 'unknown'),
+            'org': data.get('org', 'unknown'),
+            'dns_history': data.get('dns_history', []),
+            'ml_confidence': data.get('ml_confidence', 0.0),
+            'ml_classification': data.get('ml_classification', 'unknown')
+        }
+        
+        # Calculate derived metrics
+        bitrate = 0
+        if flow['duration'] > 0:
+            bitrate = (flow['bytes'] * 8) / (flow['duration'] * 1000)  # Kbps
+        
+        avg_packet_size = 0
+        if flow['packets'] > 0:
+            avg_packet_size = flow['bytes'] / flow['packets']
+        
+        # Build intelligent prompt for LLM
+        prompt = f"""Analyze this QUIC/HTTP3 flow for video advertising/tracking classification.
+
+FLOW DETAILS:
+- Destination: {flow['daddr']}:{flow['dport']}
+- Network: ASN {flow['asn']} ({flow['org']})
+- Duration: {flow['duration']:.2f} seconds
+- Volume: {flow['bytes']:,} bytes in {flow['packets']:,} packets
+- Avg packet size: {avg_packet_size:.0f} bytes
+- Bitrate: {bitrate:.0f} Kbps
+- DNS history: {', '.join(flow['dns_history']) if flow['dns_history'] else 'No recent DNS queries'}
+- ML classifier: {flow['ml_classification']} (confidence: {flow['ml_confidence']:.2f})
+
+VIDEO AD PATTERNS (typical characteristics):
+- Bumper ads: 6 seconds, 500-2000 Kbps
+- Skippable ads: 15-90 seconds, skip at 5s, 800-3000 Kbps
+- Non-skippable: 15-30 seconds fixed, 800-3000 Kbps
+- Ad pods: Multiple consecutive ads, 55-95 seconds total
+- Telemetry: Small periodic packets (50-200 bytes), high frequency
+
+BEHAVIORAL INDICATORS:
+- Short duration + low bitrate = likely ad/telemetry
+- Burst connections to CDN IPs = ad syndication
+- Small packets + high frequency = tracking beacons
+- Duration matching ad standards (6s, 15s, 30s) = video ad
+- Connection to known ad networks (doubleclick, googlesyndication)
+
+TASK:
+Classify this flow as:
+1. "video_ad" - Video advertisement content
+2. "ad_telemetry" - Ad tracking/analytics
+3. "legitimate_video" - Actual content stream
+4. "uncertain" - Insufficient information
+
+Provide your analysis as JSON:
+{{
+  "classification": "video_ad|ad_telemetry|legitimate_video|uncertain",
+  "confidence": 0.0-1.0,
+  "reasoning": "Brief explanation of key indicators",
+  "recommended_action": "block|monitor|allow"
+}}
+
+Focus on temporal patterns (duration, bitrate), not SNI (encrypted in QUIC)."""
+
+        # Call LLM
+        client = OpenAI(
+            base_url=endpoint,
+            api_key=api_key if api_key else "ollama"
+        )
+        
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are an expert network traffic analyst specializing in video streaming and advertising patterns. Provide concise, technical analysis."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=300
+        )
+        
+        # Parse LLM response
+        llm_response = completion.choices[0].message.content
+        
+        # Try to extract JSON from response
+        import re
+        json_match = re.search(r'\{[^}]+\}', llm_response, re.DOTALL)
+        if json_match:
+            result = json.loads(json_match.group(0))
+        else:
+            # Fallback parsing
+            result = {
+                "classification": "uncertain",
+                "confidence": 0.5,
+                "reasoning": llm_response[:200],
+                "recommended_action": "monitor"
+            }
+        
+        # Store analysis in Redis for dashboard display
+        analysis_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'flow': flow,
+            'llm_result': result,
+            'model': model
+        }
+        db.rdb.r.lpush('ml_detector:llm_analyses', json.dumps(analysis_entry))
+        db.rdb.r.ltrim('ml_detector:llm_analyses', 0, 99)  # Keep last 100
+        
+        # Update stats
+        db.rdb.r.hincrby('ml_detector:llm_stats', 'total_analyses', 1)
+        db.rdb.r.hincrby('ml_detector:llm_stats', f'classification_{result["classification"]}', 1)
+        
+        return jsonify({
+            "success": True,
+            "classification": result.get("classification", "uncertain"),
+            "confidence": result.get("confidence", 0.5),
+            "reasoning": result.get("reasoning", ""),
+            "recommended_action": result.get("recommended_action", "monitor"),
+            "ml_confidence": flow['ml_confidence'],
+            "combined_confidence": (result.get("confidence", 0.5) + flow['ml_confidence']) / 2
+        })
+        
+    except ImportError:
+        return jsonify({
+            "success": False,
+            "error": "OpenAI library not installed"
+        }), 500
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse LLM JSON response: {e}")
+        return jsonify({
+            "success": False,
+            "error": "LLM returned invalid JSON format"
+        }), 500
+    except Exception as e:
+        logger.error(f"Error in LLM flow analysis: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @ml_detector.route("/settings/preset/<preset_name>", methods=["POST"])
 def apply_preset(preset_name):
     """Apply a preset configuration"""

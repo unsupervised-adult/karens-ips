@@ -160,6 +160,7 @@ The ML Detector blueprint provides the following REST API endpoints:
 The ML Detector reads from the following Redis keys:
 
 **Database 0 (SLIPS Core Data):**
+
 ```bash
 ml_detector:stats                   # Hash: SLIPS evidence-based statistics
 ml_detector:recent_detections       # List: Recent detections
@@ -170,6 +171,7 @@ ml_detector:alerts                  # List: Alerts
 ```
 
 **Database 1 (Stream Ad Blocker):**
+
 ```bash
 stream_ad_blocker:stats             # Hash: QUIC stream blocking statistics
   - total_analyzed                  # Total QUIC streams analyzed
@@ -190,6 +192,7 @@ The ML Detector dashboard displays two independent monitoring systems side-by-si
 ### SLIPS Evidence Detection (Blue Cards)
 
 Behavioral analysis using SLIPS core detection engine:
+
 - Total packets analyzed
 - Advertisements detected via ML behavioral analysis
 - Legitimate traffic
@@ -198,6 +201,7 @@ Behavioral analysis using SLIPS core detection engine:
 ### QUIC/HTTP3 Stream Analysis (Yellow Cards)
 
 Real-time protocol inspection for syndication networks and telemetry:
+
 - Total streams analyzed
 - Suspicious flows filtered
 - Unique endpoints blocked
@@ -231,6 +235,7 @@ The `slips_suricata_dataset_sync.py` service provides bidirectional integration 
 3. **Combined Detection**: Both systems share intelligence for higher confidence blocking decisions
 
 **Dataset Files:**
+
 - `slips-blocked-ips.lst` - IPs blocked by SLIPS behavioral analysis
 - `suricata-detected-ips.lst` - IPs detected by Suricata signatures
 - `blocked-domains.lst` - Domains from blocklist DB (existing)
@@ -263,6 +268,7 @@ sudo journalctl -fu slips-suricata-sync
 **Statistics:**
 
 Check Redis for sync statistics:
+
 ```bash
 redis-cli HGETALL slips_suricata_sync:stats
 ```
@@ -495,12 +501,14 @@ Regenerate TLS SNI blocking rules after:
 | **Generate TLS SNI Rules** | Full rule regeneration | ⚠️ Takes 2-3 min | Replaces all rules with fresh ones from database |
 
 **Check Status** - Safe to use anytime:
+
 - Queries database for domain count
 - Checks rules file existence and counts rules
 - Shows last generation timestamp
 - Displays sync status with color coding (green/yellow/red)
 
 **Generate TLS SNI Rules** - Creates fresh rules:
+
 1. Backs up old rules with timestamp
 2. Reads all domains from database
 3. Generates Suricata drop rules with TLS SNI matching
@@ -516,16 +524,19 @@ drop tls any any -> any any (msg:"Blocked ads domain: example.com"; tls.sni; con
 ```
 
 **Database:**
+
 - Path: `/var/lib/suricata/ips_filter.db`
 - Tables: `blocked_domains`, `blocklist_sources`, `blocklist_metadata`
 - Domains: 344,806+ ad/tracking/malware domains
 
 **Generated Rules:**
+
 - Output: `/var/lib/suricata/rules/ml-detector-blocking.rules`
 - Size: ~58 MB (344,806 rules + header)
 - SID Range: 9000000 - 9344806 (avoids conflicts)
 
 **Suricata Configuration:**
+
 - Mode: NFQueue (`suricata -q 0`)
 - Rules loaded: Configured in `/etc/suricata/suricata.yaml`
 - Reload: Graceful via `systemctl reload suricata`
@@ -551,6 +562,7 @@ tail -f /var/log/suricata/fast.log | grep "Blocked ads domain"
 ### Backup & Recovery
 
 **Automatic Backups:**
+
 - Location: `/var/lib/suricata/rules/backups/`
 - Format: `ml-detector-blocking.rules.YYYYMMDD_HHMMSS`
 - Created before each regeneration
@@ -591,16 +603,19 @@ curl -X POST http://localhost:55000/suricata/api/tls-sni/generate-rules
 ### Performance Considerations
 
 **Rule Loading:**
+
 - 344k rules load in ~10 seconds on modern hardware
 - Memory usage: ~500 MB additional RAM for rule storage
 - No noticeable performance impact on packet processing
 
 **Generation Time:**
+
 - Small database (<10k domains): ~5 seconds
 - Medium database (100k domains): ~30 seconds
 - Large database (344k domains): ~2-3 minutes
 
 **Blocking Performance:**
+
 - Inline inspection: < 1ms latency per packet
 - TLS SNI lookup: Constant time O(1) via hash table
 - No external script overhead

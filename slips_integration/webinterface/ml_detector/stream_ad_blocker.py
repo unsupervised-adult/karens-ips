@@ -856,13 +856,43 @@ class StreamAdBlocker:
                             detection_sources.append(f"SLIPS:{'+'.join(slips_evidence)}")
                             confidence_scores.append(slips_confidence)
 
-                        # 5. Use ML classifier if available
+                        # 5. Use ML classifier if available (with LLM enhancement for borderline cases)
                         if self.classifier:
-                            is_ad_ml, ml_confidence, ml_method = self.classifier.classify_flow(
-                                domain, flow_data, dst_ip, 443
+                            # Get DNS history for this flow
+                            dns_history = []
+                            try:
+                                dns_key = f"profile_{flow_data['src_ip']}_dns"
+                                dns_records = self.redis_db.lrange(dns_key, 0, 10)
+                                dns_history = [r.decode('utf-8') if isinstance(r, bytes) else r for r in dns_records]
+                            except:
+                                pass
+                            
+                            # Use hybrid ML+LLM classification
+                            is_ad_ml, ml_confidence, ml_method, llm_reasoning = self.classifier.classify_with_llm(
+                                domain, flow_data, dst_ip, 443, dns_history
                             )
+                            
                             if is_ad_ml:
-                                detection_sources.append(f"ML:{ml_method}")
+                                # Check if LLM was involved
+                                if llm_reasoning:
+                                    detection_sources.append(f"ML+LLM:{ml_method}")
+                                    self.stats['llm_enhanced_detections'] = self.stats.get('llm_enhanced_detections', 0) + 1
+                                    # Store LLM reasoning for dashboard
+                                    try:
+                                        self.redis_db.lpush('stream_blocker:llm_reasoning', 
+                                                           json.dumps({
+                                                               'timestamp': time.time(),
+                                                               'flow': f"{dst_ip}:443",
+                                                               'domain': domain,
+                                                               'confidence': ml_confidence,
+                                                               'reasoning': llm_reasoning
+                                                           }))
+                                        self.redis_db.ltrim('stream_blocker:llm_reasoning', 0, 99)
+                                    except:
+                                        pass
+                                else:
+                                    detection_sources.append(f"ML:{ml_method}")
+                                
                                 confidence_scores.append(ml_confidence)
                                 self.stats['ml_detections'] += 1
 

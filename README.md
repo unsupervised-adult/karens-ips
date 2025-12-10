@@ -27,6 +27,7 @@ sudo ./karens-ips-installer.sh
 **Time:** 15-30 minutes
 
 **What gets installed:**
+
 - Suricata 8.0 (NFQUEUE inline mode)
 - SLIPS ML behavioral engine
 - Dataset-based pattern matching
@@ -88,6 +89,7 @@ Internet → br0 (bridge) → NFQUEUE → Suricata (datasets) → SLIPS (ML) →
 ```
 
 **Dataset approach:**
+
 - 3 Suricata rules (DNS/HTTP/TLS) reference 1 hash table
 - O(1) lookup for 350K+ domains (hagezi Pro, perflyst SmartTV/Android)
 - TLS SNI inspection blocks HTTPS traffic at handshake
@@ -140,16 +142,19 @@ suricatasc -c "dataset-list"
 **HOME_NET:** Set in web UI → Configuration tab
 
 **LLM integration:** Configuration tab → Intelligence Settings
+
 - OpenAI API key for GPT-4 analysis
 - Ollama local models (llama3.2, mistral, etc.)
 - Automatic threat correlation and evidence analysis
 
 **DNS blocklists:** Suricata Config tab → DNS Blocklists
+
 - hagezi (Pro/Pro++/Ultimate) - 350K+ domains
 - perflyst (SmartTV/Android/FireTV) - Tracking prevention
 - Automatic sync to Suricata datasets
 
 **Manual domain blocking:** Suricata Config tab → Add TLS SNI Domain
+
 - Add individual domains to blocklist
 - View manually added domains (reads SQLite directly)
 - Instant dataset regeneration and Suricata reload

@@ -319,6 +319,65 @@ class MLAdClassifier:
         self.model.fit(X_scaled, new_labels_y)
         self.save_model()
         print(f"✅ Model retrained with {len(new_samples_X)} new samples")
+    
+    def classify_with_llm(self, domain, profile_data, dst_ip, dst_port, dns_history=None):
+        """
+        Hybrid ML + LLM classification for borderline cases
+        Returns: (is_ad, confidence, method, llm_reasoning)
+        """
+        # First, get ML classification
+        is_ad_ml, ml_confidence, ml_method = self.classify_flow(domain, profile_data, dst_ip, dst_port)
+        
+        # Only use LLM for borderline cases (confidence between 0.60 and 0.85)
+        if ml_confidence < 0.60 or ml_confidence > 0.85:
+            return is_ad_ml, ml_confidence, ml_method, None
+        
+        # Prepare data for LLM analysis
+        try:
+            import requests
+            
+            flow_data = {
+                'daddr': dst_ip,
+                'dport': dst_port,
+                'packets': profile_data.get('packets', 0),
+                'bytes': profile_data.get('bytes', 0),
+                'duration': profile_data.get('duration', 0),
+                'dns_history': dns_history or [],
+                'ml_confidence': ml_confidence,
+                'ml_classification': 'ad' if is_ad_ml else 'legitimate'
+            }
+            
+            # Call LLM endpoint
+            response = requests.post(
+                'http://localhost:55000/ml_detector/analyze_flow_with_llm',
+                json=flow_data,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                llm_result = response.json()
+                
+                if llm_result.get('success'):
+                    llm_confidence = llm_result.get('confidence', 0.5)
+                    llm_classification = llm_result.get('classification', 'uncertain')
+                    llm_reasoning = llm_result.get('reasoning', '')
+                    
+                    # Combine ML and LLM confidence
+                    combined_confidence = (ml_confidence + llm_confidence) / 2
+                    
+                    # Determine final classification
+                    is_ad_final = (
+                        llm_classification in ['video_ad', 'ad_telemetry'] or
+                        (is_ad_ml and combined_confidence > 0.65)
+                    )
+                    
+                    return is_ad_final, combined_confidence, 'hybrid_ml_llm', llm_reasoning
+            
+        except Exception as e:
+            print(f"LLM analysis failed, falling back to ML only: {e}")
+        
+        # Fallback to ML-only decision
+        return is_ad_ml, ml_confidence, ml_method, None
 
 if __name__ == '__main__':
     classifier = MLAdClassifier()
@@ -326,3 +385,4 @@ if __name__ == '__main__':
     print(f"   Pattern rules: {len(classifier.ad_patterns)} ad patterns")
     print(f"   ML Model: RandomForest with 50 estimators")
     print(f"   Features: 8 flow-based features")
+    print(f"   LLM Enhancement: Available for borderline cases (0.60-0.85 confidence)")
