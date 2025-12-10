@@ -397,6 +397,7 @@ function loadStreamStats() {
                 $('#stream_total_analyzed').text(response.data.total_analyzed || 0);
                 $('#stream_ads_detected').text(response.data.ads_detected || 0);
                 $('#stream_ips_blocked').text(response.data.ips_blocked || 0);
+                $('#stream_flows_dropped').text(response.data.flows_dropped || response.data.cdn_flow_blocks || 0);
                 $('#stream_status').text(response.data.blocking_status || 'Unknown');
                 
                 // Color code status
@@ -416,6 +417,7 @@ function loadStreamStats() {
             $('#stream_total_analyzed').text('0');
             $('#stream_ads_detected').text('0');
             $('#stream_ips_blocked').text('0');
+            $('#stream_flows_dropped').text('0');
             $('#stream_status').text('Not Running').removeClass('text-success text-warning').addClass('text-danger');
         }
     });

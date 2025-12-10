@@ -176,6 +176,8 @@ def get_stream_stats():
                     "ads_detected": stats.get("ads_detected", "0"),
                     "ips_blocked": stats.get("ips_blocked", "0"),
                     "urls_blocked": stats.get("urls_blocked", "0"),
+                    "flows_dropped": stats.get("flows_dropped", "0"),
+                    "cdn_flow_blocks": stats.get("cdn_flow_blocks", "0"),
                     "legitimate_traffic": stats.get("legitimate_traffic", "0"),
                     "last_update": stats.get("last_update", "Never"),
                     "blocking_status": stats.get("blocking_status", "Unknown")
@@ -190,6 +192,8 @@ def get_stream_stats():
                     "ads_detected": "0",
                     "ips_blocked": "0",
                     "urls_blocked": "0",
+                    "flows_dropped": "0",
+                    "cdn_flow_blocks": "0",
                     "legitimate_traffic": "0",
                     "last_update": "Never",
                     "blocking_status": "Not Running"
