@@ -123,12 +123,6 @@ console.log("ML Detector JS: Script loaded");
             updateLLMRangeDisplay();
         });
         
-        function updateLLMRangeDisplay() {
-            const min = $('#llm_min_threshold').val();
-            const max = $('#llm_max_threshold').val();
-            $('#llm_range_display').text(min + ' - ' + max);
-        }
-        
         // Save thresholds button
         $('#save_thresholds').on('click', function() {
             const thresholds = {
@@ -198,6 +192,15 @@ console.log("ML Detector JS: Script loaded");
         console.log("ML Detector JS: Setup complete");
     });
 })();
+
+// ----------------------------------------
+// Helper Functions
+// ----------------------------------------
+function updateLLMRangeDisplay() {
+    const min = $('#llm_min_threshold').val();
+    const max = $('#llm_max_threshold').val();
+    $('#llm_range_display').text(min + ' - ' + max);
+}
 
 // ----------------------------------------
 // Chart Initialization
