@@ -246,108 +246,6 @@
     </div>
   </div>
 
-  <!-- Training Dataset Backup/Restore -->
-  <div class="row mb-4">
-    <div class="col-md-12">
-      <div class="card">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">Training Dataset Management</h5>
-          <button class="btn btn-sm btn-outline-secondary" onclick="refreshDatasetInfo()">
-            <i class="bi bi-arrow-clockwise"></i> Refresh
-          </button>
-        </div>
-        <div class="card-body">
-          <div class="row mb-3">
-            <div class="col-md-8">
-              <div id="dataset_info">
-                <p class="text-muted">Loading dataset information...</p>
-              </div>
-            </div>
-            <div class="col-md-4 text-end">
-              <button class="btn btn-primary mb-2 w-100" onclick="backupDataset()">
-                <i class="bi bi-download"></i> Backup Dataset
-              </button>
-              <button class="btn btn-secondary mb-2 w-100" data-bs-toggle="modal" data-bs-target="#restoreModal">
-                <i class="bi bi-upload"></i> Restore from Backup
-              </button>
-              <button class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#trimModal">
-                <i class="bi bi-scissors"></i> Trim Dataset
-              </button>
-            </div>
-          </div>
-          <div id="backup_message" class="alert" style="display:none;"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Restore Modal -->
-  <div class="modal fade" id="restoreModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Restore Dataset from Backup</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Select Backup:</label>
-            <select class="form-select" id="backup_select">
-              <option value="">Loading backups...</option>
-            </select>
-          </div>
-          <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle"></i> 
-            <strong>Warning:</strong> This will replace your current training dataset and restart the service.
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-primary" onclick="restoreDataset()">Restore Dataset</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Trim Modal -->
-  <div class="modal fade" id="trimModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Trim Training Dataset</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Maximum Samples:</label>
-            <input type="number" class="form-control" id="trim_max_samples" value="10000" min="100" step="100">
-            <small class="text-muted">Dataset will be trimmed to this many samples</small>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Trim Strategy:</label>
-            <select class="form-select" id="trim_strategy">
-              <option value="smart">Smart (recommended - quality + diversity)</option>
-              <option value="keep_balanced">Keep Balanced (equal ads/legitimate)</option>
-              <option value="keep_recent">Keep Most Recent</option>
-              <option value="keep_high_confidence">Keep High Confidence</option>
-            </select>
-            <small class="text-muted">
-              Smart: Keeps high-confidence recent samples, prefers LLM-labeled, maintains domain diversity
-            </small>
-          </div>
-          <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> 
-            A backup will be created automatically before trimming.
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-warning" onclick="trimDataset()">Trim Dataset</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Model Information -->
   <div class="row mb-4">
     <div class="col-12">
@@ -472,6 +370,12 @@
           <button class="nav-link" id="settings-tab" data-bs-toggle="tab"
                   data-bs-target="#settings" type="button" role="tab">
             <i class="bi bi-gear"></i> Settings
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="dataset-tab" data-bs-toggle="tab"
+                  data-bs-target="#dataset-management" type="button" role="tab">
+            <i class="bi bi-database"></i> Training Dataset
           </button>
         </li>
       </ul>
@@ -709,7 +613,7 @@
               <!-- Duration Thresholds -->
               <div class="row mb-4">
                 <div class="col-12">
-                  <h6 class="text-primary border-bottom pb-2">⏱️ Duration Thresholds (seconds)</h6>
+                  <h6 class="text-primary border-bottom pb-2">Duration Thresholds (seconds)</h6>
                 </div>
                 <div class="col-md-4">
                   <label for="streaming_min_duration" class="form-label">
@@ -737,7 +641,7 @@
               <!-- Size Thresholds -->
               <div class="row mb-4">
                 <div class="col-12">
-                  <h6 class="text-primary border-bottom pb-2">📦 Size Thresholds (bytes)</h6>
+                  <h6 class="text-primary border-bottom pb-2">Size Thresholds (bytes)</h6>
                 </div>
                 <div class="col-md-4">
                   <label for="streaming_min_bytes" class="form-label">
@@ -1063,8 +967,109 @@
             </div>
           </div>
         </div>
+
+        <!-- Training Dataset Management Tab -->
+        <div class="tab-pane fade" id="dataset-management" role="tabpanel">
+          <div class="card mt-3">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">Training Dataset Management</h5>
+              <button class="btn btn-sm btn-outline-secondary" onclick="refreshDatasetInfo()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="row mb-3">
+                <div class="col-md-8">
+                  <div id="dataset_info">
+                    <p class="text-muted">Loading dataset information...</p>
+                  </div>
+                </div>
+                <div class="col-md-4 text-end">
+                  <button class="btn btn-primary mb-2 w-100" onclick="backupDataset()">
+                    <i class="bi bi-download"></i> Backup Dataset
+                  </button>
+                  <button class="btn btn-secondary mb-2 w-100" data-bs-toggle="modal" data-bs-target="#restoreModal">
+                    <i class="bi bi-upload"></i> Restore from Backup
+                  </button>
+                  <button class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#trimModal">
+                    <i class="bi bi-scissors"></i> Trim Dataset
+                  </button>
+                </div>
+              </div>
+              <div id="backup_message" class="alert" style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
 
-</div>
+  <!-- Restore Modal -->
+  <div class="modal fade" id="restoreModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Restore Dataset from Backup</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Select Backup:</label>
+            <select class="form-select" id="backup_select">
+              <option value="">Loading backups...</option>
+            </select>
+          </div>
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> 
+            <strong>Warning:</strong> This will replace your current training dataset and restart the service.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" onclick="restoreDataset()">Restore Dataset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trim Modal -->
+  <div class="modal fade" id="trimModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Trim Training Dataset</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Maximum Samples:</label>
+            <input type="number" class="form-control" id="trim_max_samples" value="10000" min="100" step="100">
+            <small class="text-muted">Dataset will be trimmed to this many samples</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Trim Strategy:</label>
+            <select class="form-select" id="trim_strategy">
+              <option value="smart">Smart (recommended - quality + diversity)</option>
+              <option value="keep_balanced">Keep Balanced (equal ads/legitimate)</option>
+              <option value="keep_recent">Keep Most Recent</option>
+              <option value="keep_high_confidence">Keep High Confidence</option>
+            </select>
+            <small class="text-muted">
+              Smart: Keeps high-confidence recent samples, prefers LLM-labeled, maintains domain diversity
+            </small>
+          </div>
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> 
+            A backup will be created automatically before trimming.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-warning" onclick="trimDataset()">Trim Dataset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model Information -->
