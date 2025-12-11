@@ -66,21 +66,24 @@ class StreamAdBlocker:
             'ad_server_blocks': 0
         }
         
+        # Load detection thresholds from Redis or use defaults
+        self.load_thresholds()
+        
         # Connect to blocklist database
         self.blocklist_db = None
         try:
             self.blocklist_db = sqlite3.connect('/var/lib/suricata/ips_filter.db', check_same_thread=False)
             domain_count = self.blocklist_db.execute("SELECT COUNT(*) FROM blocked_domains").fetchone()[0]
-            print(f"✅ Connected to blocklist DB: {domain_count:,} domains")
+            print(f"[+] Connected to blocklist DB: {domain_count:,} domains")
         except Exception as e:
-            print(f"⚠️  Blocklist DB unavailable: {e}")
+            print(f"[!] Blocklist DB unavailable: {e}")
 
         # Initialize ML classifier
         try:
             self.classifier = MLAdClassifier()
-            print("✅ ML classifier loaded")
+            print("[+] ML classifier loaded")
         except Exception as e:
-            print(f"⚠️  ML classifier failed, using pattern-only mode: {e}")
+            print(f"[!] ML classifier failed, using pattern-only mode: {e}")
 
         # Known ad & telemetry domains for quick filtering
         self.ad_patterns = [
@@ -173,6 +176,20 @@ class StreamAdBlocker:
             'post_roll': {'min_dur': 5, 'max_dur': 30, 'location': 'video_end'}
         }
 
+    def load_thresholds(self):
+        """Load detection thresholds from Redis or use defaults"""
+        try:
+            thresholds = self.r_stats.hgetall("stream_ad_blocker:thresholds")
+            self.youtube_threshold = float(thresholds.get("youtube_threshold", "0.60"))
+            self.cdn_threshold = float(thresholds.get("cdn_threshold", "0.85"))
+            self.control_plane_threshold = float(thresholds.get("control_plane_threshold", "0.70"))
+            print(f"[+] Thresholds: YouTube={self.youtube_threshold}, CDN={self.cdn_threshold}, ControlPlane={self.control_plane_threshold}")
+        except Exception as e:
+            print(f"[!] Error loading thresholds, using defaults: {e}")
+            self.youtube_threshold = 0.60
+            self.cdn_threshold = 0.85
+            self.control_plane_threshold = 0.70
+
     def check_blocklist_db(self, domain):
         """
         Query blocklist database for domain
@@ -207,7 +224,7 @@ class StreamAdBlocker:
             
             return False, None, 0.0
         except Exception as e:
-            print(f"⚠️  Blocklist DB query failed: {e}")
+            print(f"[!] Blocklist DB query failed: {e}")
             return False, None, 0.0
     
     def get_slips_evidence(self, src_ip, dst_ip):
@@ -460,7 +477,7 @@ class StreamAdBlocker:
         Doesn't block entire IP, just drops this specific connection
         Perfect for CDN IPs where legitimate content shares same IP as ads
         """
-        if confidence < 0.75:
+        if confidence < 0.40:
             return False
         
         # Skip private IPs
@@ -492,12 +509,12 @@ class StreamAdBlocker:
                 self.r_stats.lpush('ml_detector:flow_drops', json.dumps(log_entry))
                 self.r_stats.ltrim('ml_detector:flow_drops', 0, 499)
                 
-                print(f"🎯 DROPPED FLOW: {src_ip} -> {dst_ip}:{dst_port} ({confidence:.0%} confidence - {reason})")
+                print(f"[*] DROPPED FLOW: {src_ip} -> {dst_ip}:{dst_port} ({confidence:.0%} confidence - {reason})")
                 return True
             
             return False
         except Exception as e:
-            print(f"⚠️  Flow drop failed: {e}")
+            print(f"[!] Flow drop failed: {e}")
             return False
     
     def block_flow_via_suricata(self, src_ip, src_port, dst_ip, dst_port, proto='udp', reason='LLM-detected video ad'):
@@ -565,10 +582,10 @@ class StreamAdBlocker:
                 self.r_stats.lpush('ml_detector:flow_blocks', json.dumps(log_entry))
                 self.r_stats.ltrim('ml_detector:flow_blocks', 0, 999)
                 
-                print(f"🚫 FLOW BLOCKED (Suricata): {flow_tuple} ({reason})")
+                print(f"[-] FLOW BLOCKED (Suricata): {flow_tuple} ({reason})")
                 return True
             else:
-                print(f"⚠️  Suricata flow injection warning: {inject_result.stderr}")
+                print(f"[!] Suricata flow injection warning: {inject_result.stderr}")
                 return False
                 
         except Exception as e:
@@ -612,10 +629,10 @@ class StreamAdBlocker:
                 self.r_stats.lpush('ml_detector:action_logs', json.dumps(log_entry))
                 self.r_stats.ltrim('ml_detector:action_logs', 0, 499)
 
-                print(f"🚫 BLOCKED IP: {ip} ({reason})")
+                print(f"[-] BLOCKED IP: {ip} ({reason})")
                 return True
             else:
-                print(f"⚠️  Failed to block {ip}: {result.stderr}")
+                print(f"[!] Failed to block {ip}: {result.stderr}")
                 return False
 
         except Exception as e:
@@ -659,7 +676,7 @@ class StreamAdBlocker:
             self.r_stats.lpush('ml_detector:action_logs', json.dumps(log_entry))
             self.r_stats.ltrim('ml_detector:action_logs', 0, 499)
 
-            print(f"🚫 BLOCKED URL: {domain} ({reason})")
+            print(f"[-] BLOCKED URL: {domain} ({reason})")
             return True
 
         except Exception as e:
@@ -710,7 +727,7 @@ class StreamAdBlocker:
                     self.youtube_connection_cache[dst_ip] = self.youtube_connection_cache[dst_ip][-50:]
 
         except Exception as e:
-            print(f"⚠️  Error learning pattern: {e}")
+            print(f"[!] Error learning pattern: {e}")
 
     def process_detection(self, domain, dst_ip, confidence, method, flow_data):
         """Process a detected ad and optionally block it"""
@@ -774,18 +791,22 @@ class StreamAdBlocker:
             is_youtube = 'googlevideo' in domain.lower() or 'youtube' in domain.lower()
             is_cdn = any(cdn in domain.lower() for cdn in ['cloudfront', 'akamai', 'fastly', 'edgecast'])
             
+            # Verbose logging for YouTube flows
+            if is_youtube:
+                print(f"[YT] YouTube flow: {domain} | dur={flow_data.get('dur', 0):.1f}s bytes={flow_data.get('sbytes', 0)} pkts={flow_data.get('spkts', 0)} | confidence={confidence:.2%} method={method}")
+            
             # Strategy 1: IP-level block for ad control plane (prevents ad auctions)
             # Control plane = small payloads for ad decisioning, safe to block
-            if is_control_plane and confidence >= 0.70:
+            if is_control_plane and confidence >= self.control_plane_threshold:
                 if self.block_ip(dst_ip, f"ad_control_plane:{method}"):
                     blocked = True
                     detection['block_type'] = 'ip_control_plane'
-                    print(f"🚫 AD CONTROL BLOCK: {domain} ({confidence:.0%} confidence - blocks ad auctions)")
+                    print(f"[-] AD CONTROL BLOCK: {domain} ({confidence:.0%} confidence - blocks ad auctions)")
             
             # Strategy 2: Flow-level blocking for YouTube/googlevideo (NO SSAI in region)
             # Separate ad streams detected by ML - safe to drop specific flows
             # Uses Suricata flow-based blocking for surgical precision
-            elif is_youtube and confidence >= 0.75:
+            elif is_youtube and confidence >= self.youtube_threshold:
                 # Use Suricata flow blocking (prevents CDN collateral damage)
                 if self.block_flow_via_suricata(
                     flow_data.get('src_ip', '0.0.0.0'),
@@ -797,11 +818,13 @@ class StreamAdBlocker:
                 ):
                     blocked = True
                     detection['block_type'] = 'suricata_flow_youtube_ad'
-                    print(f"🚫 YOUTUBE AD FLOW BLOCKED (Suricata): {domain} ({confidence:.0%} - separate ad stream)")
+                    print(f"[-] YOUTUBE AD FLOW BLOCKED (Suricata): {domain} ({confidence:.0%} - separate ad stream)")
+            elif is_youtube and confidence >= 0.40:
+                print(f"[i] YouTube flow below threshold: {domain} confidence={confidence:.2%} dur={flow_data.get('dur', 0):.1f}s bytes={flow_data.get('sbytes', 0)}")
             
             # Strategy 3: Flow-level blocking for other CDNs
             # Higher confidence threshold for non-YouTube CDNs
-            elif is_cdn and confidence >= 0.85:
+            elif is_cdn and confidence >= self.cdn_threshold:
                 # Use Suricata flow blocking (prevents CDN collateral damage)
                 if self.block_flow_via_suricata(
                     flow_data.get('src_ip', '0.0.0.0'),
@@ -813,7 +836,7 @@ class StreamAdBlocker:
                 ):
                     blocked = True
                     detection['block_type'] = 'suricata_flow_cdn'
-                    print(f"🚫 CDN AD FLOW BLOCKED (Suricata): {domain} ({confidence:.0%} confidence)")
+                    print(f"[-] CDN AD FLOW BLOCKED (Suricata): {domain} ({confidence:.0%} confidence)")
             
             # Strategy 4: Hybrid approach - try flow first, fallback to IP if very high confidence
             elif confidence >= 0.90:
@@ -840,7 +863,7 @@ class StreamAdBlocker:
                 detection['block_type'] = detection.get('block_type', 'url') + '+url'
 
         status = "BLOCKED" if blocked else "DETECTED"
-        print(f"🎯 {status}: {domain} → {dst_ip} (confidence: {confidence:.2f}, method: {method})")
+        print(f"[*] {status}: {domain} → {dst_ip} (confidence: {confidence:.2f}, method: {method})")
 
         return detection
 
@@ -851,12 +874,12 @@ class StreamAdBlocker:
         sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
         sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', buffering=1)
         
-        print("🎯 Starting Stream Ad Blocker & Telemetry Filter...", flush=True)
+        print("[*] Starting Stream Ad Blocker & Telemetry Filter...", flush=True)
         print(f"   ML Classifier: {'Enabled' if self.classifier else 'Disabled'}", flush=True)
         print(f"   Blocking Patterns: {len(self.ad_patterns)} ad/telemetry domains loaded", flush=True)
         print(f"   Streaming Services: {len(self.streaming_services)} services monitored", flush=True)
-        print(f"   🛡️  Flow-based QUIC/HTTP3 analysis via Zeek", flush=True)
-        print(f"   📡 Subscribing to SLIPS 'new_flow' channel", flush=True)
+        print(f"   Flow-based QUIC/HTTP3 analysis via Zeek", flush=True)
+        print(f"   Subscribing to SLIPS 'new_flow' channel", flush=True)
         print()
 
         seen_flows = set()
@@ -865,10 +888,10 @@ class StreamAdBlocker:
         # Create pubsub connection
         pubsub = self.r.pubsub()
         pubsub.subscribe('new_flow')
-        print("✅ Subscribed to 'new_flow' channel", flush=True)
+        print("[+] Subscribed to 'new_flow' channel", flush=True)
 
         blocking_enabled = self.get_blocking_status()
-        status_icon = "🟢" if blocking_enabled else "🟡"
+        status_icon = "[*]" if blocking_enabled else "[!]"
         print(f"{status_icon} Live Blocking: {'ENABLED' if blocking_enabled else 'DISABLED'}\n", flush=True)
 
         for message in pubsub.listen():
@@ -881,7 +904,7 @@ class StreamAdBlocker:
                 # Update blocking status periodically
                 if iteration % 100 == 0:
                     blocking_enabled = self.get_blocking_status()
-                    status_icon = "🟢" if blocking_enabled else "🟡"
+                    status_icon = "[*]" if blocking_enabled else "[!]"
                     print(f"\n{status_icon} Stats: {self.stats['total_analyzed']} flows analyzed, "
                           f"{self.stats['ads_detected']} ads detected, "
                           f"{self.stats['flows_dropped']} flows dropped", flush=True)

@@ -207,6 +207,72 @@ def get_stream_stats():
         }), 500
 
 
+@ml_detector.route("/get_thresholds")
+def get_thresholds():
+    """Get current detection thresholds"""
+    try:
+        thresholds = redis_db1.hgetall("stream_ad_blocker:thresholds")
+        
+        if thresholds:
+            return jsonify({
+                "success": True,
+                "data": {
+                    "youtube_threshold": float(thresholds.get("youtube_threshold", "0.60")),
+                    "cdn_threshold": float(thresholds.get("cdn_threshold", "0.85")),
+                    "control_plane_threshold": float(thresholds.get("control_plane_threshold", "0.70"))
+                }
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "data": {
+                    "youtube_threshold": 0.60,
+                    "cdn_threshold": 0.85,
+                    "control_plane_threshold": 0.70
+                }
+            })
+    except Exception as e:
+        logger.error(f"Error fetching thresholds: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/set_thresholds", methods=["POST"])
+def set_thresholds():
+    """Update detection thresholds and restart service"""
+    try:
+        data = request.get_json()
+        
+        youtube_threshold = float(data.get("youtube_threshold", 0.60))
+        cdn_threshold = float(data.get("cdn_threshold", 0.85))
+        control_plane_threshold = float(data.get("control_plane_threshold", 0.70))
+        
+        if not (0.40 <= youtube_threshold <= 0.95):
+            return jsonify({"success": False, "error": "YouTube threshold must be between 0.40 and 0.95"}), 400
+        if not (0.50 <= cdn_threshold <= 0.95):
+            return jsonify({"success": False, "error": "CDN threshold must be between 0.50 and 0.95"}), 400
+        if not (0.50 <= control_plane_threshold <= 0.90):
+            return jsonify({"success": False, "error": "Control plane threshold must be between 0.50 and 0.90"}), 400
+        
+        redis_db1.hset("stream_ad_blocker:thresholds", mapping={
+            "youtube_threshold": str(youtube_threshold),
+            "cdn_threshold": str(cdn_threshold),
+            "control_plane_threshold": str(control_plane_threshold)
+        })
+        
+        subprocess.run(["sudo", "systemctl", "restart", "stream-ad-blocker"], check=True)
+        
+        return jsonify({
+            "success": True,
+            "message": "Thresholds updated and service restarted"
+        })
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error restarting service: {e}")
+        return jsonify({"success": False, "error": "Failed to restart service"}), 500
+    except Exception as e:
+        logger.error(f"Error setting thresholds: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @ml_detector.route("/settings")
 def get_settings():
     """Get current detector configuration"""

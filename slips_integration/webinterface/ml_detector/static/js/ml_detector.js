@@ -102,6 +102,43 @@ console.log("ML Detector JS: Script loaded");
             }
         });
         
+        // Threshold slider listeners
+        $('#youtube_threshold').on('input', function() {
+            $('#youtube_threshold_value').text($(this).val());
+        });
+        $('#cdn_threshold').on('input', function() {
+            $('#cdn_threshold_value').text($(this).val());
+        });
+        $('#control_plane_threshold').on('input', function() {
+            $('#control_plane_threshold_value').text($(this).val());
+        });
+        
+        // Save thresholds button
+        $('#save_thresholds').on('click', function() {
+            const thresholds = {
+                youtube_threshold: parseFloat($('#youtube_threshold').val()),
+                cdn_threshold: parseFloat($('#cdn_threshold').val()),
+                control_plane_threshold: parseFloat($('#control_plane_threshold').val())
+            };
+            
+            $.ajax({
+                url: '/ml_detector/set_thresholds',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(thresholds),
+                success: function(response) {
+                    if (response.success) {
+                        alert('Thresholds updated successfully. Service will be restarted.');
+                    } else {
+                        alert('Error updating thresholds: ' + (response.error || 'Unknown error'));
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert('Error updating thresholds: ' + error);
+                }
+            });
+        });
+        
         console.log("ML Detector JS: Setup complete");
     });
 })();
@@ -368,6 +405,27 @@ function loadAllData() {
     loadAlerts();
     loadTimeline();
     loadFeatureImportance();
+    loadThresholds();
+}
+
+function loadThresholds() {
+    $.ajax({
+        url: '/ml_detector/get_thresholds',
+        method: 'GET',
+        success: function(response) {
+            if (response.success && response.data) {
+                $('#youtube_threshold').val(response.data.youtube_threshold);
+                $('#youtube_threshold_value').text(response.data.youtube_threshold);
+                $('#cdn_threshold').val(response.data.cdn_threshold);
+                $('#cdn_threshold_value').text(response.data.cdn_threshold);
+                $('#control_plane_threshold').val(response.data.control_plane_threshold);
+                $('#control_plane_threshold_value').text(response.data.control_plane_threshold);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading thresholds:', error);
+        }
+    });
 }
 
 function loadStats() {
