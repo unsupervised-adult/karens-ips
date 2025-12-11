@@ -845,193 +845,224 @@ class StreamAdBlocker:
         return detection
 
     def monitor_flows(self):
-        """Main monitoring loop"""
-        print("🎯 Starting Stream Ad Blocker & Telemetry Filter...")
-        print(f"   ML Classifier: {'Enabled' if self.classifier else 'Disabled'}")
-        print(f"   Blocking Patterns: {len(self.ad_patterns)} ad/telemetry domains loaded")
-        print(f"   Streaming Services: {len(self.streaming_services)} services monitored")
-        print(f"   🛡️  Blocking ads, tracking, analytics, and corpo spyware")
+        """Main monitoring loop - subscribes to SLIPS new_flow channel (Zeek flows)"""
+        # Force unbuffered output
+        import sys
+        sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
+        sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', buffering=1)
+        
+        print("🎯 Starting Stream Ad Blocker & Telemetry Filter...", flush=True)
+        print(f"   ML Classifier: {'Enabled' if self.classifier else 'Disabled'}", flush=True)
+        print(f"   Blocking Patterns: {len(self.ad_patterns)} ad/telemetry domains loaded", flush=True)
+        print(f"   Streaming Services: {len(self.streaming_services)} services monitored", flush=True)
+        print(f"   🛡️  Flow-based QUIC/HTTP3 analysis via Zeek", flush=True)
+        print(f"   📡 Subscribing to SLIPS 'new_flow' channel", flush=True)
         print()
 
-        seen_domains = set()
+        seen_flows = set()
         iteration = 0
 
-        while True:
-            iteration += 1
-            blocking_enabled = self.get_blocking_status()
-            status_icon = "🟢" if blocking_enabled else "🟡"
+        # Create pubsub connection
+        pubsub = self.r.pubsub()
+        pubsub.subscribe('new_flow')
+        print("✅ Subscribed to 'new_flow' channel", flush=True)
 
-            if iteration % 10 == 1:
-                print(f"\n{status_icon} Live Blocking: {'ENABLED' if blocking_enabled else 'DISABLED'}")
-                print(f"   Stats: {self.stats['ads_detected']} ads detected, "
-                      f"{self.stats['ips_blocked']} IPs blocked, "
-                      f"{self.stats['urls_blocked']} URLs blocked\n")
+        blocking_enabled = self.get_blocking_status()
+        status_icon = "🟢" if blocking_enabled else "🟡"
+        print(f"{status_icon} Live Blocking: {'ENABLED' if blocking_enabled else 'DISABLED'}\n", flush=True)
 
+        for message in pubsub.listen():
             try:
-                # Get all resolved domains
-                all_domains = set(self.r.hkeys('DomainsResolved'))
-                new_domains = all_domains - seen_domains
+                if message['type'] != 'message':
+                    continue
 
-                if new_domains:
-                    for domain in new_domains:
-                        self.stats['total_analyzed'] += 1
+                iteration += 1
+                
+                # Update blocking status periodically
+                if iteration % 100 == 0:
+                    blocking_enabled = self.get_blocking_status()
+                    status_icon = "🟢" if blocking_enabled else "🟡"
+                    print(f"\n{status_icon} Stats: {self.stats['total_analyzed']} flows analyzed, "
+                          f"{self.stats['ads_detected']} ads detected, "
+                          f"{self.stats['flows_dropped']} flows dropped", flush=True)
 
-                        # Get IP for this domain
-                        ip_data = self.r.hget('DomainsResolved', domain)
-                        try:
-                            ip_list = json.loads(ip_data) if ip_data else []
-                            dst_ip = ip_list[0] if isinstance(ip_list, list) and ip_list else ip_data if ip_data else 'Unknown'
-                        except:
-                            dst_ip = str(ip_data) if ip_data else 'Unknown'
+                # Parse flow data from SLIPS
+                flow_data_raw = message['data']
+                if isinstance(flow_data_raw, bytes):
+                    flow_data_raw = flow_data_raw.decode('utf-8')
+                
+                flow_info = json.loads(flow_data_raw)
+                
+                # Extract flow details
+                # SLIPS flow format: profileid, twid, flow data
+                profileid = flow_info.get('profileid', '')
+                flow = flow_info.get('flow', {})
+                
+                # Extract port and protocol
+                dport = flow.get('dport', 0)
+                proto = flow.get('proto', '').lower()
+                
+                # Skip DNS queries (we only want data flows)
+                if dport == 53:
+                    continue
 
-                        # Multi-source detection pipeline
-                        detection_sources = []
-                        confidence_scores = []
-                        
-                        # 1. Check blocklist database (338K+ domains)
-                        is_blocklisted, bl_category, bl_confidence = self.check_blocklist_db(domain)
-                        if is_blocklisted:
-                            detection_sources.append(f"Blocklist:{bl_category}")
-                            confidence_scores.append(bl_confidence)
-                        
-                        # 2. Check pattern matching
-                        if self.is_ad_domain(domain):
-                            detection_sources.append("Pattern:ad_domain")
-                            confidence_scores.append(0.75)
-
-                        # Log legitimate traffic for timeline
-                        if not detection_sources:
-                            # This is legitimate traffic - log it for timeline
-                            timeline_entry = {
-                                'timestamp': datetime.now().isoformat(),
-                                'hour': datetime.now().strftime('%H:00'),
-                                'classification': 'legitimate',
-                                'confidence': 0.95,
-                                'method': 'clean_domain'
-                            }
-                            self.r_stats.lpush('ml_detector:timeline', json.dumps(timeline_entry))
-                            self.r_stats.ltrim('ml_detector:timeline', 0, 999)
-                            continue
-
-                        # Get flow data if available
-                        flow_data = {
-                            'pkts': 10,
-                            'bytes': 5000,
-                            'dur': 15.0,
-                            'src_ip': '10.10.252.5',
-                            'dport': 443,
-                            'proto': 'HTTPS'
-                        }
-
-                        # 3. Analyze flow pattern
-                        is_ad_flow, flow_confidence, flow_reason = self.analyze_flow_pattern(flow_data)
-                        if is_ad_flow:
-                            detection_sources.append(f"Flow:{flow_reason}")
-                            confidence_scores.append(flow_confidence)
-
-                        # 4. Query SLIPS behavioral analysis
-                        slips_threat, slips_evidence, slips_confidence = self.get_slips_evidence(
-                            flow_data['src_ip'], dst_ip
-                        )
-                        if slips_threat > 0:
-                            detection_sources.append(f"SLIPS:{'+'.join(slips_evidence)}")
-                            confidence_scores.append(slips_confidence)
-
-                        # 5. Use ML classifier if available (with LLM enhancement for borderline cases)
-                        if self.classifier:
-                            # Get DNS history for this flow
-                            dns_history = []
+                self.stats['total_analyzed'] += 1
+                
+                # Extract relevant fields
+                src_ip = profileid.split('_')[0] if '_' in profileid else flow.get('saddr', '')
+                dst_ip = flow.get('daddr', '')
+                src_port = flow.get('sport', 0)
+                pkts = flow.get('pkts', 0)
+                bytes_sent = flow.get('bytes', 0)
+                duration = flow.get('dur', 0)
+                
+                # Create flow identifier
+                flow_id = f"{src_ip}:{src_port}->{dst_ip}:{dport}"
+                
+                # Skip if already analyzed recently
+                if flow_id in seen_flows:
+                    continue
+                seen_flows.add(flow_id)
+                
+                # Construct flow_data for analysis
+                flow_data = {
+                    'src_ip': src_ip,
+                    'sport': src_port,
+                    'dport': dport,
+                    'proto': 'udp',
+                    'pkts': pkts,
+                    'bytes': bytes_sent,
+                    'dur': duration
+                }
+                
+                # Try to resolve IP to domain via SLIPS data
+                domain = None
+                try:
+                    # Check DomainsResolved
+                    for resolved_domain in self.r.hkeys('DomainsResolved'):
+                        ip_data = self.r.hget('DomainsResolved', resolved_domain)
+                        if dst_ip in str(ip_data):
+                            domain = resolved_domain
+                            break
+                except:
+                    pass
+                
+                # If no domain found, use IP
+                if not domain:
+                    domain = dst_ip
+                
+                # Multi-source detection pipeline
+                detection_sources = []
+                confidence_scores = []
+                
+                # 1. Check blocklist database (if domain resolved)
+                if domain != dst_ip:
+                    is_blocklisted, bl_category, bl_confidence = self.check_blocklist_db(domain)
+                    if is_blocklisted:
+                        detection_sources.append(f"Blocklist:{bl_category}")
+                        confidence_scores.append(bl_confidence)
+                
+                # 2. Analyze flow pattern (CRITICAL for QUIC ad detection)
+                is_ad_flow, flow_confidence, flow_reason = self.analyze_flow_pattern(flow_data)
+                if is_ad_flow:
+                    detection_sources.append(f"Flow:{flow_reason}")
+                    confidence_scores.append(flow_confidence)
+                
+                # 3. Query SLIPS behavioral analysis
+                slips_threat, slips_evidence, slips_confidence = self.get_slips_evidence(
+                    src_ip, dst_ip
+                )
+                if slips_threat > 0:
+                    detection_sources.append(f"SLIPS:{'+'.join(slips_evidence)}")
+                    confidence_scores.append(slips_confidence)
+                
+                # 4. Use ML classifier with LLM enhancement
+                if self.classifier and is_ad_flow:
+                    # Get DNS history
+                    dns_history = []
+                    try:
+                        dns_key = f"profile_{src_ip}_dns"
+                        dns_records = self.r.lrange(dns_key, 0, 10)
+                        dns_history = [r.decode('utf-8') if isinstance(r, bytes) else r for r in dns_records]
+                    except:
+                        pass
+                    
+                    # Use hybrid ML+LLM classification
+                    is_ad_ml, ml_confidence, ml_method, llm_reasoning = self.classifier.classify_with_llm(
+                        domain, flow_data, dst_ip, 443, dns_history
+                    )
+                    
+                    if is_ad_ml:
+                        if llm_reasoning:
+                            detection_sources.append(f"ML+LLM:{ml_method}")
+                            self.stats['llm_enhanced_detections'] = self.stats.get('llm_enhanced_detections', 0) + 1
+                            # Store LLM reasoning
                             try:
-                                dns_key = f"profile_{flow_data['src_ip']}_dns"
-                                dns_records = self.redis_db.lrange(dns_key, 0, 10)
-                                dns_history = [r.decode('utf-8') if isinstance(r, bytes) else r for r in dns_records]
+                                self.r_stats.lpush('stream_blocker:llm_reasoning', 
+                                                   json.dumps({
+                                                       'timestamp': time.time(),
+                                                       'flow': flow_id,
+                                                       'dst_ip': dst_ip,
+                                                       'domain': domain,
+                                                       'confidence': ml_confidence,
+                                                       'reasoning': llm_reasoning,
+                                                       'flow_age': duration,
+                                                       'flow_bytes': bytes_sent
+                                                   }))
+                                self.r_stats.ltrim('stream_blocker:llm_reasoning', 0, 99)
                             except:
                                 pass
-                            
-                            # Use hybrid ML+LLM classification
-                            is_ad_ml, ml_confidence, ml_method, llm_reasoning = self.classifier.classify_with_llm(
-                                domain, flow_data, dst_ip, 443, dns_history
-                            )
-                            
-                            if is_ad_ml:
-                                # Check if LLM was involved
-                                if llm_reasoning:
-                                    detection_sources.append(f"ML+LLM:{ml_method}")
-                                    self.stats['llm_enhanced_detections'] = self.stats.get('llm_enhanced_detections', 0) + 1
-                                    # Store LLM reasoning for dashboard
-                                    try:
-                                        self.redis_db.lpush('stream_blocker:llm_reasoning', 
-                                                           json.dumps({
-                                                               'timestamp': time.time(),
-                                                               'flow': f"{dst_ip}:443",
-                                                               'domain': domain,
-                                                               'confidence': ml_confidence,
-                                                               'reasoning': llm_reasoning
-                                                           }))
-                                        self.redis_db.ltrim('stream_blocker:llm_reasoning', 0, 99)
-                                    except:
-                                        pass
-                                else:
-                                    detection_sources.append(f"ML:{ml_method}")
-                                
-                                confidence_scores.append(ml_confidence)
-                                self.stats['ml_detections'] += 1
-
-                        # Calculate combined confidence (weighted average with boost for multiple sources)
-                        if confidence_scores:
-                            avg_confidence = sum(confidence_scores) / len(confidence_scores)
-                            # Boost confidence if multiple sources agree
-                            multi_source_boost = min(0.15, (len(detection_sources) - 1) * 0.05)
-                            combined_confidence = min(1.0, avg_confidence + multi_source_boost)
-                            
-                            method = " + ".join(detection_sources)
-                            
-                            # Learn from this detection (for YouTube/QUIC)
-                            if 'googlevideo' in domain or 'youtube' in domain:
-                                self.learn_youtube_pattern(dst_ip, flow_data, True, combined_confidence)
-
-                            self.process_detection(domain, dst_ip, combined_confidence, method, flow_data)
                         else:
-                            # Pattern-only mode
-                            if is_ad_flow:
-                                # Learn from this detection (for YouTube/QUIC)
-                                if 'googlevideo' in domain or 'youtube' in domain:
-                                    self.learn_youtube_pattern(dst_ip, flow_data, True, flow_confidence)
+                            detection_sources.append(f"ML:{ml_method}")
+                        
+                        confidence_scores.append(ml_confidence)
+                        self.stats['ml_detections'] += 1
+                
+                # Process detection if confidence threshold met
+                if confidence_scores:
+                    avg_confidence = sum(confidence_scores) / len(confidence_scores)
+                    # Boost confidence if multiple sources agree
+                    multi_source_boost = min(0.15, (len(detection_sources) - 1) * 0.05)
+                    combined_confidence = min(1.0, avg_confidence + multi_source_boost)
+                    
+                    method = " + ".join(detection_sources)
+                    
+                    # Learn from YouTube/QUIC patterns
+                    if 'google' in dst_ip or (domain and 'google' in domain.lower()):
+                        self.learn_youtube_pattern(dst_ip, flow_data, True, combined_confidence)
+                    
+                    self.process_detection(domain, dst_ip, combined_confidence, method, flow_data)
+                
+                # Periodically update stats
+                if self.stats['total_analyzed'] % 50 == 0:
+                    stats_update = {
+                        'total_analyzed': str(self.stats['total_analyzed']),
+                        'ads_detected': str(self.stats['ads_detected']),
+                        'stream_ads_detected': str(self.stats['ads_detected']),
+                        'ips_blocked': str(self.stats['ips_blocked']),
+                        'urls_blocked': str(self.stats['urls_blocked']),
+                        'flows_dropped': str(self.stats['flows_dropped']),
+                        'cdn_flow_blocks': str(self.stats['cdn_flow_blocks']),
+                        'legitimate_traffic': str(self.stats['total_analyzed'] - self.stats['ads_detected']),
+                        'legitimate_streams': str(self.stats['total_analyzed'] - self.stats['ads_detected']),
+                        'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'blocking_status': 'Active' if blocking_enabled else 'Monitoring Only',
+                        'llm_enhanced_detections': str(self.stats.get('llm_enhanced_detections', 0))
+                    }
+                    self.r_stats.hset('stream_ad_blocker:stats', mapping=stats_update)
+                
+                # Clean seen_flows cache periodically
+                if len(seen_flows) > 10000:
+                    seen_flows = set(list(seen_flows)[-5000:])
 
-                                self.process_detection(domain, dst_ip, flow_confidence,
-                                                     f"pattern+flow:{flow_reason}", flow_data)
-                            else:
-                                # Just domain pattern match
-                                if 'googlevideo' in domain or 'youtube' in domain:
-                                    self.learn_youtube_pattern(dst_ip, flow_data, True, 0.85)
-
-                                self.process_detection(domain, dst_ip, 0.85,
-                                                     "domain_pattern", flow_data)
-
-                    seen_domains = all_domains
-
-                # Update stats in Redis - write to dedicated stream_ad_blocker:stats key
-                # This prevents conflicts with SLIPS ML Dashboard Feeder module
-                stats_update = {
-                    'total_analyzed': str(self.stats['total_analyzed']),
-                    'ads_detected': str(self.stats['ads_detected']),
-                    'stream_ads_detected': str(self.stats['ads_detected']),
-                    'ips_blocked': str(self.stats['ips_blocked']),
-                    'urls_blocked': str(self.stats['urls_blocked']),
-                    'legitimate_traffic': str(len(all_domains) - self.stats['ads_detected']),
-                    'legitimate_streams': str(len(all_domains) - self.stats['ads_detected']),
-                    'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'blocking_status': 'Active' if blocking_enabled else 'Monitoring Only'
-                }
-                # Write only to stream_ad_blocker:stats (dedicated key, no conflicts)
-                self.r_stats.hset('stream_ad_blocker:stats', mapping=stats_update)
-
+            except KeyboardInterrupt:
+                raise
+            except json.JSONDecodeError:
+                continue
             except Exception as e:
-                print(f"❌ Error in monitoring loop: {e}")
+                print(f"❌ Error processing flow: {e}", flush=True)
                 import traceback
                 traceback.print_exc()
-
-            time.sleep(2)
 
 if __name__ == '__main__':
     try:
