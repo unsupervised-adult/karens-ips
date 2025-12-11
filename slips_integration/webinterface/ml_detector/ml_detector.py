@@ -245,6 +245,8 @@ def set_thresholds():
         youtube_threshold = float(data.get("youtube_threshold", 0.60))
         cdn_threshold = float(data.get("cdn_threshold", 0.85))
         control_plane_threshold = float(data.get("control_plane_threshold", 0.70))
+        llm_min_threshold = float(data.get("llm_min_threshold", 0.30))
+        llm_max_threshold = float(data.get("llm_max_threshold", 0.90))
         
         if not (0.40 <= youtube_threshold <= 0.95):
             return jsonify({"success": False, "error": "YouTube threshold must be between 0.40 and 0.95"}), 400
@@ -252,11 +254,19 @@ def set_thresholds():
             return jsonify({"success": False, "error": "CDN threshold must be between 0.50 and 0.95"}), 400
         if not (0.50 <= control_plane_threshold <= 0.90):
             return jsonify({"success": False, "error": "Control plane threshold must be between 0.50 and 0.90"}), 400
+        if not (0.20 <= llm_min_threshold <= 0.60):
+            return jsonify({"success": False, "error": "LLM min threshold must be between 0.20 and 0.60"}), 400
+        if not (0.70 <= llm_max_threshold <= 0.95):
+            return jsonify({"success": False, "error": "LLM max threshold must be between 0.70 and 0.95"}), 400
+        if llm_min_threshold >= llm_max_threshold:
+            return jsonify({"success": False, "error": "LLM min must be less than LLM max"}), 400
         
         redis_db1.hset("stream_ad_blocker:thresholds", mapping={
             "youtube_threshold": str(youtube_threshold),
             "cdn_threshold": str(cdn_threshold),
-            "control_plane_threshold": str(control_plane_threshold)
+            "control_plane_threshold": str(control_plane_threshold),
+            "llm_min_threshold": str(llm_min_threshold),
+            "llm_max_threshold": str(llm_max_threshold)
         })
         
         subprocess.run(["sudo", "systemctl", "restart", "stream-ad-blocker"], check=True)
@@ -369,6 +379,132 @@ def get_logging_status():
         })
     except Exception as e:
         logger.error(f"Error getting logging status: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/dataset_info")
+def get_dataset_info():
+    """Get training dataset statistics"""
+    try:
+        from ml_ad_classifier import MLAdClassifier
+        classifier = MLAdClassifier()
+        info = classifier.get_dataset_info()
+        
+        if info.get('exists'):
+            info['file_size_mb'] = round(info['file_size'] / (1024 * 1024), 2)
+        
+        return jsonify({
+            "success": True,
+            "dataset": info
+        })
+    except Exception as e:
+        logger.error(f"Error getting dataset info: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/backup_dataset", methods=["POST"])
+def backup_dataset():
+    """Backup training dataset"""
+    try:
+        data = request.get_json()
+        backup_name = data.get("backup_name", f"dataset_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+        
+        backup_dir = '/var/lib/stream_ad_blocker/backups'
+        os.makedirs(backup_dir, exist_ok=True)
+        backup_path = os.path.join(backup_dir, backup_name)
+        
+        from ml_ad_classifier import MLAdClassifier
+        classifier = MLAdClassifier()
+        success, message = classifier.backup_dataset(backup_path)
+        
+        return jsonify({
+            "success": success,
+            "message": message,
+            "backup_path": backup_path if success else None
+        })
+    except Exception as e:
+        logger.error(f"Error backing up dataset: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/restore_dataset", methods=["POST"])
+def restore_dataset():
+    """Restore training dataset from backup"""
+    try:
+        data = request.get_json()
+        backup_path = data.get("backup_path")
+        
+        if not backup_path:
+            return jsonify({"success": False, "error": "Backup path required"}), 400
+        
+        from ml_ad_classifier import MLAdClassifier
+        classifier = MLAdClassifier()
+        success, message = classifier.restore_dataset(backup_path)
+        
+        if success:
+            subprocess.run(["sudo", "systemctl", "restart", "stream-ad-blocker"], check=True)
+        
+        return jsonify({
+            "success": success,
+            "message": message
+        })
+    except Exception as e:
+        logger.error(f"Error restoring dataset: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/list_backups")
+def list_backups():
+    """List available dataset backups"""
+    try:
+        backup_dir = '/var/lib/stream_ad_blocker/backups'
+        
+        if not os.path.exists(backup_dir):
+            return jsonify({"success": True, "backups": []})
+        
+        backups = []
+        for filename in sorted(os.listdir(backup_dir), reverse=True):
+            if filename.endswith('.json'):
+                filepath = os.path.join(backup_dir, filename)
+                stat = os.stat(filepath)
+                backups.append({
+                    'filename': filename,
+                    'path': filepath,
+                    'size': stat.st_size,
+                    'size_mb': round(stat.st_size / (1024 * 1024), 2),
+                    'created': datetime.fromtimestamp(stat.st_ctime).isoformat()
+                })
+        
+        return jsonify({
+            "success": True,
+            "backups": backups
+        })
+    except Exception as e:
+        logger.error(f"Error listing backups: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/trim_dataset", methods=["POST"])
+def trim_dataset():
+    """Trim training dataset to prevent excessive growth"""
+    try:
+        data = request.get_json()
+        max_samples = data.get("max_samples", 10000)
+        strategy = data.get("strategy", "keep_balanced")
+        
+        if strategy not in ['keep_recent', 'keep_balanced', 'keep_high_confidence']:
+            return jsonify({"success": False, "error": "Invalid trim strategy"}), 400
+        
+        from ml_ad_classifier import MLAdClassifier
+        classifier = MLAdClassifier()
+        success, message = classifier.trim_dataset(max_samples, strategy)
+        
+        return jsonify({
+            "success": success,
+            "message": message
+        })
+    except Exception as e:
+        logger.error(f"Error trimming dataset: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 

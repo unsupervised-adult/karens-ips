@@ -16,11 +16,15 @@ from collections import defaultdict
 from time import time
 
 class MLAdClassifier:
-    def __init__(self):
+    def __init__(self, llm_min_threshold=0.30, llm_max_threshold=0.90):
         self.model = None
         self.scaler = StandardScaler()
         self.model_path = '/opt/StratosphereLinuxIPS/webinterface/ml_detector/ad_classifier_model.pkl'
         self.scaler_path = '/opt/StratosphereLinuxIPS/webinterface/ml_detector/ad_classifier_scaler.pkl'
+        self.dataset_path = '/var/lib/stream_ad_blocker/training_dataset.json'
+        self.llm_min_threshold = llm_min_threshold
+        self.llm_max_threshold = llm_max_threshold
+        self.training_samples = []
         
         self.ad_patterns = [
             'doubleclick', 'googlesyndication', 'googleadservices',
@@ -318,7 +322,181 @@ class MLAdClassifier:
         X_scaled = self.scaler.transform(new_samples_X)
         self.model.fit(X_scaled, new_labels_y)
         self.save_model()
-        print(f"✅ Model retrained with {len(new_samples_X)} new samples")
+        print(f"[+] Model retrained with {len(new_samples_X)} new samples")
+    
+    def save_training_sample(self, domain, features, label, confidence, method, reasoning=None):
+        """Save LLM-labeled sample to training dataset"""
+        sample = {
+            'timestamp': datetime.now().isoformat(),
+            'domain': domain,
+            'features': features.tolist() if hasattr(features, 'tolist') else features,
+            'label': int(label),
+            'confidence': float(confidence),
+            'method': method,
+            'reasoning': reasoning
+        }
+        
+        self.training_samples.append(sample)
+        
+        if len(self.training_samples) >= 10:
+            self.flush_training_samples()
+    
+    def flush_training_samples(self):
+        """Write accumulated training samples to disk"""
+        if not self.training_samples:
+            return
+        
+        try:
+            existing_data = []
+            if os.path.exists(self.dataset_path):
+                with open(self.dataset_path, 'r') as f:
+                    existing_data = json.load(f)
+            
+            existing_data.extend(self.training_samples)
+            
+            os.makedirs(os.path.dirname(self.dataset_path), exist_ok=True)
+            with open(self.dataset_path, 'w') as f:
+                json.dump(existing_data, f, indent=2)
+            
+            print(f"[+] Saved {len(self.training_samples)} training samples (total: {len(existing_data)})")
+            self.training_samples = []
+            
+            self.auto_trim_check(max_samples=10000)
+            
+        except Exception as e:
+            print(f"[!] Failed to save training samples: {e}")
+    
+    def backup_dataset(self, backup_path):
+        """Backup training dataset to specified path"""
+        try:
+            if not os.path.exists(self.dataset_path):
+                return False, "No training dataset found"
+            
+            self.flush_training_samples()
+            
+            import shutil
+            shutil.copy2(self.dataset_path, backup_path)
+            
+            with open(self.dataset_path, 'r') as f:
+                sample_count = len(json.load(f))
+            
+            return True, f"Backed up {sample_count} training samples to {backup_path}"
+        except Exception as e:
+            return False, f"Backup failed: {e}"
+    
+    def restore_dataset(self, backup_path):
+        """Restore training dataset from backup"""
+        try:
+            if not os.path.exists(backup_path):
+                return False, "Backup file not found"
+            
+            with open(backup_path, 'r') as f:
+                data = json.load(f)
+            
+            os.makedirs(os.path.dirname(self.dataset_path), exist_ok=True)
+            
+            import shutil
+            shutil.copy2(backup_path, self.dataset_path)
+            
+            return True, f"Restored {len(data)} training samples from {backup_path}"
+        except Exception as e:
+            return False, f"Restore failed: {e}"
+    
+    def get_dataset_info(self):
+        """Get statistics about current training dataset"""
+        try:
+            if not os.path.exists(self.dataset_path):
+                return {
+                    'exists': False,
+                    'total_samples': 0,
+                    'ad_samples': 0,
+                    'legitimate_samples': 0
+                }
+            
+            with open(self.dataset_path, 'r') as f:
+                data = json.load(f)
+            
+            ad_count = sum(1 for s in data if s.get('label') == 1)
+            
+            return {
+                'exists': True,
+                'total_samples': len(data),
+                'ad_samples': ad_count,
+                'legitimate_samples': len(data) - ad_count,
+                'file_path': self.dataset_path,
+                'file_size': os.path.getsize(self.dataset_path)
+            }
+        except Exception as e:
+            return {'exists': False, 'error': str(e)}
+    
+    def trim_dataset(self, max_samples=10000, strategy='keep_recent'):
+        """Trim dataset to prevent excessive growth
+        
+        Args:
+            max_samples: Maximum samples to keep
+            strategy: 'keep_recent', 'keep_balanced', or 'keep_high_confidence'
+        """
+        try:
+            if not os.path.exists(self.dataset_path):
+                return False, "No dataset to trim"
+            
+            self.flush_training_samples()
+            
+            with open(self.dataset_path, 'r') as f:
+                data = json.load(f)
+            
+            if len(data) <= max_samples:
+                return True, f"Dataset has {len(data)} samples, no trimming needed"
+            
+            original_count = len(data)
+            
+            if strategy == 'keep_recent':
+                data = sorted(data, key=lambda x: x.get('timestamp', ''), reverse=True)[:max_samples]
+            
+            elif strategy == 'keep_balanced':
+                ad_samples = [s for s in data if s.get('label') == 1]
+                legit_samples = [s for s in data if s.get('label') == 0]
+                
+                target_per_class = max_samples // 2
+                
+                ad_samples = sorted(ad_samples, key=lambda x: x.get('timestamp', ''), reverse=True)[:target_per_class]
+                legit_samples = sorted(legit_samples, key=lambda x: x.get('timestamp', ''), reverse=True)[:target_per_class]
+                
+                data = ad_samples + legit_samples
+            
+            elif strategy == 'keep_high_confidence':
+                data = sorted(data, key=lambda x: x.get('confidence', 0), reverse=True)[:max_samples]
+            
+            backup_path = f"{self.dataset_path}.pre_trim_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            import shutil
+            shutil.copy2(self.dataset_path, backup_path)
+            
+            with open(self.dataset_path, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            return True, f"Trimmed from {original_count} to {len(data)} samples using '{strategy}' strategy. Backup: {backup_path}"
+        
+        except Exception as e:
+            return False, f"Trim failed: {e}"
+    
+    def auto_trim_check(self, max_samples=10000):
+        """Check if dataset needs trimming and do it automatically"""
+        try:
+            if not os.path.exists(self.dataset_path):
+                return
+            
+            with open(self.dataset_path, 'r') as f:
+                data = json.load(f)
+            
+            if len(data) > max_samples * 1.2:
+                print(f"[*] Dataset has {len(data)} samples, auto-trimming to {max_samples}...")
+                success, message = self.trim_dataset(max_samples, 'keep_balanced')
+                if success:
+                    print(f"[+] {message}")
+                else:
+                    print(f"[!] {message}")
+        except Exception as e:
+            print(f"[!] Auto-trim check failed: {e}")
     
     def classify_with_llm(self, domain, profile_data, dst_ip, dst_port, dns_history=None):
         """
@@ -328,9 +506,9 @@ class MLAdClassifier:
         # First, get ML classification
         is_ad_ml, ml_confidence, ml_method = self.classify_flow(domain, profile_data, dst_ip, dst_port)
         
-        # Use LLM for wider range to build training dataset (0.30-0.90)
+        # Use LLM for configurable range to build training dataset
         # With local LLM on slow GPU, we can afford more calls for better labeling
-        if ml_confidence < 0.30 or ml_confidence > 0.90:
+        if ml_confidence < self.llm_min_threshold or ml_confidence > self.llm_max_threshold:
             return is_ad_ml, ml_confidence, ml_method, None
         
         # Prepare data for LLM analysis

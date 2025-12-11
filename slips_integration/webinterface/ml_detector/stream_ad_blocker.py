@@ -83,7 +83,7 @@ class StreamAdBlocker:
 
         # Initialize ML classifier
         try:
-            self.classifier = MLAdClassifier()
+            self.classifier = MLAdClassifier(self.llm_min_threshold, self.llm_max_threshold)
             print("[+] ML classifier loaded")
         except Exception as e:
             print(f"[!] ML classifier failed, using pattern-only mode: {e}")
@@ -193,12 +193,17 @@ class StreamAdBlocker:
             self.youtube_threshold = float(thresholds.get("youtube_threshold", "0.60"))
             self.cdn_threshold = float(thresholds.get("cdn_threshold", "0.85"))
             self.control_plane_threshold = float(thresholds.get("control_plane_threshold", "0.70"))
+            self.llm_min_threshold = float(thresholds.get("llm_min_threshold", "0.30"))
+            self.llm_max_threshold = float(thresholds.get("llm_max_threshold", "0.90"))
             print(f"[+] Thresholds: YouTube={self.youtube_threshold}, CDN={self.cdn_threshold}, ControlPlane={self.control_plane_threshold}")
+            print(f"[+] LLM Range: {self.llm_min_threshold} - {self.llm_max_threshold}")
         except Exception as e:
             print(f"[!] Error loading thresholds, using defaults: {e}")
             self.youtube_threshold = 0.60
             self.cdn_threshold = 0.85
             self.control_plane_threshold = 0.70
+            self.llm_min_threshold = 0.30
+            self.llm_max_threshold = 0.90
 
     def init_detection_history_db(self):
         """Initialize SQLite database for detection history"""
@@ -1101,6 +1106,21 @@ class StreamAdBlocker:
                         domain, flow_data, dst_ip, 443, dns_history
                     )
                     
+                    # Save LLM-labeled sample to training dataset
+                    if llm_reasoning:
+                        try:
+                            features = self.classifier.extract_flow_features(flow_data, dst_ip, 443)
+                            self.classifier.save_training_sample(
+                                domain=domain,
+                                features=features,
+                                label=1 if is_ad_ml else 0,
+                                confidence=ml_confidence,
+                                method=ml_method,
+                                reasoning=llm_reasoning
+                            )
+                        except Exception as e:
+                            print(f"[!] Failed to save training sample: {e}")
+                    
                     if is_ad_ml:
                         if llm_reasoning:
                             detection_sources.append(f"ML+LLM:{ml_method}")
@@ -1174,12 +1194,18 @@ class StreamAdBlocker:
                 traceback.print_exc()
 
 if __name__ == '__main__':
+    blocker = None
     try:
         blocker = StreamAdBlocker()
         blocker.monitor_flows()
     except KeyboardInterrupt:
-        print("\n\n👋 Stream Ad Blocker stopped")
+        print("\n\n[*] Stream Ad Blocker stopped")
+        if blocker and hasattr(blocker, 'classifier'):
+            print("[*] Flushing training samples...")
+            blocker.classifier.flush_training_samples()
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print(f"\n[!] Fatal error: {e}")
         import traceback
         traceback.print_exc()
+        if blocker and hasattr(blocker, 'classifier'):
+            blocker.classifier.flush_training_samples()

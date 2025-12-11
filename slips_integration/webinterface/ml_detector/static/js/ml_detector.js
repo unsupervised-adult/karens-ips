@@ -112,13 +112,31 @@ console.log("ML Detector JS: Script loaded");
         $('#control_plane_threshold').on('input', function() {
             $('#control_plane_threshold_value').text($(this).val());
         });
+        $('#llm_min_threshold').on('input', function() {
+            const val = $(this).val();
+            $('#llm_min_threshold_value').text(val);
+            updateLLMRangeDisplay();
+        });
+        $('#llm_max_threshold').on('input', function() {
+            const val = $(this).val();
+            $('#llm_max_threshold_value').text(val);
+            updateLLMRangeDisplay();
+        });
+        
+        function updateLLMRangeDisplay() {
+            const min = $('#llm_min_threshold').val();
+            const max = $('#llm_max_threshold').val();
+            $('#llm_range_display').text(min + ' - ' + max);
+        }
         
         // Save thresholds button
         $('#save_thresholds').on('click', function() {
             const thresholds = {
                 youtube_threshold: parseFloat($('#youtube_threshold').val()),
                 cdn_threshold: parseFloat($('#cdn_threshold').val()),
-                control_plane_threshold: parseFloat($('#control_plane_threshold').val())
+                control_plane_threshold: parseFloat($('#control_plane_threshold').val()),
+                llm_min_threshold: parseFloat($('#llm_min_threshold').val()),
+                llm_max_threshold: parseFloat($('#llm_max_threshold').val())
             };
             
             $.ajax({
@@ -537,6 +555,11 @@ function loadThresholds() {
                 $('#cdn_threshold_value').text(response.data.cdn_threshold);
                 $('#control_plane_threshold').val(response.data.control_plane_threshold);
                 $('#control_plane_threshold_value').text(response.data.control_plane_threshold);
+                $('#llm_min_threshold').val(response.data.llm_min_threshold || 0.30);
+                $('#llm_min_threshold_value').text(response.data.llm_min_threshold || 0.30);
+                $('#llm_max_threshold').val(response.data.llm_max_threshold || 0.90);
+                $('#llm_max_threshold_value').text(response.data.llm_max_threshold || 0.90);
+                updateLLMRangeDisplay();
             }
         },
         error: function(xhr, status, error) {
@@ -1529,5 +1552,203 @@ $(document).ready(function() {
         loadBlacklist();
         loadFeedbackTable();
     });
+
+    // Dataset management
+    refreshDatasetInfo();
+    $('#restoreModal').on('show.bs.modal', loadBackupsList);
 });
+
+// Dataset Management Functions
+function refreshDatasetInfo() {
+    $.ajax({
+        url: '/ml_detector/dataset_info',
+        method: 'GET',
+        success: function(response) {
+            if (response.success && response.dataset) {
+                const ds = response.dataset;
+                if (ds.exists) {
+                    const infoHtml = `
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h3 class="text-primary">${ds.total_samples}</h3>
+                                    <small class="text-muted">Total Samples</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h3 class="text-danger">${ds.ad_samples}</h3>
+                                    <small class="text-muted">Ad Flows</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h3 class="text-success">${ds.legitimate_samples}</h3>
+                                    <small class="text-muted">Legitimate Flows</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h3 class="text-info">${ds.file_size_mb} MB</h3>
+                                    <small class="text-muted">Dataset Size</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted">Dataset: ${ds.file_path}</small>
+                        </div>
+                    `;
+                    $('#dataset_info').html(infoHtml);
+                } else {
+                    $('#dataset_info').html('<p class="text-warning">No training dataset found. LLM will start building one.</p>');
+                }
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading dataset info:', error);
+            $('#dataset_info').html('<p class="text-danger">Error loading dataset information</p>');
+        }
+    });
+}
+
+function backupDataset() {
+    const backupName = `dataset_backup_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.json`;
+    
+    $.ajax({
+        url: '/ml_detector/backup_dataset',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ backup_name: backupName }),
+        success: function(response) {
+            const msg = $('#backup_message');
+            if (response.success) {
+                msg.removeClass('alert-danger').addClass('alert-success');
+                msg.html(`<i class="bi bi-check-circle"></i> ${response.message}`);
+            } else {
+                msg.removeClass('alert-success').addClass('alert-danger');
+                msg.html(`<i class="bi bi-exclamation-triangle"></i> ${response.message || response.error}`);
+            }
+            msg.show();
+            setTimeout(() => msg.fadeOut(), 5000);
+            refreshDatasetInfo();
+        },
+        error: function(xhr, status, error) {
+            const msg = $('#backup_message');
+            msg.removeClass('alert-success').addClass('alert-danger');
+            msg.html(`<i class="bi bi-exclamation-triangle"></i> Backup failed: ${error}`);
+            msg.show();
+            setTimeout(() => msg.fadeOut(), 5000);
+        }
+    });
+}
+
+function loadBackupsList() {
+    $.ajax({
+        url: '/ml_detector/list_backups',
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                const select = $('#backup_select');
+                select.empty();
+                
+                if (response.backups.length === 0) {
+                    select.append('<option value="">No backups available</option>');
+                } else {
+                    select.append('<option value="">Select a backup...</option>');
+                    response.backups.forEach(backup => {
+                        const date = new Date(backup.created).toLocaleString();
+                        select.append(`<option value="${backup.path}">${backup.filename} (${backup.size_mb} MB - ${date})</option>`);
+                    });
+                }
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading backups:', error);
+            $('#backup_select').html('<option value="">Error loading backups</option>');
+        }
+    });
+}
+
+function restoreDataset() {
+    const backupPath = $('#backup_select').val();
+    
+    if (!backupPath) {
+        alert('Please select a backup to restore');
+        return;
+    }
+    
+    if (!confirm('Are you sure? This will replace your current training dataset and restart the service.')) {
+        return;
+    }
+    
+    $.ajax({
+        url: '/ml_detector/restore_dataset',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ backup_path: backupPath }),
+        success: function(response) {
+            if (response.success) {
+                alert('Dataset restored successfully. Service is restarting...');
+                $('#restoreModal').modal('hide');
+                setTimeout(() => {
+                    refreshDatasetInfo();
+                    location.reload();
+                }, 3000);
+            } else {
+                alert(`Restore failed: ${response.message || response.error}`);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert(`Restore failed: ${error}`);
+        }
+    });
+}
+
+function trimDataset() {
+    const maxSamples = parseInt($('#trim_max_samples').val());
+    const strategy = $('#trim_strategy').val();
+    
+    if (!maxSamples || maxSamples < 100) {
+        alert('Please enter a valid maximum sample count (minimum 100)');
+        return;
+    }
+    
+    if (!confirm(`Trim dataset to ${maxSamples} samples using '${strategy}' strategy? A backup will be created automatically.`)) {
+        return;
+    }
+    
+    $.ajax({
+        url: '/ml_detector/trim_dataset',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ 
+            max_samples: maxSamples,
+            strategy: strategy 
+        }),
+        success: function(response) {
+            const msg = $('#backup_message');
+            if (response.success) {
+                msg.removeClass('alert-danger').addClass('alert-success');
+                msg.html(`<i class="bi bi-check-circle"></i> ${response.message}`);
+                $('#trimModal').modal('hide');
+            } else {
+                msg.removeClass('alert-success').addClass('alert-danger');
+                msg.html(`<i class="bi bi-exclamation-triangle"></i> ${response.message || response.error}`);
+            }
+            msg.show();
+            setTimeout(() => msg.fadeOut(), 8000);
+            refreshDatasetInfo();
+        },
+        error: function(xhr, status, error) {
+            const msg = $('#backup_message');
+            msg.removeClass('alert-success').addClass('alert-danger');
+            msg.html(`<i class="bi bi-exclamation-triangle"></i> Trim failed: ${error}`);
+            msg.show();
+            setTimeout(() => msg.fadeOut(), 5000);
+        }
+    });
+}
+
+
+
 
