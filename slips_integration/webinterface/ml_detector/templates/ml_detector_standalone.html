@@ -317,6 +317,11 @@
                   Settings
                 </button>
               </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="dataset-tab" data-bs-toggle="tab" data-bs-target="#dataset" type="button" role="tab">
+                  <i class="bi bi-database"></i> Training Dataset
+                </button>
+              </li>
             </ul>
 
             <div class="tab-content mt-3" id="mlTabContent">
@@ -715,6 +720,128 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+              <!-- Training Dataset Tab -->
+              <div class="tab-pane fade" id="dataset" role="tabpanel">
+                <div class="card">
+                  <div class="card-header bg-light">
+                    <h5 class="mb-0">Training Dataset Management</h5>
+                  </div>
+                  <div class="card-body">
+                    <div class="row mb-4">
+                      <div class="col-md-4">
+                        <div class="card bg-primary text-white">
+                          <div class="card-body text-center">
+                            <h6>Total Samples</h6>
+                            <h3 id="dataset_total_samples">0</h3>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-4">
+                        <div class="card bg-danger text-white">
+                          <div class="card-body text-center">
+                            <h6>Ad Samples</h6>
+                            <h3 id="dataset_ad_samples">0</h3>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-4">
+                        <div class="card bg-success text-white">
+                          <div class="card-body text-center">
+                            <h6>Legitimate Samples</h6>
+                            <h3 id="dataset_legit_samples">0</h3>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="row mb-3">
+                      <div class="col-md-12">
+                        <h6>Dataset Actions</h6>
+                        <div class="btn-group" role="group">
+                          <button type="button" class="btn btn-primary" onclick="backupDataset()">Backup Dataset</button>
+                          <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#trimModal">Trim Dataset</button>
+                          <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#restoreModal">Restore Backup</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                      <i class="bi bi-info-circle"></i>
+                      Training dataset stores LLM-labeled samples for future model training. Auto-trims at 12,000 samples using smart strategy.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Restore Modal -->
+  <div class="modal fade" id="restoreModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Restore Training Dataset</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Select Backup:</label>
+            <select class="form-select" id="restore_backup_select"></select>
+          </div>
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i>
+            This will replace the current dataset and restart the stream-ad-blocker service.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger" onclick="restoreDataset()">Restore</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trim Modal -->
+  <div class="modal fade" id="trimModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Trim Training Dataset</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Target Sample Count:</label>
+            <input type="number" class="form-control" id="trim_target" value="10000" min="100" max="50000">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Trim Strategy:</label>
+            <select class="form-select" id="trim_strategy">
+              <option value="smart">Smart (recommended - quality + diversity)</option>
+              <option value="keep_balanced">Keep Balanced (equal ads/legitimate)</option>
+              <option value="keep_recent">Keep Most Recent</option>
+              <option value="keep_high_confidence">Keep High Confidence</option>
+            </select>
+            <small class="text-muted">
+              Smart: Keeps high-confidence recent samples, prefers LLM-labeled, maintains domain diversity
+            </small>
+          </div>
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            A backup will be created automatically before trimming.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-warning" onclick="trimDataset()">Trim Dataset</button>
         </div>
       </div>
     </div>

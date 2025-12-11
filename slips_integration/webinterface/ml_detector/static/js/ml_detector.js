@@ -1553,8 +1553,11 @@ $(document).ready(function() {
         loadFeedbackTable();
     });
 
-    // Dataset management
-    refreshDatasetInfo();
+    // Dataset management - load when dataset tab is shown
+    $('#dataset-tab').on('shown.bs.tab', function() {
+        refreshDatasetInfo();
+    });
+    
     $('#restoreModal').on('show.bs.modal', loadBackupsList);
 });
 

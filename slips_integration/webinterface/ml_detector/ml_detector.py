@@ -9,6 +9,7 @@ import subprocess
 import csv
 import io
 import redis
+import sqlite3
 from datetime import datetime, timedelta
 from typing import Dict, List
 from ..database.database import db
@@ -386,6 +387,10 @@ def get_logging_status():
 def get_dataset_info():
     """Get training dataset statistics"""
     try:
+        ml_detector_dir = '/opt/StratosphereLinuxIPS/webinterface/ml_detector'
+        if ml_detector_dir not in sys.path:
+            sys.path.insert(0, ml_detector_dir)
+        
         from ml_ad_classifier import MLAdClassifier
         classifier = MLAdClassifier()
         info = classifier.get_dataset_info()
@@ -413,6 +418,10 @@ def backup_dataset():
         os.makedirs(backup_dir, exist_ok=True)
         backup_path = os.path.join(backup_dir, backup_name)
         
+        ml_detector_dir = '/opt/StratosphereLinuxIPS/webinterface/ml_detector'
+        if ml_detector_dir not in sys.path:
+            sys.path.insert(0, ml_detector_dir)
+        
         from ml_ad_classifier import MLAdClassifier
         classifier = MLAdClassifier()
         success, message = classifier.backup_dataset(backup_path)
@@ -436,6 +445,10 @@ def restore_dataset():
         
         if not backup_path:
             return jsonify({"success": False, "error": "Backup path required"}), 400
+        
+        ml_detector_dir = '/opt/StratosphereLinuxIPS/webinterface/ml_detector'
+        if ml_detector_dir not in sys.path:
+            sys.path.insert(0, ml_detector_dir)
         
         from ml_ad_classifier import MLAdClassifier
         classifier = MLAdClassifier()
@@ -494,6 +507,10 @@ def trim_dataset():
         
         if strategy not in ['keep_recent', 'keep_balanced', 'keep_high_confidence', 'smart']:
             return jsonify({"success": False, "error": "Invalid trim strategy"}), 400
+        
+        ml_detector_dir = '/opt/StratosphereLinuxIPS/webinterface/ml_detector'
+        if ml_detector_dir not in sys.path:
+            sys.path.insert(0, ml_detector_dir)
         
         from ml_ad_classifier import MLAdClassifier
         classifier = MLAdClassifier()
