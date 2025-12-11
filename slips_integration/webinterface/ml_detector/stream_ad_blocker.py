@@ -141,20 +141,27 @@ class StreamAdBlocker:
             'outbrain.com'
         ]
 
-        # Streaming service patterns
+        # Streaming service patterns - all platforms with video ads
         self.streaming_services = [
             ('youtube', ['googlevideo.com', 'youtube.com', 'youtu.be']),
-            ('twitch', ['twitch.tv', 'ttvnw.net']),
+            ('twitch', ['twitch.tv', 'ttvnw.net', 'twitchcdn.net']),
             ('netflix', ['netflix.com', 'nflxvideo.net']),
             ('hulu', ['hulu.com', 'hulustream.com']),
-            ('prime', ['primevideo.com', 'amazon.com/gp/video'])
+            ('prime', ['primevideo.com', 'amazon.com/gp/video']),
+            ('vimeo', ['vimeo.com', 'vimeocdn.com']),
+            ('dailymotion', ['dailymotion.com', 'dmcdn.net']),
+            ('roku', ['roku.com', 'rokutime.com']),
+            ('pluto', ['pluto.tv', 'plutotv.net']),
+            ('peacock', ['peacocktv.com', 'nbcuni.com'])
         ]
 
         # YouTube ad learning: Track connection patterns
+        # NOTE: "YouTube" variable naming preserved for backward compatibility
+        # Actually tracks ALL video platform flows (YouTube, Twitch, Vimeo, etc)
         # Key: IP address, Value: {'flows': [], 'classified_as_ad': bool, 'confidence': float}
         self.youtube_connection_cache = {}
 
-        # Track video session context for better ad detection
+        # Track video session context for better ad detection across all platforms
         # Key: source_ip, Value: {'last_content_flow': timestamp, 'content_duration': seconds, 'ad_count': int}
         self.video_sessions = {}
         
@@ -788,12 +795,18 @@ class StreamAdBlocker:
             
             # Determine domain type
             is_control_plane = self.is_ad_control_plane(domain)
-            is_youtube = 'googlevideo' in domain.lower() or 'youtube' in domain.lower()
+            # Check if this is ANY video streaming platform (not just YouTube)
+            is_video_platform = any(
+                any(pattern in domain.lower() for pattern in patterns)
+                for service_name, patterns in self.streaming_services
+            )
             is_cdn = any(cdn in domain.lower() for cdn in ['cloudfront', 'akamai', 'fastly', 'edgecast'])
             
-            # Verbose logging for YouTube flows
-            if is_youtube:
-                print(f"[YT] YouTube flow: {domain} | dur={flow_data.get('dur', 0):.1f}s bytes={flow_data.get('sbytes', 0)} pkts={flow_data.get('spkts', 0)} | confidence={confidence:.2%} method={method}")
+            # Verbose logging for video platform flows
+            if is_video_platform:
+                platform = next((name for name, patterns in self.streaming_services 
+                               if any(p in domain.lower() for p in patterns)), 'unknown')
+                print(f"[VIDEO/{platform.upper()}] {domain} | dur={flow_data.get('dur', 0):.1f}s bytes={flow_data.get('sbytes', 0)} pkts={flow_data.get('spkts', 0)} | confidence={confidence:.2%} method={method}")
             
             # Strategy 1: IP-level block for ad control plane (prevents ad auctions)
             # Control plane = small payloads for ad decisioning, safe to block
@@ -803,24 +816,23 @@ class StreamAdBlocker:
                     detection['block_type'] = 'ip_control_plane'
                     print(f"[-] AD CONTROL BLOCK: {domain} ({confidence:.0%} confidence - blocks ad auctions)")
             
-            # Strategy 2: Flow-level blocking for YouTube/googlevideo (NO SSAI in region)
-            # Separate ad streams detected by ML - safe to drop specific flows
-            # Uses Suricata flow-based blocking for surgical precision
-            elif is_youtube and confidence >= self.youtube_threshold:
-                # Use Suricata flow blocking (prevents CDN collateral damage)
+            # Strategy 2: Flow-level blocking for video streaming platforms
+            # Detects ad streams on YouTube, Twitch, Vimeo, etc by flow characteristics
+            # Uses Suricata flow-based blocking for surgical precision (NO SSAI regions)
+            elif is_video_platform and confidence >= self.youtube_threshold:
                 if self.block_flow_via_suricata(
                     flow_data.get('src_ip', '0.0.0.0'),
                     flow_data.get('sport', 0),
                     dst_ip,
                     flow_data.get('dport', 443),
                     flow_data.get('proto', 'udp').lower(),
-                    f"youtube_ad_flow:{method}:{confidence:.2f}"
+                    f"video_ad_flow:{method}:{confidence:.2f}"
                 ):
                     blocked = True
-                    detection['block_type'] = 'suricata_flow_youtube_ad'
-                    print(f"[-] YOUTUBE AD FLOW BLOCKED (Suricata): {domain} ({confidence:.0%} - separate ad stream)")
-            elif is_youtube and confidence >= 0.40:
-                print(f"[i] YouTube flow below threshold: {domain} confidence={confidence:.2%} dur={flow_data.get('dur', 0):.1f}s bytes={flow_data.get('sbytes', 0)}")
+                    detection['block_type'] = 'suricata_flow_video_ad'
+                    print(f"[-] VIDEO AD FLOW BLOCKED: {domain} ({confidence:.0%} - ad stream detected)")
+            elif is_video_platform and confidence >= 0.40:
+                print(f"[i] Video flow below threshold: {domain} confidence={confidence:.2%} dur={flow_data.get('dur', 0):.1f}s bytes={flow_data.get('sbytes', 0)}")
             
             # Strategy 3: Flow-level blocking for other CDNs
             # Higher confidence threshold for non-YouTube CDNs

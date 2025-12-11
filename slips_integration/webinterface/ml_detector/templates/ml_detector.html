@@ -107,28 +107,28 @@
         <div class="card-body">
           <div class="row">
             <div class="col-md-4">
-              <label for="youtube_threshold" class="form-label">YouTube Flow Blocking</label>
+              <label for="youtube_threshold" class="form-label">Video Ad Flow Blocking</label>
               <div class="input-group">
                 <input type="range" class="form-range" id="youtube_threshold" min="0.40" max="0.95" step="0.05" value="0.60">
                 <span class="ms-3 fw-bold" id="youtube_threshold_value">0.60</span>
               </div>
-              <small class="text-muted">Confidence threshold for YouTube ad flow blocking</small>
+              <small class="text-muted">Confidence threshold for blocking video ad streams (YouTube, Twitch, etc)</small>
             </div>
             <div class="col-md-4">
-              <label for="cdn_threshold" class="form-label">CDN Flow Blocking</label>
+              <label for="cdn_threshold" class="form-label">Generic CDN Blocking</label>
               <div class="input-group">
                 <input type="range" class="form-range" id="cdn_threshold" min="0.50" max="0.95" step="0.05" value="0.85">
                 <span class="ms-3 fw-bold" id="cdn_threshold_value">0.85</span>
               </div>
-              <small class="text-muted">Confidence threshold for other CDN ad flow blocking</small>
+              <small class="text-muted">Confidence threshold for non-video CDN ad blocking (higher = safer)</small>
             </div>
             <div class="col-md-4">
-              <label for="control_plane_threshold" class="form-label">Control Plane Blocking</label>
+              <label for="control_plane_threshold" class="form-label">Ad Control Plane</label>
               <div class="input-group">
                 <input type="range" class="form-range" id="control_plane_threshold" min="0.50" max="0.90" step="0.05" value="0.70">
                 <span class="ms-3 fw-bold" id="control_plane_threshold_value">0.70</span>
               </div>
-              <small class="text-muted">Confidence threshold for ad control plane IP blocking</small>
+              <small class="text-muted">IP blocking for ad auction endpoints (prevents ads from loading)</small>
             </div>
           </div>
           <div class="mt-3">
