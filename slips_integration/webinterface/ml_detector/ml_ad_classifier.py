@@ -328,8 +328,9 @@ class MLAdClassifier:
         # First, get ML classification
         is_ad_ml, ml_confidence, ml_method = self.classify_flow(domain, profile_data, dst_ip, dst_port)
         
-        # Only use LLM for borderline cases (confidence between 0.60 and 0.85)
-        if ml_confidence < 0.60 or ml_confidence > 0.85:
+        # Use LLM for wider range to build training dataset (0.30-0.90)
+        # With local LLM on slow GPU, we can afford more calls for better labeling
+        if ml_confidence < 0.30 or ml_confidence > 0.90:
             return is_ad_ml, ml_confidence, ml_method, None
         
         # Prepare data for LLM analysis
@@ -385,4 +386,4 @@ if __name__ == '__main__':
     print(f"   Pattern rules: {len(classifier.ad_patterns)} ad patterns")
     print(f"   ML Model: RandomForest with 50 estimators")
     print(f"   Features: 8 flow-based features")
-    print(f"   LLM Enhancement: Available for borderline cases (0.60-0.85 confidence)")
+    print(f"   LLM Enhancement: Available for uncertain cases (0.30-0.90 confidence)")
