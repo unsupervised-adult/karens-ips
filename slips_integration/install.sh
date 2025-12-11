@@ -45,14 +45,14 @@ if [ ! -d "$SLIPS_PATH/webinterface" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}✓${NC} Found valid SLIPS installation at: $SLIPS_PATH"
+echo -e "${GREEN}[+]${NC} Found valid SLIPS installation at: $SLIPS_PATH"
 echo ""
 
 # Create backup
 BACKUP_DIR="${SLIPS_PATH}_backup_$(date +%Y%m%d_%H%M%S)"
 echo -e "${YELLOW}Creating backup at: $BACKUP_DIR${NC}"
 cp -r "$SLIPS_PATH/webinterface" "$BACKUP_DIR"
-echo -e "${GREEN}✓${NC} Backup created"
+echo -e "${GREEN}[+]${NC} Backup created"
 echo ""
 
 # Copy ML Detector blueprint
@@ -65,7 +65,7 @@ if [ -d "$ML_DETECTOR_DEST" ]; then
 fi
 
 cp -r "$SCRIPT_DIR/webinterface/ml_detector" "$ML_DETECTOR_DEST"
-echo -e "${GREEN}✓${NC} ML Detector blueprint installed"
+echo -e "${GREEN}[+]${NC} ML Detector blueprint installed"
 
 # Copy Suricata Config blueprint
 echo "Installing Suricata Config blueprint..."
@@ -77,15 +77,15 @@ if [ -d "$SURICATA_CONFIG_DEST" ]; then
 fi
 
 cp -r "$SCRIPT_DIR/webinterface/suricata_config" "$SURICATA_CONFIG_DEST"
-echo -e "${GREEN}✓${NC} Suricata Config blueprint installed"
+echo -e "${GREEN}[+]${NC} Suricata Config blueprint installed"
 
 # Install stream_ad_blocker.py service
 echo "Installing stream ad blocker service..."
 if [ -f "$SCRIPT_DIR/webinterface/ml_detector/stream_ad_blocker.py" ]; then
     cp "$SCRIPT_DIR/webinterface/ml_detector/stream_ad_blocker.py" "$SLIPS_PATH/webinterface/ml_detector/stream_ad_blocker.py"
-    echo -e "${GREEN}✓${NC} Stream ad blocker service installed"
+    echo -e "${GREEN}[+]${NC} Stream ad blocker service installed"
 else
-    echo -e "${YELLOW}⚠${NC} stream_ad_blocker.py not found"
+    echo -e "${YELLOW}[!]${NC} stream_ad_blocker.py not found"
 fi
 echo ""
 
@@ -96,9 +96,9 @@ echo "Installing ML Detector integrated SLIPS files..."
 echo "  - Installing webinterface/app.py"
 if [ -f "$SCRIPT_DIR/webinterface/app.py" ]; then
     cp "$SCRIPT_DIR/webinterface/app.py" "$SLIPS_PATH/webinterface/app.py"
-    echo -e "    ${GREEN}✓${NC} app.py installed successfully"
+    echo -e "    ${GREEN}[+]${NC} app.py installed successfully"
 else
-    echo -e "    ${RED}✗${NC} app.py source file not found"
+    echo -e "    ${RED}[!]${NC} app.py source file not found"
     exit 1
 fi
 
@@ -106,9 +106,9 @@ fi
 echo "  - Installing webinterface/templates/app.html"
 if [ -f "$SCRIPT_DIR/webinterface/templates/app.html" ]; then
     cp "$SCRIPT_DIR/webinterface/templates/app.html" "$SLIPS_PATH/webinterface/templates/app.html"
-    echo -e "    ${GREEN}✓${NC} app.html installed successfully"
+    echo -e "    ${GREEN}[+]${NC} app.html installed successfully"
 else
-    echo -e "    ${RED}✗${NC} app.html source file not found"
+    echo -e "    ${RED}[!]${NC} app.html source file not found"
     exit 1
 fi
 
@@ -116,15 +116,15 @@ fi
 echo "Configuring stream ad blocker..."
 if command -v redis-cli &> /dev/null; then
     redis-cli -n 1 SET ml_detector:blocking_enabled 1 > /dev/null 2>&1 && \
-        echo -e "${GREEN}✓${NC} Active blocking enabled by default" || \
-        echo -e "${YELLOW}⚠${NC} Could not enable blocking (Redis might not be running)"
+        echo -e "${GREEN}[+]${NC} Active blocking enabled by default" || \
+        echo -e "${YELLOW}[!]${NC} Could not enable blocking (Redis might not be running)"
 else
-    echo -e "${YELLOW}⚠${NC} redis-cli not found. You'll need to enable blocking manually:"
+    echo -e "${YELLOW}[!]${NC} redis-cli not found. You'll need to enable blocking manually:"
     echo "    redis-cli -n 1 SET ml_detector:blocking_enabled 1"
 fi
 
 echo ""
-echo -e "${GREEN}✓ Installation complete!${NC}"
+echo -e "${GREEN}[+] Installation complete!${NC}"
 echo ""
 echo "Next steps:"
 echo "1. Start your SLIPS instance with traffic analysis"

@@ -121,7 +121,7 @@
 </head>
 <body>
     <div class="simple-container">
-        <h1>🛡️ Ad Blocking Status</h1>
+        <h1>Ad Blocking Status</h1>
         
         <!-- Protection Status -->
         <div class="status-card">
@@ -164,7 +164,7 @@
         
         <!-- Device Breakdown -->
         <div class="status-card">
-            <h3>🚫 Blocked by Device Type</h3>
+            <h3>Blocked by Device Type</h3>
             <div class="device-list" id="device-breakdown">
                 <!-- Populated by JavaScript -->
             </div>
@@ -196,11 +196,11 @@
                 statusEl.className = `status-indicator status-${color === 'green' ? 'protected' : color === 'yellow' ? 'partial' : 'error'}`;
                 
                 if (status === 'PROTECTED') {
-                    statusDesc.textContent = '✅ Your network is fully protected from ads and threats!';
+                    statusDesc.textContent = 'Your network is fully protected from ads and threats!';
                 } else if (status === 'PARTIAL') {
-                    statusDesc.textContent = '⚠️ Some protection services are running. Check may be needed.';
+                    statusDesc.textContent = 'Some protection services are running. Check may be needed.';
                 } else {
-                    statusDesc.textContent = '❌ Protection services are not running. Please check your setup.';
+                    statusDesc.textContent = 'Protection services are not running. Please check your setup.';
                 }
                 
                 // Update numbers
@@ -237,20 +237,20 @@
             } catch (error) {
                 console.error('Error loading stats:', error);
                 document.getElementById('protection-status').textContent = 'ERROR';
-                document.getElementById('status-description').textContent = '❌ Unable to load protection status';
+                document.getElementById('status-description').textContent = 'Unable to load protection status';
             }
         }
         
-        // Get emoji for device type
+        // Get icon for device type
         function getDeviceEmoji(device) {
-            const emojis = {
-                'Samsung TV/Fridge': '📺',
-                'Netflix': '🎬', 
-                'Android Devices': '📱',
-                'Amazon FireTV': '📺',
-                'Other Ads': '🚫'
+            const icons = {
+                'Samsung TV/Fridge': '[TV]',
+                'Netflix': '[STREAM]', 
+                'Android Devices': '[MOBILE]',
+                'Amazon FireTV': '[FIRE]',
+                'Other Ads': '[ADS]'
             };
-            return emojis[device] || '🚫';
+            return icons[device] || '[ADS]';
         }
         
         // Auto-refresh every 30 seconds

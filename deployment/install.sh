@@ -17,11 +17,11 @@ print_status() {
 }
 
 print_success() {
-    echo -e "${GREEN}[✓]${NC} $1"
+    echo -e "${GREEN}[+]${NC} $1"
 }
 
 print_error() {
-    echo -e "${RED}[✗]${NC} $1"
+    echo -e "${RED}[!]${NC} $1"
 }
 
 print_warning() {
