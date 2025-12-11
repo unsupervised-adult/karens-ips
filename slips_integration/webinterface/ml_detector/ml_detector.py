@@ -273,6 +273,105 @@ def set_thresholds():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@ml_detector.route("/detection_history")
+def get_detection_history():
+    """Get detection history from SQLite database"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        platform_filter = request.args.get('platform', None)
+        
+        history_db = sqlite3.connect('/var/lib/stream_ad_blocker/detection_history.db')
+        history_db.row_factory = sqlite3.Row
+        
+        query = "SELECT * FROM detections"
+        params = []
+        
+        if platform_filter:
+            query += " WHERE platform = ?"
+            params.append(platform_filter)
+        
+        query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        
+        cursor = history_db.execute(query, params)
+        rows = cursor.fetchall()
+        
+        detections = [dict(row) for row in rows]
+        
+        total_query = "SELECT COUNT(*) as count FROM detections"
+        if platform_filter:
+            total_query += " WHERE platform = ?"
+            total = history_db.execute(total_query, [platform_filter]).fetchone()[0]
+        else:
+            total = history_db.execute(total_query).fetchone()[0]
+        
+        history_db.close()
+        
+        return jsonify({
+            "success": True,
+            "data": detections,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        })
+    except Exception as e:
+        logger.error(f"Error fetching detection history: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/clear_detection_history", methods=["POST"])
+def clear_detection_history():
+    """Clear detection history database"""
+    try:
+        history_db = sqlite3.connect('/var/lib/stream_ad_blocker/detection_history.db')
+        history_db.execute("DELETE FROM detections")
+        history_db.commit()
+        history_db.close()
+        
+        return jsonify({
+            "success": True,
+            "message": "Detection history cleared"
+        })
+    except Exception as e:
+        logger.error(f"Error clearing history: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/toggle_detection_logging", methods=["POST"])
+def toggle_detection_logging():
+    """Enable/disable detection logging"""
+    try:
+        data = request.get_json()
+        enabled = data.get("enabled", True)
+        
+        redis_db1.set("stream_ad_blocker:logging_enabled", "1" if enabled else "0")
+        
+        subprocess.run(["sudo", "systemctl", "restart", "stream-ad-blocker"], check=True)
+        
+        return jsonify({
+            "success": True,
+            "message": f"Detection logging {'enabled' if enabled else 'disabled'}"
+        })
+    except Exception as e:
+        logger.error(f"Error toggling logging: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@ml_detector.route("/get_logging_status")
+def get_logging_status():
+    """Get current logging status"""
+    try:
+        enabled = redis_db1.get("stream_ad_blocker:logging_enabled")
+        return jsonify({
+            "success": True,
+            "enabled": enabled != "0" if enabled else True
+        })
+    except Exception as e:
+        logger.error(f"Error getting logging status: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @ml_detector.route("/settings")
 def get_settings():
     """Get current detector configuration"""

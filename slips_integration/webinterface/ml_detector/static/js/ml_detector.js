@@ -139,6 +139,44 @@ console.log("ML Detector JS: Script loaded");
             });
         });
         
+        // Detection history controls
+        $('#logging_enabled').on('change', function() {
+            $.ajax({
+                url: '/ml_detector/toggle_detection_logging',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ enabled: $(this).is(':checked') }),
+                success: function(response) {
+                    if (response.success) {
+                        console.log('Logging toggled:', response.message);
+                    }
+                }
+            });
+        });
+        
+        $('#clear_history').on('click', function() {
+            if (confirm('Clear all detection history? This cannot be undone.')) {
+                $.ajax({
+                    url: '/ml_detector/clear_detection_history',
+                    method: 'POST',
+                    success: function(response) {
+                        if (response.success) {
+                            alert('History cleared');
+                            loadDetectionHistory();
+                        }
+                    }
+                });
+            }
+        });
+        
+        $('#refresh_history').on('click', function() {
+            loadDetectionHistory();
+        });
+        
+        $('#platform_filter').on('change', function() {
+            loadDetectionHistory();
+        });
+        
         console.log("ML Detector JS: Setup complete");
     });
 })();
@@ -406,6 +444,85 @@ function loadAllData() {
     loadTimeline();
     loadFeatureImportance();
     loadThresholds();
+    loadLoggingStatus();
+    loadDetectionHistory();
+}
+
+function loadLoggingStatus() {
+    $.ajax({
+        url: '/ml_detector/get_logging_status',
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                $('#logging_enabled').prop('checked', response.enabled);
+            }
+        }
+    });
+}
+
+function loadDetectionHistory(page = 0) {
+    const limit = 50;
+    const offset = page * limit;
+    const platform = $('#platform_filter').val();
+    
+    $.ajax({
+        url: '/ml_detector/detection_history',
+        method: 'GET',
+        data: { limit: limit, offset: offset, platform: platform },
+        success: function(response) {
+            if (response.success) {
+                $('#history_total').text('Total: ' + response.total + ' detections');
+                
+                const tbody = $('#history_table_body');
+                tbody.empty();
+                
+                if (response.data.length === 0) {
+                    tbody.append('<tr><td colspan="8" class="text-center">No detections recorded</td></tr>');
+                } else {
+                    response.data.forEach(function(row) {
+                        const timestamp = new Date(row.timestamp).toLocaleString();
+                        const confidence = (row.confidence * 100).toFixed(0) + '%';
+                        const duration = row.duration ? row.duration.toFixed(1) + 's' : '-';
+                        const bytes = row.bytes ? (row.bytes / 1024).toFixed(1) + 'KB' : '-';
+                        const status = row.blocked ? '<span class="badge bg-danger">Blocked</span>' : '<span class="badge bg-warning">Detected</span>';
+                        const platformBadge = '<span class="badge bg-primary">' + row.platform.toUpperCase() + '</span>';
+                        
+                        tbody.append(
+                            '<tr>' +
+                            '<td>' + timestamp + '</td>' +
+                            '<td>' + platformBadge + '</td>' +
+                            '<td class="text-truncate" style="max-width: 200px;" title="' + row.domain + '">' + row.domain + '</td>' +
+                            '<td>' + confidence + '</td>' +
+                            '<td>' + row.method + '</td>' +
+                            '<td>' + duration + '</td>' +
+                            '<td>' + bytes + '</td>' +
+                            '<td>' + status + '</td>' +
+                            '</tr>'
+                        );
+                    });
+                }
+                
+                // Pagination
+                const totalPages = Math.ceil(response.total / limit);
+                const pagination = $('#history_pagination');
+                pagination.empty();
+                
+                if (totalPages > 1) {
+                    for (let i = 0; i < Math.min(totalPages, 5); i++) {
+                        const active = i === page ? ' active' : '';
+                        pagination.append(
+                            '<li class="page-item' + active + '"><a class="page-link" href="#" data-page="' + i + '">' + (i + 1) + '</a></li>'
+                        );
+                    }
+                    
+                    pagination.find('a').on('click', function(e) {
+                        e.preventDefault();
+                        loadDetectionHistory(parseInt($(this).data('page')));
+                    });
+                }
+            }
+        }
+    });
 }
 
 function loadThresholds() {

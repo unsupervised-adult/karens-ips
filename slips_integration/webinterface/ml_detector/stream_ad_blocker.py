@@ -69,6 +69,9 @@ class StreamAdBlocker:
         # Load detection thresholds from Redis or use defaults
         self.load_thresholds()
         
+        # Initialize detection history database
+        self.init_detection_history_db()
+        
         # Connect to blocklist database
         self.blocklist_db = None
         try:
@@ -196,6 +199,75 @@ class StreamAdBlocker:
             self.youtube_threshold = 0.60
             self.cdn_threshold = 0.85
             self.control_plane_threshold = 0.70
+
+    def init_detection_history_db(self):
+        """Initialize SQLite database for detection history"""
+        try:
+            self.history_db = sqlite3.connect('/var/lib/stream_ad_blocker/detection_history.db', check_same_thread=False)
+            self.history_db.execute('''
+                CREATE TABLE IF NOT EXISTS detections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    domain TEXT NOT NULL,
+                    dst_ip TEXT,
+                    src_ip TEXT,
+                    confidence REAL,
+                    method TEXT,
+                    block_type TEXT,
+                    duration REAL,
+                    bytes INTEGER,
+                    packets INTEGER,
+                    platform TEXT,
+                    blocked INTEGER DEFAULT 0
+                )
+            ''')
+            self.history_db.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON detections(timestamp)')
+            self.history_db.execute('CREATE INDEX IF NOT EXISTS idx_domain ON detections(domain)')
+            self.history_db.execute('CREATE INDEX IF NOT EXISTS idx_platform ON detections(platform)')
+            self.history_db.commit()
+            
+            # Check if logging is enabled
+            logging_enabled = self.r_stats.get("stream_ad_blocker:logging_enabled")
+            self.logging_enabled = logging_enabled != "0" if logging_enabled else True
+            
+            print(f"[+] Detection history DB initialized (logging: {'enabled' if self.logging_enabled else 'disabled'})")
+        except Exception as e:
+            print(f"[!] Failed to initialize history DB: {e}")
+            self.history_db = None
+            self.logging_enabled = False
+
+    def log_detection(self, domain, detection_data, flow_data, confidence, method, blocked=False):
+        """Log detection to history database"""
+        if not self.history_db or not self.logging_enabled:
+            return
+        
+        try:
+            platform = 'unknown'
+            for service_name, patterns in self.streaming_services:
+                if any(p in domain.lower() for p in patterns):
+                    platform = service_name
+                    break
+            
+            self.history_db.execute('''
+                INSERT INTO detections 
+                (domain, dst_ip, src_ip, confidence, method, block_type, duration, bytes, packets, platform, blocked)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                domain,
+                detection_data.get('dst_ip'),
+                flow_data.get('src_ip') or flow_data.get('saddr'),
+                confidence,
+                method,
+                detection_data.get('block_type', 'detection_only'),
+                flow_data.get('dur', 0),
+                flow_data.get('sbytes', 0),
+                flow_data.get('spkts', 0),
+                platform,
+                1 if blocked else 0
+            ))
+            self.history_db.commit()
+        except Exception as e:
+            print(f"[!] Failed to log detection: {e}")
 
     def check_blocklist_db(self, domain):
         """
@@ -831,8 +903,10 @@ class StreamAdBlocker:
                     blocked = True
                     detection['block_type'] = 'suricata_flow_video_ad'
                     print(f"[-] VIDEO AD FLOW BLOCKED: {domain} ({confidence:.0%} - ad stream detected)")
+                    self.log_detection(domain, detection, flow_data, confidence, method, blocked=True)
             elif is_video_platform and confidence >= 0.40:
                 print(f"[i] Video flow below threshold: {domain} confidence={confidence:.2%} dur={flow_data.get('dur', 0):.1f}s bytes={flow_data.get('sbytes', 0)}")
+                self.log_detection(domain, detection, flow_data, confidence, method, blocked=False)
             
             # Strategy 3: Flow-level blocking for other CDNs
             # Higher confidence threshold for non-YouTube CDNs

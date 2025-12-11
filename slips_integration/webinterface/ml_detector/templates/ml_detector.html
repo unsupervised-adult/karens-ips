@@ -141,6 +141,63 @@
     </div>
   </div>
 
+  <!-- Detection History -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Detection History</h5>
+          <div>
+            <div class="form-check form-switch d-inline-block me-3">
+              <input class="form-check-input" type="checkbox" id="logging_enabled" checked>
+              <label class="form-check-label" for="logging_enabled">Enable Logging</label>
+            </div>
+            <button class="btn btn-sm btn-warning" id="clear_history">Clear History</button>
+            <button class="btn btn-sm btn-primary" id="refresh_history">Refresh</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label for="platform_filter" class="form-label">Filter by Platform:</label>
+            <select class="form-select form-select-sm" id="platform_filter" style="width: 200px; display: inline-block;">
+              <option value="">All Platforms</option>
+              <option value="youtube">YouTube</option>
+              <option value="twitch">Twitch</option>
+              <option value="vimeo">Vimeo</option>
+              <option value="dailymotion">Dailymotion</option>
+              <option value="roku">Roku</option>
+              <option value="pluto">Pluto TV</option>
+            </select>
+            <span class="ms-3 text-muted" id="history_total">Total: 0 detections</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Platform</th>
+                  <th>Domain</th>
+                  <th>Confidence</th>
+                  <th>Method</th>
+                  <th>Duration</th>
+                  <th>Bytes</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="history_table_body">
+                <tr><td colspan="8" class="text-center">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <nav>
+            <ul class="pagination pagination-sm justify-content-center" id="history_pagination">
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Charts Row -->
   <div class="row mb-4">
     <div class="col-md-6">
