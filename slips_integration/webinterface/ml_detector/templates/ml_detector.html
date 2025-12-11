@@ -326,10 +326,14 @@
           <div class="mb-3">
             <label class="form-label">Trim Strategy:</label>
             <select class="form-select" id="trim_strategy">
+              <option value="smart">Smart (recommended - quality + diversity)</option>
               <option value="keep_balanced">Keep Balanced (equal ads/legitimate)</option>
               <option value="keep_recent">Keep Most Recent</option>
               <option value="keep_high_confidence">Keep High Confidence</option>
             </select>
+            <small class="text-muted">
+              Smart: Keeps high-confidence recent samples, prefers LLM-labeled, maintains domain diversity
+            </small>
           </div>
           <div class="alert alert-info">
             <i class="bi bi-info-circle"></i> 

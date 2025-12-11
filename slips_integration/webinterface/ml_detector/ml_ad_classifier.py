@@ -434,7 +434,7 @@ class MLAdClassifier:
         
         Args:
             max_samples: Maximum samples to keep
-            strategy: 'keep_recent', 'keep_balanced', or 'keep_high_confidence'
+            strategy: 'keep_recent', 'keep_balanced', 'keep_high_confidence', or 'smart'
         """
         try:
             if not os.path.exists(self.dataset_path):
@@ -467,6 +467,63 @@ class MLAdClassifier:
             elif strategy == 'keep_high_confidence':
                 data = sorted(data, key=lambda x: x.get('confidence', 0), reverse=True)[:max_samples]
             
+            elif strategy == 'smart':
+                # Smart trimming: prioritize diversity and quality
+                ad_samples = [s for s in data if s.get('label') == 1]
+                legit_samples = [s for s in data if s.get('label') == 0]
+                
+                target_per_class = max_samples // 2
+                
+                # For ads: keep high confidence recent ones (trim low confidence old ads)
+                ad_samples_scored = []
+                for s in ad_samples:
+                    from dateutil import parser
+                    try:
+                        age_days = (datetime.now() - parser.parse(s.get('timestamp', ''))).days
+                    except:
+                        age_days = 999
+                    
+                    # Score: higher confidence + newer = higher score
+                    confidence_weight = s.get('confidence', 0.5) * 2.0
+                    recency_weight = max(0, 1.0 - (age_days / 30.0))  # Decay over 30 days
+                    has_llm = 1.5 if s.get('reasoning') else 1.0  # Prefer LLM-labeled
+                    
+                    score = confidence_weight * recency_weight * has_llm
+                    ad_samples_scored.append((score, s))
+                
+                # For legitimate: keep diverse high-confidence examples
+                legit_samples_scored = []
+                domain_counts = {}
+                for s in legit_samples:
+                    domain = s.get('domain', '').split('.')[0] if '.' in s.get('domain', '') else s.get('domain', '')
+                    domain_counts[domain] = domain_counts.get(domain, 0) + 1
+                
+                for s in legit_samples:
+                    try:
+                        age_days = (datetime.now() - parser.parse(s.get('timestamp', ''))).days
+                    except:
+                        age_days = 999
+                    
+                    domain = s.get('domain', '').split('.')[0] if '.' in s.get('domain', '') else s.get('domain', '')
+                    
+                    # Penalize over-represented domains (prefer diversity)
+                    diversity_weight = 1.0 / max(1, domain_counts.get(domain, 1) / 10.0)
+                    confidence_weight = s.get('confidence', 0.5) * 1.5
+                    recency_weight = max(0, 1.0 - (age_days / 30.0))
+                    has_llm = 1.3 if s.get('reasoning') else 1.0
+                    
+                    score = confidence_weight * recency_weight * diversity_weight * has_llm
+                    legit_samples_scored.append((score, s))
+                
+                # Sort by score and take top samples
+                ad_samples_scored.sort(reverse=True, key=lambda x: x[0])
+                legit_samples_scored.sort(reverse=True, key=lambda x: x[0])
+                
+                ad_samples = [s for _, s in ad_samples_scored[:target_per_class]]
+                legit_samples = [s for _, s in legit_samples_scored[:target_per_class]]
+                
+                data = ad_samples + legit_samples
+            
             backup_path = f"{self.dataset_path}.pre_trim_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             import shutil
             shutil.copy2(self.dataset_path, backup_path)
@@ -490,7 +547,7 @@ class MLAdClassifier:
             
             if len(data) > max_samples * 1.2:
                 print(f"[*] Dataset has {len(data)} samples, auto-trimming to {max_samples}...")
-                success, message = self.trim_dataset(max_samples, 'keep_balanced')
+                success, message = self.trim_dataset(max_samples, 'smart')
                 if success:
                     print(f"[+] {message}")
                 else:

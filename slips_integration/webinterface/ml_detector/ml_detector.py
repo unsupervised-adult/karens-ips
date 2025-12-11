@@ -490,9 +490,9 @@ def trim_dataset():
     try:
         data = request.get_json()
         max_samples = data.get("max_samples", 10000)
-        strategy = data.get("strategy", "keep_balanced")
+        strategy = data.get("strategy", "smart")
         
-        if strategy not in ['keep_recent', 'keep_balanced', 'keep_high_confidence']:
+        if strategy not in ['keep_recent', 'keep_balanced', 'keep_high_confidence', 'smart']:
             return jsonify({"success": False, "error": "Invalid trim strategy"}), 400
         
         from ml_ad_classifier import MLAdClassifier
