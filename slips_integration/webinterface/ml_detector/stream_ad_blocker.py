@@ -1033,8 +1033,8 @@ class StreamAdBlocker:
                     
                     self.process_detection(domain, dst_ip, combined_confidence, method, flow_data)
                 
-                # Periodically update stats
-                if self.stats['total_analyzed'] % 50 == 0:
+                # Periodically update stats (every 10 flows)
+                if self.stats['total_analyzed'] % 10 == 0:
                     stats_update = {
                         'total_analyzed': str(self.stats['total_analyzed']),
                         'ads_detected': str(self.stats['ads_detected']),
