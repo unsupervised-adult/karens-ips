@@ -82,10 +82,15 @@ verify_suricata_config() {
     
     if echo "$test_output" | grep -q "Configuration provided was successfully loaded"; then
         success "  Configuration test passed"
+        
+        # Check for non-critical dataset warnings (comment lines are harmless)
+        if echo "$test_output" | grep -qE "invalid Ipv6 value.*in.*datasets.*\.lst"; then
+            log "  Note: Empty dataset files contain only comments (normal on fresh install)"
+        fi
     else
         warn "  Configuration test failed"
         log "  Errors:"
-        echo "$test_output" | grep -E "ERROR|Warning" | sed 's/^/    /'
+        echo "$test_output" | grep -E "ERROR|Warning" | grep -v "invalid Ipv6 value" | sed 's/^/    /'
     fi
 }
 
