@@ -80,12 +80,6 @@
             ML Detector
           </a>
         </li>
-        <li class="nav-item" role="presentation">
-          <a class="nav-link" type="button" id="nav-suricata-tab" data-bs-toggle="tab" data-bs-target="#nav-suricata" role="tab"
-          aria-controls="nav-suricata" aria-selected="false">
-            Suricata
-          </a>
-        </li>
       </ul>
       <div class="d-flex align-items-center ms-auto" style="flex-shrink: 0; white-space: nowrap;">
         <a type="button" id="changedb_button" class="nav-link btn-primary" data-bs-toggle="modal" data-bs-target="#modal_choose_redis">
@@ -123,11 +117,6 @@
       </div>
       <div class="tab-pane fade" id="nav-ml-detector" role="tabpanel" aria-labelledby="nav-ml-detector-tab">
         {% include 'ml_detector.html' %}
-      </div>
-      <div class="tab-pane fade" id="nav-suricata" role="tabpanel" aria-labelledby="nav-suricata-tab">
-        <div class="container-fluid mt-3">
-          <iframe src="/suricata/" style="width: 100%; height: 85vh; border: 1px solid #dee2e6; border-radius: 4px;" title="Suricata Configuration"></iframe>
-        </div>
       </div>
     </div>
     <div class="modal " id="modal_choose_redis" tabindex="-1" role="dialog" aria-labelledby="staticBackdropLabel">
