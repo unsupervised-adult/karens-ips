@@ -93,7 +93,7 @@ verify_suricata_config() {
     else
         warn "  Configuration test failed"
         log "  Errors:"
-        echo "$test_output" | grep -E "ERROR|Warning" | grep -v "invalid Ipv6 value" | sed 's/^/    /'
+        echo "$test_output" | grep -E "ERROR|Warning" | grep -v "invalid Ipv6 value" | sed 's/^/    /' || true
     fi
 }
 
