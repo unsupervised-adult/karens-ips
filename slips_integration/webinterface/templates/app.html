@@ -81,7 +81,8 @@
           </a>
         </li>
         <li class="nav-item" role="presentation">
-          <a class="nav-link" type="button" href="/suricata/" target="_blank">
+          <a class="nav-link" type="button" id="nav-suricata-tab" data-bs-toggle="tab" data-bs-target="#nav-suricata" role="tab"
+          aria-controls="nav-suricata" aria-selected="false">
             Suricata
           </a>
         </li>
@@ -165,19 +166,6 @@
     $.fn.dataTable.ext.errMode = 'none';
     $(document).on('error.dt', function(e, settings, techNote, message) {
       console.log('DataTables warning suppressed:', message);
-    });
-
-    // Initialize Bootstrap tabs to ensure proper show/hide behavior
-    $(document).ready(function() {
-      // Ensure only active tab is visible on load
-      $('#nav-tabContent .tab-pane').not('.show.active').hide();
-      
-      // Handle tab clicks to properly show/hide content
-      $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-        var target = $(e.target).attr("data-bs-target");
-        $('#nav-tabContent .tab-pane').hide();
-        $(target).show();
-      });
     });
   </script>
   
