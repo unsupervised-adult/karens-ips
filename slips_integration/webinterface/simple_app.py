@@ -99,7 +99,7 @@ def logout():
 @login_required
 def dashboard():
     """Main dashboard after login"""
-    return render_template('dashboard.html')
+    return render_template('app.html')
 
 
 if __name__ == '__main__':
