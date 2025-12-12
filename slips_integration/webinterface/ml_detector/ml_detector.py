@@ -1696,8 +1696,8 @@ def blocking_status():
             data = request.get_json()
             enabled = data.get('enabled', False)
 
-            # Store in Redis
-            db.rdb.r.set('ml_detector:blocking_enabled', '1' if enabled else '0')
+            # Store in Redis DB 1 (where stream-ad-blocker reads from)
+            redis_db1.set('ml_detector:blocking_enabled', '1' if enabled else '0')
 
             # Log the change
             log_entry = {
@@ -1705,17 +1705,16 @@ def blocking_status():
                 'action': 'blocking_enabled' if enabled else 'blocking_disabled',
                 'message': f"Live blocking {'ENABLED' if enabled else 'DISABLED'} by user"
             }
-            db.rdb.r.lpush('ml_detector:action_logs', json.dumps(log_entry))
-            db.rdb.r.ltrim('ml_detector:action_logs', 0, 499)  # Keep last 500 logs
+            redis_db1.lpush('ml_detector:action_logs', json.dumps(log_entry))
+            redis_db1.ltrim('ml_detector:action_logs', 0, 499)  # Keep last 500 logs
 
             logger.info(f"Live blocking {'enabled' if enabled else 'disabled'}")
 
             return jsonify({"success": True, "data": {"enabled": enabled}})
 
         # GET request - return current status
-        enabled = db.rdb.r.get('ml_detector:blocking_enabled')
+        enabled = redis_db1.get('ml_detector:blocking_enabled')
         if enabled:
-            enabled = enabled.decode() if isinstance(enabled, bytes) else enabled
             enabled = enabled == '1'
         else:
             enabled = False
