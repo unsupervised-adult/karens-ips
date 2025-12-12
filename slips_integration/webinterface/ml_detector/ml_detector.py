@@ -292,6 +292,10 @@ def get_detection_history():
         offset = request.args.get('offset', 0, type=int)
         platform_filter = request.args.get('platform', None)
         
+        # Treat empty string as None
+        if platform_filter == '':
+            platform_filter = None
+        
         history_db = sqlite3.connect('/var/lib/stream_ad_blocker/detection_history.db')
         history_db.row_factory = sqlite3.Row
         
