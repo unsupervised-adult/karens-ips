@@ -77,16 +77,16 @@ class StreamAdBlocker:
         try:
             self.blocklist_db = sqlite3.connect('/var/lib/suricata/ips_filter.db', check_same_thread=False)
             domain_count = self.blocklist_db.execute("SELECT COUNT(*) FROM blocked_domains").fetchone()[0]
-            print(f"[+] Connected to blocklist DB: {domain_count:,} domains")
+            print(f"[+] Connected to blocklist DB: {domain_count:,} domains", flush=True)
         except Exception as e:
-            print(f"[!] Blocklist DB unavailable: {e}")
+            print(f"[!] Blocklist DB unavailable: {e}", flush=True)
 
         # Initialize ML classifier
         try:
             self.classifier = MLAdClassifier(self.llm_min_threshold, self.llm_max_threshold)
-            print("[+] ML classifier loaded")
+            print("[+] ML classifier loaded", flush=True)
         except Exception as e:
-            print(f"[!] ML classifier failed, using pattern-only mode: {e}")
+            print(f"[!] ML classifier failed, using pattern-only mode: {e}", flush=True)
 
         # Known ad & telemetry domains for quick filtering
         self.ad_patterns = [
@@ -967,7 +967,20 @@ class StreamAdBlocker:
         
         print("[*] Starting Stream Ad Blocker & Telemetry Filter...", flush=True)
         print(f"   ML Classifier: {'Enabled' if self.classifier else 'Disabled'}", flush=True)
-        print(f"   Blocking Patterns: {len(self.ad_patterns)} ad/telemetry domains loaded", flush=True)
+        
+        # Report blocking pattern counts
+        blocklist_count = 0
+        if self.blocklist_db:
+            try:
+                blocklist_count = self.blocklist_db.execute("SELECT COUNT(*) FROM blocked_domains").fetchone()[0]
+            except:
+                pass
+        
+        if blocklist_count > 0:
+            print(f"   Blocklist Database: {blocklist_count:,} domains", flush=True)
+        print(f"   Hardcoded Patterns: {len(self.ad_patterns)} ad/telemetry domains", flush=True)
+        total_patterns = blocklist_count + len(self.ad_patterns)
+        print(f"   Total Blocking Patterns: {total_patterns:,}", flush=True)
         print(f"   Streaming Services: {len(self.streaming_services)} services monitored", flush=True)
         print(f"   Flow-based QUIC/HTTP3 analysis via Zeek", flush=True)
         print(f"   Subscribing to SLIPS 'new_flow' channel", flush=True)
