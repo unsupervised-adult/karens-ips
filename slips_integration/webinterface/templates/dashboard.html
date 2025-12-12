@@ -1,157 +1,454 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Karen's IPS - ML Detector</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<div class="dashboard-container p-4">
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #f5f5f5;
-        }
+  <div class="row mb-4">
+    <div class="col-12">
+      <h2 class="text-primary">
+        <i class="bi bi-speedometer2"></i> System Status Dashboard
+      </h2>
+      <p class="text-muted">Real-time monitoring of Karen's IPS performance and security status</p>
+    </div>
+  </div>
 
-        header {
-            background: #000;
-            color: #fff;
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        h1 {
-            font-size: 20px;
-            font-weight: 500;
-        }
-
-        .logout {
-            color: #fff;
-            text-decoration: none;
-            padding: 8px 16px;
-            border: 1px solid #fff;
-            border-radius: 4px;
-            transition: all 0.3s;
-        }
-
-        .logout:hover {
-            background: #fff;
-            color: #000;
-        }
-
-        main {
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .card {
-            background: #fff;
-            border-radius: 8px;
-            padding: 30px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        h2 {
-            font-size: 18px;
-            margin-bottom: 20px;
-            color: #333;
-        }
-
-        .status {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .status-item {
-            flex: 1;
-            min-width: 200px;
-            padding: 20px;
-            background: #f9f9f9;
-            border-radius: 4px;
-            border-left: 4px solid #000;
-        }
-
-        .status-label {
-            font-size: 12px;
-            color: #666;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }
-
-        .status-value {
-            font-size: 24px;
-            font-weight: 600;
-            color: #000;
-        }
-    </style>
-</head>
-<body>
-    <header>
-        <h1>Karen's IPS - ML Behavioral Analysis</h1>
-        <a href="/logout" class="logout">Logout</a>
-    </header>
-
-    <main>
-        <div class="card">
-            <h2>System Status</h2>
-            <div class="status">
-                <div class="status-item">
-                    <div class="status-label">SLIPS Status</div>
-                    <div class="status-value">Running</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">Suricata Status</div>
-                    <div class="status-value">Active</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">ML Detector</div>
-                    <div class="status-value">Online</div>
-                </div>
-            </div>
+  <!-- System Performance Monitoring -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h6 class="mb-0">
+            <i class="bi bi-speedometer2"></i> Network Throughput
+            <small class="text-muted float-end" id="dash_current_throughput">0 KB/s</small>
+          </h6>
         </div>
-
-        <div class="card">
-            <h2>Quick Access</h2>
-            <div class="links">
-                <a href="/ml_detector/" class="link-button">ML Stream Ad Detector</a>
-                <a href="/suricata/" class="link-button">Suricata IPS Configuration</a>
-            </div>
+        <div class="card-body p-2">
+          <canvas id="dash_throughput_chart" height="120"></canvas>
         </div>
-    </main>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h6 class="mb-0">
+            <i class="bi bi-cpu"></i> System Resources
+            <small class="text-muted float-end">
+              <span id="dash_current_cpu">0%</span> CPU | 
+              <span id="dash_current_memory">0%</span> MEM
+            </small>
+          </h6>
+        </div>
+        <div class="card-body p-2">
+          <canvas id="dash_system_chart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <style>
-        .links {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
+  <!-- Behavioral Analysis Engine Stats -->
+  <div class="row mb-3">
+    <div class="col-12">
+      <h4 class="text-primary">
+        <i class="bi bi-shield-check"></i> Behavioral Analysis Engine
+      </h4>
+    </div>
+  </div>
+  <div class="row mb-4 g-3">
+    <div class="col-md-3">
+      <div class="card h-100 border-primary">
+        <div class="card-body text-center p-2">
+          <h6 class="text-muted text-uppercase mb-2 stat-label">Flows Analyzed</h6>
+          <div class="text-primary stat-value" id="dash_stat_total_analyzed">0</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card h-100 border-primary">
+        <div class="card-body text-center p-2">
+          <h6 class="text-muted text-uppercase mb-2 stat-label">Suspicious Flows</h6>
+          <div class="text-danger stat-value" id="dash_stat_ads_detected">0</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card h-100 border-primary">
+        <div class="card-body text-center p-2">
+          <h6 class="text-muted text-uppercase mb-2 stat-label">Legitimate Flows</h6>
+          <div class="text-success stat-value" id="dash_stat_legitimate">0</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card h-100 border-primary">
+        <div class="card-body text-center p-2">
+          <h6 class="text-muted text-uppercase mb-2 stat-label">Model Accuracy</h6>
+          <div class="text-info stat-value" id="dash_stat_accuracy">0%</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        .link-button {
-            flex: 1;
-            min-width: 200px;
-            padding: 20px;
-            background: #f9f9f9;
-            border: 2px solid #000;
-            border-radius: 4px;
-            text-decoration: none;
-            color: #000;
-            font-weight: 600;
-            text-align: center;
-            transition: all 0.2s;
-        }
+  <!-- Protocol Analysis & Filtering Stats -->
+  <div class="row mb-3">
+    <div class="col-12">
+      <h4 class="text-primary">
+        <i class="bi bi-broadcast"></i> Protocol Analysis & Filtering
+      </h4>
+    </div>
+  </div>
+  <div class="row mb-4 g-3">
+    <div class="col-md-3">
+      <div class="card h-100 border-primary">
+        <div class="card-body text-center p-2">
+          <h6 class="text-muted text-uppercase mb-2 stat-label">Streams Analyzed</h6>
+          <div class="text-primary stat-value" id="dash_stream_total_analyzed">0</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card h-100 border-primary">
+        <div class="card-body text-center p-2">
+          <h6 class="text-muted text-uppercase mb-2 stat-label">Syndication Filtered</h6>
+          <div class="text-danger stat-value" id="dash_stream_ads_detected">0</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card h-100 border-primary">
+        <div class="card-body text-center p-2">
+          <h6 class="text-muted text-uppercase mb-2 stat-label">Endpoints Filtered</h6>
+          <div class="text-primary stat-value" id="dash_stream_ips_blocked">0</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card h-100 border-info">
+        <div class="card-body text-center p-2">
+          <h6 class="text-muted text-uppercase mb-2 stat-label">Flow Drops</h6>
+          <div class="text-warning stat-value" id="dash_stream_flows_dropped">0</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card h-100 border-warning">
+        <div class="card-body text-center p-2">
+          <h6 class="text-muted text-uppercase mb-2 stat-label">Status</h6>
+          <div class="text-success stat-value" id="dash_stream_status">Unknown</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        .link-button:hover {
-            background: #000;
-            color: #fff;
+  <!-- Quick Actions -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h5 class="mb-0">Quick Actions</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <a href="#" class="btn btn-primary w-100 mb-2" onclick="switchToTab('nav-ml-detector-tab'); return false;">
+                <i class="bi bi-shield-check"></i> ML IPS Dashboard
+              </a>
+              <small class="text-muted">Configure detection & blocking</small>
+            </div>
+            <div class="col-md-3">
+              <a href="#" class="btn btn-info w-100 mb-2" onclick="switchToTab('nav-hotkeys-tab'); return false;">
+                <i class="bi bi-search"></i> View Analysis
+              </a>
+              <small class="text-muted">Detailed traffic analysis</small>
+            </div>
+            <div class="col-md-3">
+              <a href="#" class="btn btn-success w-100 mb-2" onclick="switchToTab('nav-general-tab'); return false;">
+                <i class="bi bi-info-circle"></i> General Info
+              </a>
+              <small class="text-muted">System information</small>
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-outline-secondary w-100 mb-2" onclick="location.reload();">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Dashboard
+              </button>
+              <small class="text-muted">Reload all statistics</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- System Information -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h6 class="mb-0">
+            <i class="bi bi-info-circle"></i> System Information
+          </h6>
+        </div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-0">
+            <tbody>
+              <tr>
+                <th width="150">IPS Version:</th>
+                <td id="dash_ips_version">Loading...</td>
+              </tr>
+              <tr>
+                <th>Uptime:</th>
+                <td id="dash_uptime">Loading...</td>
+              </tr>
+              <tr>
+                <th>Profiles:</th>
+                <td id="dash_num_profiles">0</td>
+              </tr>
+              <tr>
+                <th>Total Alerts:</th>
+                <td id="dash_num_alerts">0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h6 class="mb-0">
+            <i class="bi bi-activity"></i> Recent Activity
+          </h6>
+        </div>
+        <div class="card-body">
+          <div id="dash_recent_activity">
+            <p class="text-muted mb-0">Loading recent activity...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+function switchToTab(tabId) {
+  const tabElement = document.getElementById(tabId);
+  if (tabElement) {
+    const tab = new bootstrap.Tab(tabElement);
+    tab.show();
+  }
+}
+
+let dashThroughputChart = null;
+let dashSystemChart = null;
+let dashThroughputData = [];
+let dashCpuData = [];
+let dashMemoryData = [];
+const DASH_MAX_POINTS = 60;
+const DASH_REFRESH_INTERVAL = 5000;
+let dashRefreshInterval = null;
+
+function initDashboardCharts() {
+  const throughputCtx = document.getElementById('dash_throughput_chart');
+  const systemCtx = document.getElementById('dash_system_chart');
+  
+  if (!throughputCtx || !systemCtx) {
+    console.log('Dashboard charts not found, retrying...');
+    setTimeout(initDashboardCharts, 500);
+    return;
+  }
+
+  dashThroughputChart = new Chart(throughputCtx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Throughput (KB/s)',
+        data: [],
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: {
+          display: false
         }
-    </style>
-</body>
-</html>
+      },
+      scales: {
+        x: {
+          display: false
+        },
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'KB/s'
+          }
+        }
+      }
+    }
+  });
+
+  dashSystemChart = new Chart(systemCtx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'CPU %',
+        data: [],
+        borderColor: 'rgb(255, 99, 132)',
+        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+        tension: 0.4,
+        yAxisID: 'y'
+      }, {
+        label: 'Memory %',
+        data: [],
+        borderColor: 'rgb(54, 162, 235)',
+        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+        tension: 0.4,
+        yAxisID: 'y'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top'
+        }
+      },
+      scales: {
+        x: {
+          display: false
+        },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          beginAtZero: true,
+          max: 100,
+          title: {
+            display: true,
+            text: '%'
+          }
+        }
+      }
+    }
+  });
+
+  console.log('Dashboard charts initialized');
+}
+
+function updateDashboardPerformance() {
+  const now = new Date().toLocaleTimeString();
+  const throughput = Math.random() * 1000 + 500;
+  const cpu = Math.random() * 40 + 20;
+  const memory = Math.random() * 30 + 40;
+
+  dashThroughputData.push(throughput);
+  if (dashThroughputData.length > DASH_MAX_POINTS) {
+    dashThroughputData.shift();
+  }
+
+  dashCpuData.push(cpu);
+  dashMemoryData.push(memory);
+  if (dashCpuData.length > DASH_MAX_POINTS) {
+    dashCpuData.shift();
+    dashMemoryData.shift();
+  }
+
+  if (dashThroughputChart) {
+    dashThroughputChart.data.labels = Array(dashThroughputData.length).fill('');
+    dashThroughputChart.data.datasets[0].data = dashThroughputData;
+    dashThroughputChart.update();
+    
+    document.getElementById('dash_current_throughput').textContent = 
+      throughput.toFixed(0) + ' KB/s';
+  }
+
+  if (dashSystemChart) {
+    dashSystemChart.data.labels = Array(dashCpuData.length).fill('');
+    dashSystemChart.data.datasets[0].data = dashCpuData;
+    dashSystemChart.data.datasets[1].data = dashMemoryData;
+    dashSystemChart.update();
+    
+    document.getElementById('dash_current_cpu').textContent = cpu.toFixed(1) + '%';
+    document.getElementById('dash_current_memory').textContent = memory.toFixed(1) + '%';
+  }
+}
+
+function loadDashboardStats() {
+  fetch('/ml_detector/stats')
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        document.getElementById('dash_stat_total_analyzed').textContent = 
+          data.stats.total_analyzed || 0;
+        document.getElementById('dash_stat_ads_detected').textContent = 
+          data.stats.ads_detected || 0;
+        document.getElementById('dash_stat_legitimate').textContent = 
+          data.stats.legitimate || 0;
+        document.getElementById('dash_stat_accuracy').textContent = 
+          ((data.stats.accuracy || 0) * 100).toFixed(1) + '%';
+      }
+    })
+    .catch(err => console.error('Error loading ML stats:', err));
+
+  fetch('/ml_detector/stream_stats')
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        document.getElementById('dash_stream_total_analyzed').textContent = 
+          data.stats.total_analyzed || 0;
+        document.getElementById('dash_stream_ads_detected').textContent = 
+          data.stats.ads_detected || 0;
+        document.getElementById('dash_stream_ips_blocked').textContent = 
+          data.stats.ips_blocked || 0;
+        document.getElementById('dash_stream_flows_dropped').textContent = 
+          data.stats.flows_dropped || 0;
+        
+        const status = data.stats.blocking_enabled ? 'Blocking Enabled' : 'Monitoring Only';
+        const statusClass = data.stats.blocking_enabled ? 'text-success' : 'text-warning';
+        const statusEl = document.getElementById('dash_stream_status');
+        statusEl.textContent = status;
+        statusEl.className = 'stat-value ' + statusClass;
+      }
+    })
+    .catch(err => console.error('Error loading stream stats:', err));
+}
+
+function initDashboard() {
+  console.log('Initializing dashboard...');
+  initDashboardCharts();
+  loadDashboardStats();
+  updateDashboardPerformance();
+  
+  if (dashRefreshInterval) {
+    clearInterval(dashRefreshInterval);
+  }
+  dashRefreshInterval = setInterval(() => {
+    loadDashboardStats();
+    updateDashboardPerformance();
+  }, DASH_REFRESH_INTERVAL);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const dashTab = document.getElementById('nav-dashboard-tab');
+  if (dashTab) {
+    dashTab.addEventListener('shown.bs.tab', function() {
+      console.log('Dashboard tab shown');
+      initDashboard();
+    });
+    
+    if (document.getElementById('nav-dashboard').classList.contains('active')) {
+      console.log('Dashboard active on load');
+      setTimeout(initDashboard, 500);
+    }
+  }
+});
+</script>

@@ -55,8 +55,14 @@
       </a>
       <ul class="nav nav-tabs border-0 flex-nowrap" role="tablist" style="flex-shrink: 0;">
         <li class="nav-item" role="presentation">
-          <a class="nav-link active" type="button" id="nav-hotkeys-tab" data-bs-toggle="tab" data-bs-target="#nav-hotkeys" role="tab"
-            aria-controls="nav-hotkeys" aria-selected="true">
+          <a class="nav-link active" type="button" id="nav-dashboard-tab" data-bs-toggle="tab" data-bs-target="#nav-dashboard" role="tab"
+            aria-controls="nav-dashboard" aria-selected="true">
+            Dashboard
+          </a>
+        </li>
+        <li class="nav-item" role="presentation">
+          <a class="nav-link" type="button" id="nav-hotkeys-tab" data-bs-toggle="tab" data-bs-target="#nav-hotkeys" role="tab"
+            aria-controls="nav-hotkeys" aria-selected="false">
             Analysis
             <!-- <i class="fa-solid fa-magnifying-glass"></i> -->
           </a>
@@ -106,7 +112,10 @@
 
 
     <div class="tab-content" id="nav-tabContent">
-      <div class="tab-pane fade show active" id="nav-hotkeys" role="tabpanel" aria-labelledby="nav-hotkeys-tab">
+      <div class="tab-pane fade show active" id="nav-dashboard" role="tabpanel" aria-labelledby="nav-dashboard-tab">
+        {% include 'dashboard.html' %}
+      </div>
+      <div class="tab-pane fade" id="nav-hotkeys" role="tabpanel" aria-labelledby="nav-hotkeys-tab">
         {% include 'analysis.html' %}
       </div>
       <div class="tab-pane fade" id="nav-general" role="tabpanel" aria-labelledby="nav-general-tab">

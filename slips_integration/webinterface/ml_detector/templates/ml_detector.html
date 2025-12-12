@@ -1,5 +1,38 @@
 <div class="ml-detector-container">
 
+  <!-- System Performance Monitoring -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h6 class="mb-0">
+            <i class="bi bi-speedometer2"></i> Network Throughput
+            <small class="text-muted float-end" id="current_throughput">0 KB/s</small>
+          </h6>
+        </div>
+        <div class="card-body p-2">
+          <canvas id="throughput_chart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h6 class="mb-0">
+            <i class="bi bi-cpu"></i> System Resources
+            <small class="text-muted float-end">
+              <span id="current_cpu">0%</span> CPU | 
+              <span id="current_memory">0%</span> MEM
+            </small>
+          </h6>
+        </div>
+        <div class="card-body p-2">
+          <canvas id="system_chart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Behavioral Analysis Engine -->
   <div class="row mb-3">
     <div class="col-12">

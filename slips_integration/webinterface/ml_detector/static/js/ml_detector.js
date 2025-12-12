@@ -5,6 +5,14 @@
 // Import Chart.js if not already loaded
 let timelineChart = null;
 let featureChart = null;
+let throughputChart = null;
+let systemChart = null;
+
+// Performance monitoring data
+let throughputData = [];
+let cpuData = [];
+let memoryData = [];
+const MAX_PERFORMANCE_POINTS = 60;
 
 // Refresh interval (5 seconds)
 const REFRESH_INTERVAL = 5000;
