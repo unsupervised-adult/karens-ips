@@ -789,12 +789,12 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Restore Training Dataset</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label">Select Backup:</label>
-            <select class="form-select" id="restore_backup_select"></select>
+            <label class="form-label" for="restore_backup_select">Select Backup:</label>
+            <select class="form-select" id="restore_backup_select" aria-label="Select backup file to restore"></select>
           </div>
           <div class="alert alert-warning">
             <i class="bi bi-exclamation-triangle"></i>
@@ -815,16 +815,16 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Trim Training Dataset</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label">Target Sample Count:</label>
-            <input type="number" class="form-control" id="trim_target" value="10000" min="100" max="50000">
+            <label class="form-label" for="trim_target">Target Sample Count:</label>
+            <input type="number" class="form-control" id="trim_target" value="10000" min="100" max="50000" aria-label="Target number of samples to keep">
           </div>
           <div class="mb-3">
-            <label class="form-label">Trim Strategy:</label>
-            <select class="form-select" id="trim_strategy">
+            <label class="form-label" for="trim_strategy">Trim Strategy:</label>
+            <select class="form-select" id="trim_strategy" aria-label="Select dataset trimming strategy">
               <option value="smart">Smart (recommended - quality + diversity)</option>
               <option value="keep_balanced">Keep Balanced (equal ads/legitimate)</option>
               <option value="keep_recent">Keep Most Recent</option>
