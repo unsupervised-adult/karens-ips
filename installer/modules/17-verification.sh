@@ -78,9 +78,12 @@ verify_suricata_config() {
     log "Suricata configuration test:"
 
     local test_output
-    test_output=$(suricata -T -c /etc/suricata/suricata.yaml 2>&1)
+    local test_result=0
     
-    if echo "$test_output" | grep -q "Configuration provided was successfully loaded"; then
+    # Capture output and exit code separately (don't fail on stderr)
+    test_output=$(suricata -T -c /etc/suricata/suricata.yaml 2>&1) || test_result=$?
+    
+    if [[ $test_result -eq 0 ]] && echo "$test_output" | grep -q "Configuration provided was successfully loaded"; then
         success "  Configuration test passed"
         
         # Check for non-critical dataset warnings (comment lines are harmless)
