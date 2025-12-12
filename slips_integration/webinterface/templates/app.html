@@ -167,6 +167,19 @@
     $(document).on('error.dt', function(e, settings, techNote, message) {
       console.log('DataTables warning suppressed:', message);
     });
+
+    // Initialize Bootstrap tabs to ensure proper show/hide behavior
+    $(document).ready(function() {
+      // Ensure only active tab is visible on load
+      $('#nav-tabContent .tab-pane').not('.show.active').hide();
+      
+      // Handle tab clicks to properly show/hide content
+      $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+        var target = $(e.target).attr("data-bs-target");
+        $('#nav-tabContent .tab-pane').hide();
+        $(target).show();
+      });
+    });
   </script>
   
   <script type="module" src="{{url_for('analysis.static', filename='js/analysis.js')}}"></script>
