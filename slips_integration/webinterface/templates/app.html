@@ -48,12 +48,12 @@
 
       </div>
     </div>
-    <div class="nav nav-tabs bg-light" id="slips_custom_navbar">
-      <a type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarToggleExternalContent"
-        aria-controls="navbarToggleExternalContent">
+    <div class="d-flex align-items-center bg-light" id="slips_custom_navbar" style="flex-wrap: nowrap; overflow-x: auto;">
+      <a type="button" class="navbar-toggler px-3" data-bs-toggle="collapse" data-bs-target="#navbarToggleExternalContent"
+        aria-controls="navbarToggleExternalContent" style="white-space: nowrap; font-weight: bold;">
         SLIPS
       </a>
-      <ul class="nav nav-tabs me-auto" role="tablist">
+      <ul class="nav nav-tabs border-0 flex-nowrap" role="tablist" style="flex-shrink: 0;">
         <li class="nav-item" role="presentation">
           <a class="nav-link active" type="button" id="nav-hotkeys-tab" data-bs-toggle="tab" data-bs-target="#nav-hotkeys" role="tab"
             aria-controls="nav-hotkeys" aria-selected="true">
@@ -87,7 +87,7 @@
           </a>
         </li>
       </ul>
-      <div class="ms-auto d-flex align-items-center">
+      <div class="d-flex align-items-center ms-auto" style="flex-shrink: 0; white-space: nowrap;">
         <a type="button" id="changedb_button" class="nav-link btn-primary" data-bs-toggle="modal" data-bs-target="#modal_choose_redis">
           <i class="fa-solid fa-database"></i>
           Change DB
