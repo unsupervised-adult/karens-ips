@@ -274,12 +274,22 @@
             </div>
 
             <div class="action-card">
-                <h3>Manual Whitelist Entry</h3>
+                <h3>Manual IP Whitelist</h3>
                 <p>Add IP address or CIDR range to whitelist (prevents alerts/blocks).</p>
                 <div class="form-group">
                     <input type="text" id="manual-whitelist-ip" placeholder="192.168.1.100 or 10.0.0.0/24" style="flex: 2;">
                     <button onclick="whitelistManualIP()" class="btn-primary">Whitelist IP</button>
                 </div>
+            </div>
+
+            <div class="action-card">
+                <h3>Manual DNS Whitelist</h3>
+                <p>Whitelist a domain to prevent DNS blocking (bypasses all DNS blocklists).</p>
+                <div class="form-group">
+                    <input type="text" id="manual-whitelist-domain" placeholder="example.com" style="flex: 2;">
+                    <button onclick="whitelistManualDomain()" class="btn-primary">Whitelist Domain</button>
+                </div>
+                <div id="whitelist-message" style="margin-top: 10px;"></div>
             </div>
 
 
