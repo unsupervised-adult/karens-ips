@@ -5,6 +5,7 @@ Enterprise-grade Intrusion Prevention System combining ML behavioral analysis wi
 ## Features
 
 - **Behavioral Analysis** - ML-powered threat detection with adaptive learning (SLIPS)
+- **QUIC Ad Blocking** - Encrypted stream behavioral fingerprinting (YouTube, Twitch, etc.)
 - **High-Performance IPS** - Suricata 8.0 in NFQUEUE bridge mode
 - **Dataset Intelligence** - 350K+ domain patterns (hagezi/perflyst) with O(1) hash lookup
 - **TLS SNI Inspection** - Deep packet inspection at TLS handshake (bypasses encrypted DNS)
@@ -30,6 +31,7 @@ sudo ./karens-ips-installer.sh
 
 - Suricata 8.0 (NFQUEUE inline mode)
 - SLIPS ML behavioral engine
+- Stream Ad Blocker (QUIC behavioral fingerprinting)
 - Dataset-based pattern matching
 - Web management interface
 - Threat intelligence feeds
@@ -48,9 +50,11 @@ Default credentials: `/root/.karens-ips-credentials`
 **Service management:**
 
 ```bash
-systemctl status suricata slips slips-webui redis-server
+systemctl status suricata slips slips-webui redis-server stream-ad-blocker
 systemctl restart suricata
+systemctl restart stream-ad-blocker
 journalctl -fu slips
+journalctl -fu stream-ad-blocker
 ```
 
 **Configure threat feeds:**
@@ -130,6 +134,11 @@ tail -f /var/log/suricata/eve.json | jq
 # SLIPS detections
 journalctl -fu slips | grep -i alert
 
+# Stream Ad Blocker stats
+redis-cli -n 1 HGETALL stream_ad_blocker:stats
+redis-cli -n 1 LRANGE ml_detector:recent_detections 0 10
+journalctl -fu stream-ad-blocker | grep -E "detected|blocked"
+
 # Redis stats
 redis-cli -n 1 hgetall ml_detector:stats
 
@@ -140,6 +149,93 @@ suricatasc -c "dataset-list"
 ## Configuration
 
 **HOME_NET:** Set in web UI → Configuration tab
+
+**Stream Ad Blocker (QUIC Behavioral Fingerprinting):**
+
+Detects and blocks encrypted video ads on YouTube, Twitch, and other platforms via flow pattern analysis without payload decryption.
+
+**Service Management:**
+```bash
+# Status check
+sudo systemctl status stream-ad-blocker
+journalctl -u stream-ad-blocker --since '10 minutes ago'
+
+# View real-time detections
+journalctl -fu stream-ad-blocker | grep -E "BLOCKED|detected"
+
+# Check detection stats
+redis-cli -n 1 HGETALL stream_ad_blocker:stats
+
+# View recent detections (JSON format)
+redis-cli -n 1 LRANGE ml_detector:recent_detections 0 10
+
+# Restart service after config changes
+sudo systemctl restart stream-ad-blocker
+```
+
+**Redis Configuration Keys (Database 1):**
+```bash
+# Detection thresholds (0.0 - 1.0)
+redis-cli -n 1 SET stream_ad_blocker:youtube_threshold 0.35      # Video ad flows (35% confidence)
+redis-cli -n 1 SET stream_ad_blocker:cdn_threshold 0.50          # Generic CDN ads (50%)
+redis-cli -n 1 SET stream_ad_blocker:control_plane_threshold 0.45 # Ad auction endpoints (45%)
+
+# LLM analysis zone (flows in this range get analyzed by LLM)
+redis-cli -n 1 SET stream_ad_blocker:llm_min_threshold 0.25      # Lower bound (25%)
+redis-cli -n 1 SET stream_ad_blocker:llm_max_threshold 0.75      # Upper bound (75%)
+
+# Duration filters (seconds)
+redis-cli -n 1 SET stream_ad_blocker:ad_duration_min 3           # Minimum ad duration
+redis-cli -n 1 SET stream_ad_blocker:ad_duration_max 120         # Maximum ad duration
+
+# Size filters (bytes)
+redis-cli -n 1 SET stream_ad_blocker:min_bytes 5120              # Minimum flow size (5KB)
+
+# Enable/disable blocking
+redis-cli -n 1 SET ml_detector:blocking_enabled 1                # 1=active, 0=monitor only
+```
+
+**Detection Patterns:**
+- **Bumper ads**: ≤6s duration, >50KB
+- **Skippable ads**: 5-30s, >100KB/s byte rate
+- **Non-skippable ads**: 15-30s, 1-15MB
+- **Long ads**: 30-60s, <25MB
+- **Pre-roll sequences**: <180s, >50pps packet rate
+- **Ad beacons**: <50KB, <20 packets
+- **Ad pods**: Multiple sequential ads detected via timing correlation
+
+**How It Works:**
+1. Subscribes to SLIPS `new_flow` channel (Redis DB 0)
+2. Analyzes QUIC flows (UDP port 443) for behavioral fingerprints
+3. Pattern matching on packet rates, byte sizes, duration, burst timing
+4. ML model (ad_classifier_model.pkl) provides additional classification
+5. Blocks via URL/IP blocklist or Suricata NFQUEUE flow dropping
+6. No payload decryption - analyzes flow metadata only
+
+**Troubleshooting:**
+```bash
+# Check if service is receiving flows
+journalctl -u stream-ad-blocker --since '1 minute ago' | grep "Processing flow"
+
+# Verify SLIPS is publishing flows
+redis-cli -n 0 PUBSUB CHANNELS | grep new_flow
+
+# Check for detection patterns
+journalctl -u stream-ad-blocker --since '5 minutes ago' | grep -E "quic_|preroll|ad_pod"
+
+# View blocked IPs
+redis-cli -n 1 SMEMBERS stream_ad_blocker:blocked_ips
+
+# Clear all blocks
+redis-cli -n 1 DEL stream_ad_blocker:blocked_ips
+redis-cli -n 1 DEL stream_ad_blocker:blocked_urls
+```
+
+**Performance Tuning:**
+- Lower thresholds = more detections, more false positives
+- Higher thresholds = fewer false positives, may miss some ads
+- LLM zone (25-75%) captures borderline cases for training data
+- Ultra-sensitive mode: youtube_threshold=0.30, llm_min=0.20
 
 **LLM integration:** Configuration tab → Intelligence Settings
 
