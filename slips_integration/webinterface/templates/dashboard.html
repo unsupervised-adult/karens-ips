@@ -226,6 +226,14 @@
 
 </div>
 
+<style>
+.dashboard-container .btn:focus,
+.dashboard-container .btn:active {
+  outline: none !important;
+  box-shadow: none !important;
+}
+</style>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
 function switchToTab(tabId) {
@@ -233,6 +241,10 @@ function switchToTab(tabId) {
   if (tabElement) {
     const tab = new bootstrap.Tab(tabElement);
     tab.show();
+    // Blur the current element to remove focus highlight
+    if (document.activeElement) {
+      document.activeElement.blur();
+    }
   }
 }
 
