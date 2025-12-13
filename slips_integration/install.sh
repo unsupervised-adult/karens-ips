@@ -92,33 +92,43 @@ echo ""
 # Install pre-modified SLIPS files
 echo "Installing ML Detector integrated SLIPS files..."
 
+# Ensure templates directory exists
+if [ ! -d "$SLIPS_PATH/webinterface/templates" ]; then
+    echo -e "${YELLOW}Creating templates directory...${NC}"
+    mkdir -p "$SLIPS_PATH/webinterface/templates"
+    echo -e "${GREEN}[+]${NC} Templates directory created"
+fi
+
 # Install app.py
 echo "  - Installing webinterface/app.py"
 if [ -f "$SCRIPT_DIR/webinterface/app.py" ]; then
-    cp "$SCRIPT_DIR/webinterface/app.py" "$SLIPS_PATH/webinterface/app.py"
+    cp -v "$SCRIPT_DIR/webinterface/app.py" "$SLIPS_PATH/webinterface/app.py"
     echo -e "    ${GREEN}[+]${NC} app.py installed successfully"
 else
-    echo -e "    ${RED}[!]${NC} app.py source file not found"
+    echo -e "    ${RED}[!]${NC} app.py source file not found at: $SCRIPT_DIR/webinterface/app.py"
     exit 1
 fi
 
 # Install app.html
 echo "  - Installing webinterface/templates/app.html"
 if [ -f "$SCRIPT_DIR/webinterface/templates/app.html" ]; then
-    cp "$SCRIPT_DIR/webinterface/templates/app.html" "$SLIPS_PATH/webinterface/templates/app.html"
+    cp -v "$SCRIPT_DIR/webinterface/templates/app.html" "$SLIPS_PATH/webinterface/templates/app.html"
     echo -e "    ${GREEN}[+]${NC} app.html installed successfully"
 else
-    echo -e "    ${RED}[!]${NC} app.html source file not found"
+    echo -e "    ${RED}[!]${NC} app.html source file not found at: $SCRIPT_DIR/webinterface/templates/app.html"
     exit 1
 fi
 
 # Install dashboard.html
 echo "  - Installing webinterface/templates/dashboard.html"
 if [ -f "$SCRIPT_DIR/webinterface/templates/dashboard.html" ]; then
-    cp "$SCRIPT_DIR/webinterface/templates/dashboard.html" "$SLIPS_PATH/webinterface/templates/dashboard.html"
+    cp -v "$SCRIPT_DIR/webinterface/templates/dashboard.html" "$SLIPS_PATH/webinterface/templates/dashboard.html"
     echo -e "    ${GREEN}[+]${NC} dashboard.html installed successfully"
 else
-    echo -e "    ${RED}[!]${NC} dashboard.html source file not found"
+    echo -e "    ${RED}[!]${NC} dashboard.html source file not found at: $SCRIPT_DIR/webinterface/templates/dashboard.html"
+    echo -e "    ${RED}[!]${NC} Current directory: $(pwd)"
+    echo -e "    ${RED}[!]${NC} Script directory: $SCRIPT_DIR"
+    ls -la "$SCRIPT_DIR/webinterface/templates/" 2>&1 || echo "Templates directory doesn't exist"
     exit 1
 fi
 
@@ -134,7 +144,35 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}[+] Installation complete!${NC}"
+echo "Verifying installation..."
+VERIFICATION_FAILED=0
+
+# Check critical files
+declare -a CRITICAL_FILES=(
+    "$SLIPS_PATH/webinterface/app.py"
+    "$SLIPS_PATH/webinterface/templates/app.html"
+    "$SLIPS_PATH/webinterface/templates/dashboard.html"
+    "$SLIPS_PATH/webinterface/ml_detector/ml_detector.py"
+    "$SLIPS_PATH/webinterface/suricata_config/suricata_config.py"
+)
+
+for file in "${CRITICAL_FILES[@]}"; do
+    if [ -f "$file" ]; then
+        echo -e "${GREEN}✓${NC} $(basename "$file") deployed"
+    else
+        echo -e "${RED}✗${NC} Missing: $file"
+        VERIFICATION_FAILED=1
+    fi
+done
+
+if [ $VERIFICATION_FAILED -eq 1 ]; then
+    echo -e "${RED}[!] Installation verification failed!${NC}"
+    echo -e "${YELLOW}Some files are missing. Please check the errors above.${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}[+] Installation complete and verified!${NC}"
 echo ""
 echo "Next steps:"
 echo "1. Start your SLIPS instance with traffic analysis"
