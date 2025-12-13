@@ -25,6 +25,18 @@
 /* Change DB button styles */
 #changedb_button {
     color: #0d6efd !important;
+    background-color: transparent !important;
+}
+
+#changedb_button:hover,
+#changedb_button:focus,
+#changedb_button:active,
+#changedb_button.active {
+    background-color: transparent !important;
+    color: #0d6efd !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
 /* Remove ALL focus outlines and highlights globally */
