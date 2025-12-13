@@ -152,5 +152,48 @@ def get_system_info():
         }, 500
 
 
+@app.route("/api/performance")
+@login_required
+def get_performance_metrics():
+    """Get real-time performance metrics for dashboard"""
+    import psutil
+    import time
+    
+    try:
+        interface = "br0"
+        
+        net_io = psutil.net_io_counters(pernic=True).get(interface)
+        if not net_io:
+            net_io = psutil.net_io_counters(pernic=True).get("enp6s18")
+            interface = "enp6s18" if net_io else "unknown"
+        
+        if net_io:
+            throughput_bytes = (net_io.bytes_sent + net_io.bytes_recv) / 1024
+        else:
+            throughput_bytes = 0
+        
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        memory = psutil.virtual_memory()
+        memory_percent = memory.percent
+        
+        return {
+            "success": True,
+            "throughput_kb": round(throughput_bytes, 2),
+            "cpu_percent": round(cpu_percent, 1),
+            "memory_percent": round(memory_percent, 1),
+            "interface": interface,
+            "timestamp": int(time.time() * 1000)
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "throughput_kb": 0,
+            "cpu_percent": 0,
+            "memory_percent": 0,
+            "interface": "unknown",
+            "error": str(e)
+        }, 500
+
+
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=ConfigParser().web_interface_port)

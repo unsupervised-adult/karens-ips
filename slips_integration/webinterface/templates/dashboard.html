@@ -246,42 +246,65 @@ function initDashboardCharts() {
   console.log('Dashboard charts initialized');
 }
 
+let lastBytesTotal = 0;
+let lastPerfTimestamp = 0;
+
 function updateDashboardPerformance() {
-  const now = new Date().toLocaleTimeString();
-  const throughput = Math.random() * 1000 + 500;
-  const cpu = Math.random() * 40 + 20;
-  const memory = Math.random() * 30 + 40;
+  fetch('/api/performance?v=' + Date.now())
+    .then(response => response.json())
+    .then(data => {
+      if (!data.success) {
+        console.error('Performance API error:', data.error);
+        return;
+      }
+      
+      let throughput = 0;
+      if (lastBytesTotal > 0 && lastPerfTimestamp > 0) {
+        const timeDiff = (data.timestamp - lastPerfTimestamp) / 1000;
+        const bytesDiff = data.throughput_kb - lastBytesTotal;
+        throughput = Math.max(0, bytesDiff / timeDiff);
+      }
+      
+      lastBytesTotal = data.throughput_kb;
+      lastPerfTimestamp = data.timestamp;
+      
+      const cpu = data.cpu_percent || 0;
+      const memory = data.memory_percent || 0;
 
-  dashThroughputData.push(throughput);
-  if (dashThroughputData.length > DASH_MAX_POINTS) {
-    dashThroughputData.shift();
-  }
+      dashThroughputData.push(throughput);
+      if (dashThroughputData.length > DASH_MAX_POINTS) {
+        dashThroughputData.shift();
+      }
 
-  dashCpuData.push(cpu);
-  dashMemoryData.push(memory);
-  if (dashCpuData.length > DASH_MAX_POINTS) {
-    dashCpuData.shift();
-    dashMemoryData.shift();
-  }
+      dashCpuData.push(cpu);
+      dashMemoryData.push(memory);
+      if (dashCpuData.length > DASH_MAX_POINTS) {
+        dashCpuData.shift();
+        dashMemoryData.shift();
+      }
 
-  if (dashThroughputChart) {
-    dashThroughputChart.data.labels = Array(dashThroughputData.length).fill('');
-    dashThroughputChart.data.datasets[0].data = dashThroughputData;
-    dashThroughputChart.update();
-    
-    document.getElementById('dash_current_throughput').textContent = 
-      throughput.toFixed(0) + ' KB/s';
-  }
+      if (dashThroughputChart) {
+        dashThroughputChart.data.labels = Array(dashThroughputData.length).fill('');
+        dashThroughputChart.data.datasets[0].data = dashThroughputData;
+        dashThroughputChart.update();
+        
+        document.getElementById('dash_current_throughput').textContent = 
+          throughput.toFixed(0) + ' KB/s (' + data.interface + ')';
+      }
 
-  if (dashSystemChart) {
-    dashSystemChart.data.labels = Array(dashCpuData.length).fill('');
-    dashSystemChart.data.datasets[0].data = dashCpuData;
-    dashSystemChart.data.datasets[1].data = dashMemoryData;
-    dashSystemChart.update();
-    
-    document.getElementById('dash_current_cpu').textContent = cpu.toFixed(1) + '%';
-    document.getElementById('dash_current_memory').textContent = memory.toFixed(1) + '%';
-  }
+      if (dashSystemChart) {
+        dashSystemChart.data.labels = Array(dashCpuData.length).fill('');
+        dashSystemChart.data.datasets[0].data = dashCpuData;
+        dashSystemChart.data.datasets[1].data = dashMemoryData;
+        dashSystemChart.update();
+        
+        document.getElementById('dash_current_cpu').textContent = cpu.toFixed(1) + '%';
+        document.getElementById('dash_current_memory').textContent = memory.toFixed(1) + '%';
+      }
+    })
+    .catch(err => {
+      console.error('Error fetching performance metrics:', err);
+    });
 }
 
 function loadDashboardStats() {

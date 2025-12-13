@@ -240,8 +240,6 @@ async function whitelistManualDomain() {
         }
     } catch (error) {
         messageDiv.innerHTML = '<span style="color: red;">✗ Error whitelisting domain</span>';
-    }
-}
         console.error(error);
     }
 }
