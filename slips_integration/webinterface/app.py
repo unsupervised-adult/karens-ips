@@ -86,5 +86,68 @@ def set_pcap_info():
     return info
 
 
+@app.route("/api/system_info")
+@login_required
+def get_system_info():
+    """Get system information for dashboard"""
+    try:
+        import datetime
+        from dateutil import parser
+        
+        # Fetch SLIPS version and analysis start from Redis 'analysis' hash
+        slips_version = db.r.hget('analysis', 'slips_version')
+        analysis_start = db.r.hget('analysis', 'analysis_start')
+        
+        # Decode bytes to strings if needed
+        if isinstance(slips_version, bytes):
+            slips_version = slips_version.decode('utf-8')
+        if isinstance(analysis_start, bytes):
+            analysis_start = analysis_start.decode('utf-8')
+        
+        # Calculate uptime from analysis_start
+        uptime = "Unknown"
+        if analysis_start:
+            try:
+                start_time = parser.parse(analysis_start)
+                uptime_delta = datetime.datetime.now() - start_time
+                
+                days = uptime_delta.days
+                hours, remainder = divmod(uptime_delta.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                
+                if days > 0:
+                    uptime = f"{days}d {hours}h {minutes}m"
+                elif hours > 0:
+                    uptime = f"{hours}h {minutes}m {seconds}s"
+                else:
+                    uptime = f"{minutes}m {seconds}s"
+            except Exception:
+                uptime = "Unknown"
+        
+        # Get profile count
+        profiles = db.get_profiles()
+        num_profiles = len(profiles) if profiles else 0
+        
+        # Get alerts count
+        alerts_number = db.get_number_of_alerts_so_far()
+        num_alerts = int(alerts_number) if alerts_number else 0
+        
+        return {
+            "success": True,
+            "version": slips_version if slips_version else "Unknown",
+            "uptime": uptime,
+            "profiles": num_profiles,
+            "alerts": num_alerts
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "version": "Error loading",
+            "uptime": "Error loading",
+            "profiles": 0,
+            "alerts": 0
+        }, 500
+
+
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=ConfigParser().web_interface_port)
