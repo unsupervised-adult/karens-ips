@@ -171,10 +171,10 @@
       // Ensure only active tab is visible on load
       $('#nav-tabContent .tab-pane').not('.show.active').hide();
       
-      // Handle tab clicks to properly show/hide content
-      $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+      // Handle MAIN tab clicks only (not sub-tabs within ML IPS)
+      $('#nav-pills a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
         var target = $(e.target).attr("data-bs-target");
-        $('#nav-tabContent .tab-pane').hide();
+        $('#nav-tabContent > .tab-pane').hide();
         $(target).show();
       });
       
