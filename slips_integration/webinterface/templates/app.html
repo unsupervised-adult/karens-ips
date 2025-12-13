@@ -177,6 +177,13 @@
         $('#nav-tabContent .tab-pane').hide();
         $(target).show();
       });
+      
+      // Remove focus from navigation buttons after clicking
+      $('.nav-link, .dropdown-toggle').on('click', function() {
+        setTimeout(() => {
+          $(this).blur();
+        }, 100);
+      });
     });
   </script>
   

@@ -27,6 +27,19 @@
     color: #0d6efd !important;
 }
 
+/* Remove focus outline from nav buttons */
+.nav-link.btn-primary:focus,
+.nav-link.btn-primary:active,
+#changedb_button:focus,
+#changedb_button:active,
+#reload_button:focus,
+#reload_button:active,
+.dropdown-toggle:focus,
+.dropdown-toggle:active {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
 /* Table styles */
 #table_choose_redis {
     width: 100%;
