@@ -42,100 +42,6 @@
     </div>
   </div>
 
-  <!-- Behavioral Analysis Engine Stats -->
-  <div class="row mb-3">
-    <div class="col-12">
-      <h4 class="text-primary">
-        <i class="bi bi-shield-check"></i> Behavioral Analysis Engine
-      </h4>
-    </div>
-  </div>
-  <div class="row mb-4 g-3">
-    <div class="col-md-3">
-      <div class="card h-100 border-primary">
-        <div class="card-body text-center p-2">
-          <h6 class="text-muted text-uppercase mb-2 stat-label">Flows Analyzed</h6>
-          <div class="text-primary stat-value" id="dash_stat_total_analyzed">0</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card h-100 border-primary">
-        <div class="card-body text-center p-2">
-          <h6 class="text-muted text-uppercase mb-2 stat-label">Suspicious Flows</h6>
-          <div class="text-danger stat-value" id="dash_stat_ads_detected">0</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card h-100 border-primary">
-        <div class="card-body text-center p-2">
-          <h6 class="text-muted text-uppercase mb-2 stat-label">Legitimate Flows</h6>
-          <div class="text-success stat-value" id="dash_stat_legitimate">0</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card h-100 border-primary">
-        <div class="card-body text-center p-2">
-          <h6 class="text-muted text-uppercase mb-2 stat-label">Model Accuracy</h6>
-          <div class="text-info stat-value" id="dash_stat_accuracy">0%</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Protocol Analysis & Filtering Stats -->
-  <div class="row mb-3">
-    <div class="col-12">
-      <h4 class="text-primary">
-        <i class="bi bi-broadcast"></i> Protocol Analysis & Filtering
-      </h4>
-    </div>
-  </div>
-  <div class="row mb-4 g-3">
-    <div class="col-md-3">
-      <div class="card h-100 border-primary">
-        <div class="card-body text-center p-2">
-          <h6 class="text-muted text-uppercase mb-2 stat-label">Streams Analyzed</h6>
-          <div class="text-primary stat-value" id="dash_stream_total_analyzed">0</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-2">
-      <div class="card h-100 border-primary">
-        <div class="card-body text-center p-2">
-          <h6 class="text-muted text-uppercase mb-2 stat-label">Syndication Filtered</h6>
-          <div class="text-danger stat-value" id="dash_stream_ads_detected">0</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-2">
-      <div class="card h-100 border-primary">
-        <div class="card-body text-center p-2">
-          <h6 class="text-muted text-uppercase mb-2 stat-label">Endpoints Filtered</h6>
-          <div class="text-primary stat-value" id="dash_stream_ips_blocked">0</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-2">
-      <div class="card h-100 border-info">
-        <div class="card-body text-center p-2">
-          <h6 class="text-muted text-uppercase mb-2 stat-label">Flow Drops</h6>
-          <div class="text-warning stat-value" id="dash_stream_flows_dropped">0</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card h-100 border-warning">
-        <div class="card-body text-center p-2">
-          <h6 class="text-muted text-uppercase mb-2 stat-label">Status</h6>
-          <div class="text-success stat-value" id="dash_stream_status">Unknown</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- System Information -->
   <div class="row mb-4">
     <div class="col-md-6">
@@ -192,6 +98,21 @@
 .dashboard-container .btn:active {
   outline: none !important;
   box-shadow: none !important;
+}
+
+/* Force hide any modal backdrops or overlays */
+.modal-backdrop {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.modal {
+  display: none !important;
+}
+
+.modal.show {
+  display: block !important;
 }
 </style>
 
