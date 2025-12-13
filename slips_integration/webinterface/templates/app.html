@@ -168,6 +168,11 @@
 
     // Initialize Bootstrap tabs to ensure proper show/hide behavior
     $(document).ready(function() {
+      // Ensure modal is completely hidden on page load
+      $('#modal_choose_redis').hide().removeClass('show').attr('aria-hidden', 'true');
+      $('.modal-backdrop').remove();
+      $('body').removeClass('modal-open').css('overflow', '');
+      
       // Remove focus from navigation buttons after clicking
       $('.nav-link, .dropdown-toggle').on('click', function() {
         setTimeout(() => {
