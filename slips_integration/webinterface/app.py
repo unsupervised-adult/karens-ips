@@ -94,9 +94,12 @@ def get_system_info():
         import datetime
         from dateutil import parser
         
-        # Fetch SLIPS version and analysis start from Redis 'analysis' hash
-        slips_version = db.r.hget('analysis', 'slips_version')
-        analysis_start = db.r.hget('analysis', 'analysis_start')
+        # Get analysis info from database
+        analysis_info = db.get_analysis_info()
+        
+        # Extract version and start time (keys are already strings, values might be bytes)
+        slips_version = analysis_info.get('slips_version', b'Unknown')
+        analysis_start = analysis_info.get('analysis_start', b'')
         
         # Decode bytes to strings if needed
         if isinstance(slips_version, bytes):
