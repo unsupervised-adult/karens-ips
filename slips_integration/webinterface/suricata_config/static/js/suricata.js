@@ -214,35 +214,59 @@ async function whitelistManualIP() {
 async function whitelistManualDomain() {
     const domain = document.getElementById('manual-whitelist-domain').value.trim();
     const messageDiv = document.getElementById('whitelist-message');
-    
+
+    // Clear previous messages
+    messageDiv.innerHTML = '';
+
+    // Validate domain is not empty
     if (!domain) {
-        messageDiv.innerHTML = '<span style="color: red;">Domain cannot be empty</span>';
+        const errorSpan = document.createElement('span');
+        errorSpan.style.color = 'red';
+        errorSpan.textContent = 'Domain cannot be empty';
+        messageDiv.appendChild(errorSpan);
         return;
     }
-    
+
+    // Validate domain format
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    if (!domainRegex.test(domain)) {
+        const errorSpan = document.createElement('span');
+        errorSpan.style.color = 'red';
+        errorSpan.textContent = 'Invalid domain format';
+        messageDiv.appendChild(errorSpan);
+        return;
+    }
+
     if (!confirm(`Whitelist ${domain}? This will prevent DNS blocking for this domain.`)) return;
-    
+
     try {
         const response = await fetch('/suricata/api/database/domain', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ domain: domain, action: 'whitelist' })
         });
-        
+
         const data = await response.json();
-        
+
         if (response.ok) {
-            messageDiv.innerHTML = `<span style="color: green;">✓ Domain ${domain} whitelisted. Click "Sync to Suricata" in Database Manager to apply.</span>`;
+            const successSpan = document.createElement('span');
+            successSpan.style.color = 'green';
+            successSpan.textContent = `✓ Domain ${domain} whitelisted. Click "Sync to Suricata" in Database Manager to apply.`;
+            messageDiv.appendChild(successSpan);
             document.getElementById('manual-whitelist-domain').value = '';
             setTimeout(() => messageDiv.innerHTML = '', 5000);
         } else {
-            messageDiv.innerHTML = `<span style="color: red;">✗ ${data.error || 'Failed to whitelist domain'}</span>`;
+            const errorSpan = document.createElement('span');
+            errorSpan.style.color = 'red';
+            errorSpan.textContent = `✗ ${data.error || 'Failed to whitelist domain'}`;
+            messageDiv.appendChild(errorSpan);
         }
     } catch (error) {
-        messageDiv.innerHTML = '<span style="color: red;">✗ Error whitelisting domain</span>';
-    }
-}
-        console.error(error);
+        const errorSpan = document.createElement('span');
+        errorSpan.style.color = 'red';
+        errorSpan.textContent = '✗ Error whitelisting domain';
+        messageDiv.appendChild(errorSpan);
+        console.error('Error whitelisting domain:', error);
     }
 }
 
