@@ -285,29 +285,27 @@ function updateDashboardPerformance() {
 }
 
 function loadDashboardStats() {
-  // Fetch system information from general API
-  fetch('/general/stats')
+  // Fetch system information from the new API endpoint
+  fetch('/api/system_info')
     .then(response => response.json())
     .then(data => {
-      if (data) {
-        const versionEl = document.getElementById('dash_ips_version');
-        const uptimeEl = document.getElementById('dash_uptime');
-        const profilesEl = document.getElementById('dash_num_profiles');
-        const alertsEl = document.getElementById('dash_num_alerts');
-        
-        if (versionEl && data.version) versionEl.textContent = data.version;
-        if (uptimeEl && data.uptime) uptimeEl.textContent = data.uptime;
-        if (profilesEl && data.profiles !== undefined) profilesEl.textContent = data.profiles;
-        if (alertsEl && data.alerts !== undefined) alertsEl.textContent = data.alerts;
-      }
+      const versionEl = document.getElementById('dash_ips_version');
+      const uptimeEl = document.getElementById('dash_uptime');
+      const profilesEl = document.getElementById('dash_num_profiles');
+      const alertsEl = document.getElementById('dash_num_alerts');
+      
+      if (versionEl) versionEl.textContent = data.version || 'Unknown';
+      if (uptimeEl) uptimeEl.textContent = data.uptime || 'Unknown';
+      if (profilesEl) profilesEl.textContent = data.profiles || 0;
+      if (alertsEl) alertsEl.textContent = data.alerts || 0;
     })
     .catch(err => {
       console.error('Error loading system info:', err);
       // Set fallback values
       const versionEl = document.getElementById('dash_ips_version');
       const uptimeEl = document.getElementById('dash_uptime');
-      if (versionEl) versionEl.textContent = 'Unknown';
-      if (uptimeEl) uptimeEl.textContent = 'Unknown';
+      if (versionEl) versionEl.textContent = 'Error loading';
+      if (uptimeEl) uptimeEl.textContent = 'Error loading';
     });
   
   // Fetch recent activity

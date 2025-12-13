@@ -102,5 +102,57 @@ def dashboard():
     return render_template('app.html')
 
 
+@app.route('/api/system_info')
+@login_required
+def get_system_info():
+    """Get system information for dashboard"""
+    try:
+        import datetime
+        from ..database.database import db
+        
+        # Get metadata from Redis
+        slips_version = db.r.hget('analysis', 'slips_version') or 'Unknown'
+        analysis_start = db.r.hget('analysis', 'analysis_start') or None
+        
+        # Calculate uptime
+        uptime_str = 'Unknown'
+        if analysis_start:
+            try:
+                # Parse the analysis start time and calculate uptime
+                from dateutil import parser
+                start_time = parser.parse(analysis_start)
+                uptime_delta = datetime.datetime.now() - start_time
+                days = uptime_delta.days
+                hours, remainder = divmod(uptime_delta.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                if days > 0:
+                    uptime_str = f"{days}d {hours}h {minutes}m"
+                else:
+                    uptime_str = f"{hours}h {minutes}m {seconds}s"
+            except Exception as e:
+                uptime_str = 'Unknown'
+        
+        # Get profile and alert counts
+        profiles = len(db.get_profiles()) if hasattr(db, 'get_profiles') else 0
+        alerts = 0  # TODO: implement alert counting
+        
+        return jsonify({
+            'success': True,
+            'version': slips_version.decode() if isinstance(slips_version, bytes) else slips_version,
+            'uptime': uptime_str,
+            'profiles': profiles,
+            'alerts': alerts
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'version': 'Unknown',
+            'uptime': 'Unknown',
+            'profiles': 0,
+            'alerts': 0
+        }), 500
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=55000, debug=False)
