@@ -27,7 +27,19 @@
     color: #0d6efd !important;
 }
 
-/* Remove focus outline from nav buttons */
+/* Remove ALL focus outlines and highlights globally */
+*:focus,
+*:active,
+*:focus-visible {
+    outline: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Specifically remove focus from nav elements */
+.nav-link:focus,
+.nav-link:active,
 .nav-link.btn-primary:focus,
 .nav-link.btn-primary:active,
 #changedb_button:focus,
@@ -35,9 +47,23 @@
 #reload_button:focus,
 #reload_button:active,
 .dropdown-toggle:focus,
-.dropdown-toggle:active {
+.dropdown-toggle:active,
+button:focus,
+button:active,
+a:focus,
+a:active {
+    outline: 0 !important;
     outline: none !important;
     box-shadow: none !important;
+    border: none !important;
+}
+
+/* Keep focus styles ONLY for form inputs for accessibility */
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid #0d6efd !important;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
 }
 
 /* Table styles */
