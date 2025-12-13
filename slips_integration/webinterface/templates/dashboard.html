@@ -149,6 +149,14 @@ function initDashboardCharts() {
     return;
   }
 
+  // Destroy existing charts if they exist
+  if (dashThroughputChart) {
+    dashThroughputChart.destroy();
+  }
+  if (dashSystemChart) {
+    dashSystemChart.destroy();
+  }
+
   dashThroughputChart = new Chart(throughputCtx, {
     type: 'line',
     data: {
@@ -277,57 +285,18 @@ function updateDashboardPerformance() {
 }
 
 function loadDashboardStats() {
-  fetch('/ml_detector/stats')
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        document.getElementById('dash_stat_total_analyzed').textContent = 
-          data.stats.total_analyzed || 0;
-        document.getElementById('dash_stat_ads_detected').textContent = 
-          data.stats.ads_detected || 0;
-        document.getElementById('dash_stat_legitimate').textContent = 
-          data.stats.legitimate || 0;
-        document.getElementById('dash_stat_accuracy').textContent = 
-          ((data.stats.accuracy || 0) * 100).toFixed(1) + '%';
-      }
-    })
-    .catch(err => console.error('Error loading ML stats:', err));
-
-  fetch('/ml_detector/stream_stats')
-    .then(response => response.json())
-    .then(data => {
-      if (data.success && data.data) {
-        document.getElementById('dash_stream_total_analyzed').textContent = 
-          data.data.total_analyzed || 0;
-        document.getElementById('dash_stream_ads_detected').textContent = 
-          data.data.ads_detected || 0;
-        document.getElementById('dash_stream_ips_blocked').textContent = 
-          data.data.ips_blocked || 0;
-        document.getElementById('dash_stream_flows_dropped').textContent = 
-          data.data.flows_dropped || 0;
-        
-        const blockingStatus = data.data.blocking_status || 'Unknown';
-        const status = blockingStatus === 'enabled' ? 'Blocking Enabled' : 'Monitoring Only';
-        const statusClass = blockingStatus === 'enabled' ? 'text-success' : 'text-warning';
-        const statusEl = document.getElementById('dash_stream_status');
-        statusEl.textContent = status;
-        statusEl.className = 'stat-value ' + statusClass;
-      }
-    })
-    .catch(err => console.error('Error loading stream stats:', err));
+  // Stats cards removed - no longer need to fetch or update them
 }
 
 function initDashboard() {
   console.log('Initializing dashboard...');
   initDashboardCharts();
-  loadDashboardStats();
   updateDashboardPerformance();
   
   if (dashRefreshInterval) {
     clearInterval(dashRefreshInterval);
   }
   dashRefreshInterval = setInterval(() => {
-    loadDashboardStats();
     updateDashboardPerformance();
   }, DASH_REFRESH_INTERVAL);
 }
