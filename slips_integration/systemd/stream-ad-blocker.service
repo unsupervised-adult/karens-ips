@@ -1,0 +1,32 @@
+[Unit]
+Description=Karen's IPS Stream Ad Blocker
+Documentation=https://github.com/unsupervised-adult/karens-ips
+After=network-online.target redis.service slips.service
+Requires=redis.service
+PartOf=slips.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/StratosphereLinuxIPS/webinterface/ml_detector
+ExecStart=/opt/StratosphereLinuxIPS/venv/bin/python3 /opt/StratosphereLinuxIPS/webinterface/ml_detector/stream_ad_blocker.py
+Restart=on-failure
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=stream-ad-blocker
+
+# Security hardening
+PrivateTmp=yes
+NoNewPrivileges=no
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/StratosphereLinuxIPS /var/log /etc/suricata/rules
+
+# Resource limits
+LimitNOFILE=65536
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target

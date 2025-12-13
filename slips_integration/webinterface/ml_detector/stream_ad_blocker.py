@@ -1034,13 +1034,12 @@ class StreamAdBlocker:
                     continue
 
                 self.stats['total_analyzed'] += 1
-                
                 # Extract relevant fields
                 src_ip = profileid.split('_')[0] if '_' in profileid else flow.get('saddr', '')
                 dst_ip = flow.get('daddr', '')
                 src_port = flow.get('sport', 0)
-                pkts = flow.get('pkts', 0)
-                bytes_sent = flow.get('bytes', 0)
+                pkts = flow.get('spkts', 0) + flow.get('dpkts', 0)
+                bytes_sent = flow.get('sbytes', 0) + flow.get('dbytes', 0)
                 duration = flow.get('dur', 0)
                 
                 # Create flow identifier

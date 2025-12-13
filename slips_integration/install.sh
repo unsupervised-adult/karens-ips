@@ -48,10 +48,22 @@ fi
 echo -e "${GREEN}[+]${NC} Found valid SLIPS installation at: $SLIPS_PATH"
 echo ""
 
+# Check if we need sudo
+if [ ! -w "$SLIPS_PATH/webinterface" ]; then
+    echo -e "${YELLOW}Note: Installation requires sudo privileges${NC}"
+    if ! sudo -n true 2>/dev/null; then
+        echo -e "${YELLOW}Please enter your password for sudo access:${NC}"
+    fi
+fi
+
 # Create backup
 BACKUP_DIR="${SLIPS_PATH}_backup_$(date +%Y%m%d_%H%M%S)"
 echo -e "${YELLOW}Creating backup at: $BACKUP_DIR${NC}"
-cp -r "$SLIPS_PATH/webinterface" "$BACKUP_DIR"
+if [ -w "$(dirname "$SLIPS_PATH")" ]; then
+    cp -r "$SLIPS_PATH/webinterface" "$BACKUP_DIR"
+else
+    sudo cp -r "$SLIPS_PATH/webinterface" "$BACKUP_DIR"
+fi
 echo -e "${GREEN}[+]${NC} Backup created"
 echo ""
 
@@ -64,8 +76,13 @@ if [ -d "$ML_DETECTOR_DEST" ]; then
     rm -rf "$ML_DETECTOR_DEST"
 fi
 
-cp -r "$SCRIPT_DIR/webinterface/ml_detector" "$ML_DETECTOR_DEST"
-echo -e "${GREEN}[+]${NC} ML Detector blueprint installed"
+if [ -d "$SCRIPT_DIR/webinterface/ml_detector" ]; then
+    cp -r "$SCRIPT_DIR/webinterface/ml_detector" "$ML_DETECTOR_DEST"
+    echo -e "${GREEN}[+]${NC} ML Detector blueprint installed"
+else
+    echo -e "${RED}[!]${NC} ML Detector source directory not found at $SCRIPT_DIR/webinterface/ml_detector"
+    exit 1
+fi
 
 # Copy Suricata Config blueprint
 echo "Installing Suricata Config blueprint..."
@@ -76,16 +93,44 @@ if [ -d "$SURICATA_CONFIG_DEST" ]; then
     rm -rf "$SURICATA_CONFIG_DEST"
 fi
 
-cp -r "$SCRIPT_DIR/webinterface/suricata_config" "$SURICATA_CONFIG_DEST"
-echo -e "${GREEN}[+]${NC} Suricata Config blueprint installed"
+if [ -d "$SCRIPT_DIR/webinterface/suricata_config" ]; then
+    cp -r "$SCRIPT_DIR/webinterface/suricata_config" "$SURICATA_CONFIG_DEST"
+    echo -e "${GREEN}[+]${NC} Suricata Config blueprint installed"
+else
+    echo -e "${RED}[!]${NC} Suricata Config source directory not found at $SCRIPT_DIR/webinterface/suricata_config"
+    exit 1
+fi
 
 # Install stream_ad_blocker.py service
 echo "Installing stream ad blocker service..."
 if [ -f "$SCRIPT_DIR/webinterface/ml_detector/stream_ad_blocker.py" ]; then
     cp "$SCRIPT_DIR/webinterface/ml_detector/stream_ad_blocker.py" "$SLIPS_PATH/webinterface/ml_detector/stream_ad_blocker.py"
+    chmod +x "$SLIPS_PATH/webinterface/ml_detector/stream_ad_blocker.py"
     echo -e "${GREEN}[+]${NC} Stream ad blocker service installed"
 else
-    echo -e "${YELLOW}[!]${NC} stream_ad_blocker.py not found"
+    echo -e "${YELLOW}[!]${NC} stream_ad_blocker.py not found - skipping"
+fi
+
+# Install ML model
+if [ -f "$SCRIPT_DIR/webinterface/ml_detector/ad_classifier_model.pkl" ]; then
+    cp "$SCRIPT_DIR/webinterface/ml_detector/ad_classifier_model.pkl" "$SLIPS_PATH/webinterface/ml_detector/ad_classifier_model.pkl"
+    echo -e "${GREEN}[+]${NC} ML model (ad_classifier_model.pkl) installed"
+else
+    echo -e "${YELLOW}[!]${NC} ML model not found - stream ad blocker will work without ML classification"
+fi
+
+# Install systemd service
+if [ -f "$SCRIPT_DIR/systemd/stream-ad-blocker.service" ]; then
+    echo "Installing systemd service..."
+    sudo cp "$SCRIPT_DIR/systemd/stream-ad-blocker.service" /etc/systemd/system/stream-ad-blocker.service
+    
+    # Update service file with correct SLIPS path
+    sudo sed -i "s|/opt/StratosphereLinuxIPS|$SLIPS_PATH|g" /etc/systemd/system/stream-ad-blocker.service
+    
+    sudo systemctl daemon-reload
+    echo -e "${GREEN}[+]${NC} Systemd service installed (not started yet)"
+else
+    echo -e "${YELLOW}[!]${NC} Systemd service file not found - you'll need to start manually"
 fi
 echo ""
 
@@ -98,8 +143,7 @@ if [ -f "$SCRIPT_DIR/webinterface/app.py" ]; then
     cp "$SCRIPT_DIR/webinterface/app.py" "$SLIPS_PATH/webinterface/app.py"
     echo -e "    ${GREEN}[+]${NC} app.py installed successfully"
 else
-    echo -e "    ${RED}[!]${NC} app.py source file not found"
-    exit 1
+    echo -e "    ${YELLOW}[!]${NC} app.py not found - skipping (may already be in SLIPS)"
 fi
 
 # Install app.html
@@ -108,8 +152,7 @@ if [ -f "$SCRIPT_DIR/webinterface/templates/app.html" ]; then
     cp "$SCRIPT_DIR/webinterface/templates/app.html" "$SLIPS_PATH/webinterface/templates/app.html"
     echo -e "    ${GREEN}[+]${NC} app.html installed successfully"
 else
-    echo -e "    ${RED}[!]${NC} app.html source file not found"
-    exit 1
+    echo -e "    ${YELLOW}[!]${NC} app.html not found - skipping (may already be in SLIPS)"
 fi
 
 # Install dashboard.html
@@ -118,8 +161,7 @@ if [ -f "$SCRIPT_DIR/webinterface/templates/dashboard.html" ]; then
     cp "$SCRIPT_DIR/webinterface/templates/dashboard.html" "$SLIPS_PATH/webinterface/templates/dashboard.html"
     echo -e "    ${GREEN}[+]${NC} dashboard.html installed successfully"
 else
-    echo -e "    ${RED}[!]${NC} dashboard.html source file not found"
-    exit 1
+    echo -e "    ${YELLOW}[!]${NC} dashboard.html not found - skipping"
 fi
 
 # Enable active blocking by default in Redis
@@ -140,7 +182,7 @@ echo "Next steps:"
 echo "1. Start your SLIPS instance with traffic analysis"
 echo "2. Start the SLIPS web interface:"
 echo "   cd $SLIPS_PATH && ./webinterface.sh"
-echo "3. Start the stream ad blocker service:"
+echo "3. Enable and start the stream ad blocker service:"
 echo "   sudo systemctl enable --now stream-ad-blocker"
 echo "4. Open your browser to http://localhost:55000"
 echo "5. Click on the 'ML Detector' tab to view the dashboard"
@@ -155,8 +197,17 @@ echo "  - ml_detector:alerts"
 echo ""
 echo "Stream Ad Blocker Status:"
 echo "  - Blocking mode: ACTIVE (enabled by default)"
-echo "  - Targets: QUIC streams (UDP 443) - YouTube ads, etc."
+echo "  - Targets: QUIC streams (UDP 443) - YouTube, Twitch, etc."
+echo "  - Detection: Behavioral fingerprinting on encrypted flows"
 echo "  - Check status: redis-cli -n 1 HGETALL stream_ad_blocker:stats"
+echo "  - View logs: journalctl -u stream-ad-blocker.service -f"
+echo ""
+echo "Service management:"
+echo "  - Status:  sudo systemctl status stream-ad-blocker"
+echo "  - Start:   sudo systemctl start stream-ad-blocker"
+echo "  - Stop:    sudo systemctl stop stream-ad-blocker"
+echo "  - Restart: sudo systemctl restart stream-ad-blocker"
+echo "  - Logs:    journalctl -u stream-ad-blocker.service --since '10 minutes ago'"
 echo ""
 echo -e "${YELLOW}Backup location: $BACKUP_DIR${NC}"
 echo "If anything goes wrong, you can restore from the backup."
