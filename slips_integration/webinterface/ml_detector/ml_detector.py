@@ -2278,3 +2278,138 @@ def get_action_logs():
     except Exception as e:
         logger.error(f"Error getting logs: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@ml_detector.route("/feedback/analyze_batch", methods=['POST'])
+def analyze_batch_feedback():
+    """Use LLM to analyze detections and generate feedback labels"""
+    try:
+        import requests
+        
+        data = request.get_json()
+        detections = data.get('detections', [])
+        
+        if not detections:
+            return jsonify({"error": "No detections provided"}), 400
+        
+        # Get LLM configuration from Redis (DB 1)
+        llm_endpoint = redis_db1.get('stream_ad_blocker:llm_endpoint') or 'http://localhost:11434/v1'
+        llm_model = redis_db1.get('stream_ad_blocker:llm_model') or 'qwen2.5:3b'
+        llm_api_key = redis_db1.get('stream_ad_blocker:llm_api_key') or ''
+        
+        # Build analysis prompt
+        prompt = """You are an expert in network traffic analysis and ad detection. Analyze these QUIC flow detections and determine if they are true advertisements or false positives.
+
+Detection Patterns Explained:
+- quic_bumper: ≤6s ads (YouTube bumpers)
+- quic_skippable: 5-30s skippable ads
+- quic_unskippable: 15-30s non-skippable ads
+- quic_long_ad: 30-60s+ extended ads
+- quic_preroll_seq: Pre-roll ad sequence (high packet rate)
+- quic_beacon: Small tracking/analytics beacon
+- ad_pod: Multiple ads detected in sequence
+- quic_ad_bitrate: Byte-per-packet ratio typical of ads (1000-1300 vs 1350-1500 for content)
+
+Detections to analyze:
+"""
+        
+        # Add detection data
+        for i, det in enumerate(detections[:20]):  # Limit to 20 for token efficiency
+            prompt += f"\n{i+1}. IP: {det.get('dst_ip', 'unknown')}, "
+            prompt += f"Duration: {det.get('duration', 0):.1f}s, "
+            prompt += f"Bytes: {det.get('bytes', 0)}, "
+            prompt += f"Packets: {det.get('packets', 0)}, "
+            prompt += f"Confidence: {det.get('confidence', 0):.0%}, "
+            prompt += f"Method: {det.get('detection_method', 'unknown')}"
+        
+        prompt += """
+
+For each detection, respond with ONLY a JSON array like this:
+[
+  {"index": 1, "label": "true_positive", "confidence": 0.95, "reason": "30s duration + ad_pod pattern indicates ad sequence"},
+  {"index": 2, "label": "false_positive", "confidence": 0.60, "reason": "Beacon too small, likely telemetry"}
+]
+
+Labels: "true_positive" or "false_positive"
+Confidence: 0.0 to 1.0
+Reason: Brief explanation (one sentence)"""
+        
+        # Call LLM
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        if llm_api_key:
+            headers['Authorization'] = f'Bearer {llm_api_key}'
+        
+        llm_response = requests.post(
+            f"{llm_endpoint}/chat/completions",
+            headers=headers,
+            json={
+                "model": llm_model,
+                "messages": [
+                    {"role": "system", "content": "You are a network traffic analysis expert. Respond only with valid JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 2048
+            },
+            timeout=60
+        )
+        
+        if llm_response.status_code != 200:
+            logger.error(f"LLM API error: {llm_response.status_code} - {llm_response.text}")
+            return jsonify({"error": f"LLM API error: {llm_response.status_code}"}), 500
+        
+        llm_data = llm_response.json()
+        llm_content = llm_data['choices'][0]['message']['content']
+        
+        # Parse LLM response (extract JSON from potential markdown)
+        import re
+        json_match = re.search(r'\[.*\]', llm_content, re.DOTALL)
+        if json_match:
+            analysis = json.loads(json_match.group(0))
+        else:
+            analysis = json.loads(llm_content)
+        
+        # Store LLM feedback in Redis for training
+        for item in analysis:
+            idx = item.get('index', 0) - 1
+            if 0 <= idx < len(detections):
+                det = detections[idx]
+                feedback_entry = {
+                    'timestamp': datetime.now().isoformat(),
+                    'dst_ip': det.get('dst_ip'),
+                    'duration': det.get('duration'),
+                    'bytes': det.get('bytes'),
+                    'packets': det.get('packets'),
+                    'confidence': det.get('confidence'),
+                    'detection_method': det.get('detection_method'),
+                    'llm_label': item.get('label'),
+                    'llm_confidence': item.get('confidence'),
+                    'llm_reason': item.get('reason'),
+                    'source': 'llm_batch_analysis'
+                }
+                redis_db1.lpush('ml_detector:llm_feedback', json.dumps(feedback_entry))
+        
+        # Trim to keep last 10k
+        redis_db1.ltrim('ml_detector:llm_feedback', 0, 9999)
+        
+        # Update stats
+        redis_db1.hincrby('stream_ad_blocker:stats', 'llm_enhanced_detections', len(analysis))
+        
+        return jsonify({
+            "success": True,
+            "data": {
+                "analysis": analysis,
+                "model": llm_model,
+                "analyzed_count": len(analysis)
+            }
+        })
+        
+    except ImportError:
+        return jsonify({"error": "requests library not available"}), 500
+    except Exception as e:
+        logger.error(f"Error in LLM batch analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500

@@ -38,6 +38,8 @@ from datetime import datetime
 from collections import defaultdict
 import sys
 import os
+import threading
+import queue
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ml_ad_classifier import MLAdClassifier
@@ -63,8 +65,16 @@ class StreamAdBlocker:
             'ml_detections': 0,
             'slips_correlated': 0,
             'cdn_flow_blocks': 0,
-            'ad_server_blocks': 0
+            'ad_server_blocks': 0,
+            'llm_enhanced_detections': 0,
+            'llm_queue_size': 0,
+            'llm_processed': 0
         }
+        
+        # LLM background processing queue
+        self.llm_queue = queue.Queue()
+        self.llm_thread = None
+        self.llm_running = False
         
         # Load detection thresholds from Redis or use defaults
         self.load_thresholds()
@@ -239,7 +249,86 @@ class StreamAdBlocker:
         except Exception as e:
             print(f"[!] Failed to initialize history DB: {e}")
             self.history_db = None
-            self.logging_enabled = False
+    
+    def start_llm_background_processor(self):
+        """Start background thread to process LLM queue"""
+        if self.llm_thread is not None and self.llm_thread.is_alive():
+            return
+        
+        self.llm_running = True
+        self.llm_thread = threading.Thread(target=self._llm_processing_loop, daemon=True)
+        self.llm_thread.start()
+        print("[+] LLM background processor started", flush=True)
+    
+    def stop_llm_background_processor(self):
+        """Stop background LLM processor"""
+        self.llm_running = False
+        if self.llm_thread:
+            self.llm_thread.join(timeout=5)
+        print("[+] LLM background processor stopped", flush=True)
+    
+    def _llm_processing_loop(self):
+        """Background thread that processes LLM queue one-by-one"""
+        print("[LLM] Processing thread started", flush=True)
+        
+        while self.llm_running:
+            try:
+                # Block for 1 second waiting for queue item
+                detection_data = self.llm_queue.get(timeout=1.0)
+                
+                # Update queue size stat
+                self.stats['llm_queue_size'] = self.llm_queue.qsize()
+                
+                # Process with LLM
+                try:
+                    domain = detection_data['domain']
+                    flow_data = detection_data['flow_data']
+                    dst_ip = detection_data['dst_ip']
+                    dns_history = detection_data.get('dns_history')
+                    
+                    print(f"[LLM] Processing queued detection: {domain} ({dst_ip})", flush=True)
+                    
+                    # Call LLM classification
+                    is_ad_llm, llm_confidence, llm_method, llm_reasoning = self.classifier.classify_with_llm(
+                        domain, flow_data, dst_ip, 443, dns_history
+                    )
+                    
+                    # Save LLM-labeled sample to training dataset
+                    if llm_reasoning:
+                        features = self.classifier.extract_flow_features(flow_data, dst_ip, 443)
+                        self.classifier.save_training_sample(
+                            domain=domain,
+                            features=features,
+                            label=1 if is_ad_llm else 0,
+                            confidence=llm_confidence,
+                            method=llm_method,
+                            reasoning=llm_reasoning
+                        )
+                        
+                        self.stats['llm_enhanced_detections'] += 1
+                        self.stats['llm_processed'] += 1
+                        
+                        print(f"[LLM] ✓ Labeled {domain}: {llm_method} (confidence={llm_confidence:.2f})", flush=True)
+                        print(f"[LLM] Reasoning: {llm_reasoning[:100]}...", flush=True)
+                    
+                    # Update stats in Redis
+                    self.r_stats.set('ml_detector:stats', json.dumps(self.stats))
+                    
+                except Exception as e:
+                    print(f"[LLM] Error processing detection: {e}", flush=True)
+                
+                self.llm_queue.task_done()
+                
+                # Small delay to avoid overwhelming LLM
+                time.sleep(0.5)
+                
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"[LLM] Processing loop error: {e}", flush=True)
+                time.sleep(1)
+        
+        print("[LLM] Processing thread stopped", flush=True)
 
     def log_detection(self, domain, detection_data, flow_data, confidence, method, blocked=False):
         """Log detection to history database"""
@@ -968,6 +1057,11 @@ class StreamAdBlocker:
         print("[*] Starting Stream Ad Blocker & Telemetry Filter...", flush=True)
         print(f"   ML Classifier: {'Enabled' if self.classifier else 'Disabled'}", flush=True)
         
+        # Start LLM background processor
+        if self.classifier:
+            self.start_llm_background_processor()
+            print(f"   LLM Queue Processor: Started (threshold range: {self.llm_min_threshold}-{self.llm_max_threshold})", flush=True)
+        
         # Report blocking pattern counts
         blocklist_count = 0
         if self.blocklist_db:
@@ -1102,7 +1196,7 @@ class StreamAdBlocker:
                     detection_sources.append(f"SLIPS:{'+'.join(slips_evidence)}")
                     confidence_scores.append(slips_confidence)
                 
-                # 4. Use ML classifier with LLM enhancement
+                # 4. Use ML classifier with optional background LLM enhancement
                 if self.classifier and is_ad_flow:
                     # Get DNS history
                     dns_history = []
@@ -1113,49 +1207,35 @@ class StreamAdBlocker:
                     except:
                         pass
                     
-                    # Use hybrid ML+LLM classification
-                    is_ad_ml, ml_confidence, ml_method, llm_reasoning = self.classifier.classify_with_llm(
-                        domain, flow_data, dst_ip, 443, dns_history
+                    # Use fast ML classification (no LLM blocking)
+                    is_ad_ml, ml_confidence, ml_method = self.classifier.classify_flow(
+                        domain, flow_data, dst_ip, 443
                     )
                     
-                    # Save LLM-labeled sample to training dataset
-                    if llm_reasoning:
+                    # Queue for background LLM labeling if in threshold range
+                    if (self.llm_min_threshold <= ml_confidence <= self.llm_max_threshold):
                         try:
-                            features = self.classifier.extract_flow_features(flow_data, dst_ip, 443)
-                            self.classifier.save_training_sample(
-                                domain=domain,
-                                features=features,
-                                label=1 if is_ad_ml else 0,
-                                confidence=ml_confidence,
-                                method=ml_method,
-                                reasoning=llm_reasoning
-                            )
+                            # Add to queue for async LLM processing
+                            detection_data = {
+                                'domain': domain,
+                                'flow_data': flow_data,
+                                'dst_ip': dst_ip,
+                                'dns_history': dns_history,
+                                'ml_confidence': ml_confidence,
+                                'ml_method': ml_method,
+                                'timestamp': time.time(),
+                                'flow_id': flow_id
+                            }
+                            self.llm_queue.put_nowait(detection_data)
+                            self.stats['llm_queue_size'] = self.llm_queue.qsize()
+                            print(f"[→ LLM Queue] {domain} (conf={ml_confidence:.2f}, queue_size={self.llm_queue.qsize()})", flush=True)
+                        except queue.Full:
+                            print(f"[!] LLM queue full, skipping {domain}", flush=True)
                         except Exception as e:
-                            print(f"[!] Failed to save training sample: {e}")
+                            print(f"[!] Failed to queue for LLM: {e}", flush=True)
                     
                     if is_ad_ml:
-                        if llm_reasoning:
-                            detection_sources.append(f"ML+LLM:{ml_method}")
-                            self.stats['llm_enhanced_detections'] = self.stats.get('llm_enhanced_detections', 0) + 1
-                            # Store LLM reasoning
-                            try:
-                                self.r_stats.lpush('stream_blocker:llm_reasoning', 
-                                                   json.dumps({
-                                                       'timestamp': time.time(),
-                                                       'flow': flow_id,
-                                                       'dst_ip': dst_ip,
-                                                       'domain': domain,
-                                                       'confidence': ml_confidence,
-                                                       'reasoning': llm_reasoning,
-                                                       'flow_age': duration,
-                                                       'flow_bytes': bytes_sent
-                                                   }))
-                                self.r_stats.ltrim('stream_blocker:llm_reasoning', 0, 99)
-                            except:
-                                pass
-                        else:
-                            detection_sources.append(f"ML:{ml_method}")
-                        
+                        detection_sources.append(f"ML:{ml_method}")
                         confidence_scores.append(ml_confidence)
                         self.stats['ml_detections'] += 1
                 
@@ -1188,7 +1268,9 @@ class StreamAdBlocker:
                         'legitimate_streams': str(self.stats['total_analyzed'] - self.stats['ads_detected']),
                         'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                         'blocking_status': 'Active' if blocking_enabled else 'Monitoring Only',
-                        'llm_enhanced_detections': str(self.stats.get('llm_enhanced_detections', 0))
+                        'llm_enhanced_detections': str(self.stats.get('llm_enhanced_detections', 0)),
+                        'llm_queue_size': str(self.stats.get('llm_queue_size', 0)),
+                        'llm_processed': str(self.stats.get('llm_processed', 0))
                     }
                     self.r_stats.hset('stream_ad_blocker:stats', mapping=stats_update)
                 
@@ -1212,12 +1294,17 @@ if __name__ == '__main__':
         blocker.monitor_flows()
     except KeyboardInterrupt:
         print("\n\n[*] Stream Ad Blocker stopped")
-        if blocker and hasattr(blocker, 'classifier'):
-            print("[*] Flushing training samples...")
-            blocker.classifier.flush_training_samples()
+        if blocker:
+            print("[*] Stopping LLM background processor...")
+            blocker.stop_llm_background_processor()
+            if hasattr(blocker, 'classifier'):
+                print(f"[*] Flushing training samples... (LLM processed: {blocker.stats.get('llm_processed', 0)})")
+                blocker.classifier.flush_training_samples()
     except Exception as e:
         print(f"\n[!] Fatal error: {e}")
         import traceback
         traceback.print_exc()
-        if blocker and hasattr(blocker, 'classifier'):
-            blocker.classifier.flush_training_samples()
+        if blocker:
+            blocker.stop_llm_background_processor()
+            if hasattr(blocker, 'classifier'):
+                blocker.classifier.flush_training_samples()

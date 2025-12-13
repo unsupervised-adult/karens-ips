@@ -400,11 +400,42 @@
           <div class="row mb-4">
             <div class="col-12">
               <div class="card border-secondary">
-                <div class="card-header bg-light text-dark">
+                <div class="card-header bg-light text-dark d-flex justify-content-between align-items-center">
                   <h6 class="mb-0">Detection Feedback & Model Training</h6>
+                  <button class="btn btn-sm btn-primary" id="btn_llm_analyze_feedback">
+                    <i class="bi bi-robot"></i> Refresh LLM Stats
+                  </button>
                 </div>
                 <div class="card-body">
-                  <p class="text-muted">Provide feedback on recent detections to improve model accuracy</p>
+                  <!-- LLM Auto-Labeling Stats -->
+                  <div class="row mb-3">
+                    <div class="col-md-4">
+                      <div class="card bg-light">
+                        <div class="card-body text-center">
+                          <h3 class="mb-0 text-primary" id="llm_labeled_count">-</h3>
+                          <small class="text-muted">LLM Auto-Labeled</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="card bg-light">
+                        <div class="card-body text-center">
+                          <h3 class="mb-0 text-success" id="pattern_matched_count">-</h3>
+                          <small class="text-muted">Pattern-Matched</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="card bg-light">
+                        <div class="card-body text-center">
+                          <h3 class="mb-0 text-info" id="llm_confidence_range">-</h3>
+                          <small class="text-muted">LLM Threshold Range</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <p class="text-muted">LLM automatically labels flows with confidence in the threshold range. High-confidence flows use pattern matching only.</p>
+                  <div id="llm_analysis_status" class="alert alert-info" style="display: none;"></div>
                   <div class="table-responsive">
                     <table id="feedback_table" class="table table-sm table-hover">
                       <thead>
@@ -413,12 +444,22 @@
                           <th>Source IP</th>
                           <th>Classification</th>
                           <th>Confidence</th>
+                          <th>Labeling Method</th>
+                          <th>LLM Reasoning</th>
                           <th>Feedback</th>
                         </tr>
                       </thead>
                       <tbody>
                       </tbody>
                     </table>
+                  </div>
+                  <div class="mt-3">
+                    <small class="text-muted">
+                      <strong>Labeling Methods:</strong>
+                      <span class="badge bg-primary ms-2"><i class="bi bi-robot"></i> ML+LLM</span> Auto-labeled by LLM (saved for training)
+                      <span class="badge bg-success ms-2"><i class="bi bi-check-circle"></i> Pattern</span> High-confidence pattern match
+                      <span class="badge bg-info ms-2"><i class="bi bi-cpu"></i> ML-Only</span> ML model classification
+                    </small>
                   </div>
                 </div>
               </div>
