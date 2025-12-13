@@ -168,16 +168,6 @@
 
     // Initialize Bootstrap tabs to ensure proper show/hide behavior
     $(document).ready(function() {
-      // Ensure only active tab is visible on load
-      $('#nav-tabContent .tab-pane').not('.show.active').hide();
-      
-      // Handle MAIN tab clicks only (not sub-tabs within ML IPS)
-      $('#nav-pills a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-        var target = $(e.target).attr("data-bs-target");
-        $('#nav-tabContent > .tab-pane').hide();
-        $(target).show();
-      });
-      
       // Remove focus from navigation buttons after clicking
       $('.nav-link, .dropdown-toggle').on('click', function() {
         setTimeout(() => {
