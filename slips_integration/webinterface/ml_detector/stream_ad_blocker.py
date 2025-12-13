@@ -1197,7 +1197,8 @@ class StreamAdBlocker:
                     confidence_scores.append(slips_confidence)
                 
                 # 4. Use ML classifier with optional background LLM enhancement
-                if self.classifier and is_ad_flow:
+                # Run ML on all flows for better detection and LLM training data
+                if self.classifier:
                     # Get DNS history
                     dns_history = []
                     try:
