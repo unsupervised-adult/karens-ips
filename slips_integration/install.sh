@@ -19,6 +19,45 @@ echo -e "${GREEN}Karen's IPS ML Detector - SLIPS Web UI Integration Installer${N
 echo "=============================================================="
 echo ""
 
+# Show Git Information
+echo "Pre-installation checks..."
+if command -v git &> /dev/null && [ -d "$SCRIPT_DIR/../.git" ]; then
+    CURRENT_BRANCH=$(cd "$SCRIPT_DIR/.." && git branch --show-current 2>/dev/null || echo "unknown")
+    LATEST_COMMIT=$(cd "$SCRIPT_DIR/.." && git log -1 --oneline 2>/dev/null || echo "unknown")
+    echo -e "${GREEN}[+]${NC} Git branch: ${YELLOW}$CURRENT_BRANCH${NC}"
+    echo -e "${GREEN}[+]${NC} Latest commit: $LATEST_COMMIT"
+else
+    echo -e "${YELLOW}[!]${NC} Not a git repository or git not installed"
+fi
+
+# Verify critical source files exist
+echo ""
+echo "Checking source files..."
+MISSING_FILES=0
+declare -a SOURCE_FILES=(
+    "$SCRIPT_DIR/webinterface/app.py"
+    "$SCRIPT_DIR/webinterface/templates/app.html"
+    "$SCRIPT_DIR/webinterface/templates/dashboard.html"
+    "$SCRIPT_DIR/webinterface/ml_detector/ml_detector.py"
+    "$SCRIPT_DIR/webinterface/suricata_config/suricata_config.py"
+)
+
+for file in "${SOURCE_FILES[@]}"; do
+    if [ -f "$file" ]; then
+        echo -e "${GREEN}✓${NC} $(basename "$file") found in source"
+    else
+        echo -e "${RED}✗${NC} Missing source file: $file"
+        MISSING_FILES=1
+    fi
+done
+
+if [ $MISSING_FILES -eq 1 ]; then
+    echo -e "${RED}[!] Critical source files are missing!${NC}"
+    echo -e "${YELLOW}Make sure you're on the correct git branch with all fixes.${NC}"
+    exit 1
+fi
+echo ""
+
 # Check if SLIPS path is provided
 if [ -z "$1" ]; then
     echo -e "${RED}Error: Please provide the path to your StratosphereLinuxIPS installation${NC}"
@@ -147,7 +186,7 @@ echo ""
 echo "Verifying installation..."
 VERIFICATION_FAILED=0
 
-# Check critical files
+# Check critical files with detailed info
 declare -a CRITICAL_FILES=(
     "$SLIPS_PATH/webinterface/app.py"
     "$SLIPS_PATH/webinterface/templates/app.html"
@@ -158,14 +197,20 @@ declare -a CRITICAL_FILES=(
 
 for file in "${CRITICAL_FILES[@]}"; do
     if [ -f "$file" ]; then
-        echo -e "${GREEN}✓${NC} $(basename "$file") deployed"
+        FILE_SIZE=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+        echo -e "${GREEN}✓${NC} $(basename "$file") deployed (${FILE_SIZE} bytes)"
     else
         echo -e "${RED}✗${NC} Missing: $file"
         VERIFICATION_FAILED=1
     fi
 done
 
+echo ""
+echo "Deployed templates:"
+ls -lh "$SLIPS_PATH/webinterface/templates/" 2>/dev/null | grep -E "\.html$" | awk '{print "  - " $9 " (" $5 ")"}'
+
 if [ $VERIFICATION_FAILED -eq 1 ]; then
+    echo ""
     echo -e "${RED}[!] Installation verification failed!${NC}"
     echo -e "${YELLOW}Some files are missing. Please check the errors above.${NC}"
     exit 1
