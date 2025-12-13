@@ -856,6 +856,46 @@ def sync_database_to_suricata():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@suricata_bp.route('/api/database/domain', methods=['POST'])
+def manage_domain():
+    """Handle domain whitelisting by removing from blocked_domains table"""
+    try:
+        import sqlite3
+        data = request.get_json()
+        domain = data.get('domain')
+        action = data.get('action')
+
+        if not domain:
+            return jsonify({'error': 'Domain is required'}), 400
+
+        if action != 'whitelist':
+            return jsonify({'error': 'Invalid action. Only "whitelist" is supported'}), 400
+
+        # Connect to database and remove domain from blocked_domains
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        # Delete domain from blocked_domains table (whitelisting it)
+        cursor.execute("DELETE FROM blocked_domains WHERE domain = ?", (domain,))
+        rows_affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+
+        if rows_affected > 0:
+            return jsonify({
+                'success': True,
+                'message': f'Domain {domain} whitelisted successfully'
+            })
+        else:
+            # Domain wasn't in blocklist, but that's still success
+            return jsonify({
+                'success': True,
+                'message': f'Domain {domain} was not in blocklist'
+            })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @suricata_bp.route('/api/tls-sni/generate-rules', methods=['POST'])
 def generate_tls_sni_rules():
     """
