@@ -1,5 +1,31 @@
 <div class="ml-detector-container">
 
+  <!-- ML IPS Stats -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h6 class="text-muted mb-3">Behavioral Analysis</h6>
+          <p class="mb-1"><strong>Flows Analyzed:</strong> <span id="stat_total_analyzed">0</span></p>
+          <p class="mb-1"><strong>Suspicious Flows:</strong> <span id="stat_ads_detected" class="text-danger">0</span></p>
+          <p class="mb-1"><strong>Legitimate Flows:</strong> <span id="stat_legitimate" class="text-success">0</span></p>
+          <p class="mb-0"><strong>Model Accuracy:</strong> <span id="stat_accuracy" class="text-info">0%</span></p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h6 class="text-muted mb-3">Protocol Analysis</h6>
+          <p class="mb-1"><strong>Streams Analyzed:</strong> <span id="stream_total_analyzed">0</span></p>
+          <p class="mb-1"><strong>Syndication Filtered:</strong> <span id="stream_ads_detected" class="text-danger">0</span></p>
+          <p class="mb-1"><strong>Endpoints Filtered:</strong> <span id="stream_ips_blocked">0</span></p>
+          <p class="mb-0"><strong>Status:</strong> <span id="stream_status" class="text-success">Unknown</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Detection Settings -->
   <div class="row mb-4">
     <div class="col-12">
