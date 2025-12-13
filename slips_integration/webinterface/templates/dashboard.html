@@ -402,18 +402,19 @@ function loadDashboardStats() {
   fetch('/ml_detector/stream_stats')
     .then(response => response.json())
     .then(data => {
-      if (data.success) {
+      if (data.success && data.data) {
         document.getElementById('dash_stream_total_analyzed').textContent = 
-          data.stats.total_analyzed || 0;
+          data.data.total_analyzed || 0;
         document.getElementById('dash_stream_ads_detected').textContent = 
-          data.stats.ads_detected || 0;
+          data.data.ads_detected || 0;
         document.getElementById('dash_stream_ips_blocked').textContent = 
-          data.stats.ips_blocked || 0;
+          data.data.ips_blocked || 0;
         document.getElementById('dash_stream_flows_dropped').textContent = 
-          data.stats.flows_dropped || 0;
+          data.data.flows_dropped || 0;
         
-        const status = data.stats.blocking_enabled ? 'Blocking Enabled' : 'Monitoring Only';
-        const statusClass = data.stats.blocking_enabled ? 'text-success' : 'text-warning';
+        const blockingStatus = data.data.blocking_status || 'Unknown';
+        const status = blockingStatus === 'enabled' ? 'Blocking Enabled' : 'Monitoring Only';
+        const statusClass = blockingStatus === 'enabled' ? 'text-success' : 'text-warning';
         const statusEl = document.getElementById('dash_stream_status');
         statusEl.textContent = status;
         statusEl.className = 'stat-value ' + statusClass;

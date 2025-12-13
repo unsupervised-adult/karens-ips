@@ -288,6 +288,19 @@ def set_thresholds():
 def get_detection_history():
     """Get detection history from SQLite database"""
     try:
+        import os
+        db_path = '/var/lib/stream_ad_blocker/detection_history.db'
+        
+        # Check if database exists
+        if not os.path.exists(db_path):
+            return jsonify({
+                "success": True,
+                "data": [],
+                "total": 0,
+                "limit": request.args.get('limit', 100, type=int),
+                "offset": request.args.get('offset', 0, type=int)
+            })
+        
         limit = request.args.get('limit', 100, type=int)
         offset = request.args.get('offset', 0, type=int)
         platform_filter = request.args.get('platform', None)
@@ -296,7 +309,7 @@ def get_detection_history():
         if platform_filter == '':
             platform_filter = None
         
-        history_db = sqlite3.connect('/var/lib/stream_ad_blocker/detection_history.db')
+        history_db = sqlite3.connect(db_path)
         history_db.row_factory = sqlite3.Row
         
         query = "SELECT * FROM detections"
