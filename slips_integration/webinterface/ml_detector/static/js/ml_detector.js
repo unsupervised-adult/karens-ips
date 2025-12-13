@@ -28,6 +28,12 @@ function initializeMLDetector() {
         return;
     }
     
+    // Only initialize if ML IPS tab is actually active
+    if (!$('#nav-ml-detector').hasClass('active') && !$('#nav-ml-detector').hasClass('show')) {
+        console.log("ML Detector: Tab not active, skipping initialization");
+        return;
+    }
+    
     console.log("ML Detector: Initializing...");
 
     // Initialize charts
@@ -47,6 +53,15 @@ function initializeMLDetector() {
 
     isInitialized = true;
     console.log("ML Detector: Initialized successfully");
+}
+
+// Function to stop ML Detector when switching tabs
+function stopMLDetector() {
+    console.log("ML Detector: Stopping refresh interval");
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+    }
 }
 
 // ----------------------------------------
@@ -77,6 +92,12 @@ console.log("ML Detector JS: Script loaded");
             initializeMLDetector();
         });
         
+        // Stop when switching away from ML Detector tab
+        $('#nav-ml-detector-tab').on('hidden.bs.tab', function (e) {
+            console.log("ML Detector: Tab hidden, stopping...");
+            stopMLDetector();
+        });
+        
         // Also try click event as backup
         $('#nav-ml-detector-tab').on('click', function (e) {
             console.log("ML Detector: Tab clicked");
@@ -94,10 +115,11 @@ console.log("ML Detector JS: Script loaded");
             initializeMLDetector();
         }
         
-        // Force initialize after delay to ensure stats load even if tab events don't fire
+        // Force initialize after delay ONLY if ML IPS tab is active
         setTimeout(function() {
             console.log("ML Detector: Force initialization check");
-            if ($('#nav-ml-detector-tab').length > 0 && !isInitialized) {
+            if ($('#nav-ml-detector-tab').length > 0 && !isInitialized && 
+                ($('#nav-ml-detector').hasClass('active') || $('#nav-ml-detector').hasClass('show'))) {
                 console.log("ML Detector: Forcing initialization");
                 initializeMLDetector();
             }
