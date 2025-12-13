@@ -112,6 +112,16 @@ else
     exit 1
 fi
 
+# Install dashboard.html
+echo "  - Installing webinterface/templates/dashboard.html"
+if [ -f "$SCRIPT_DIR/webinterface/templates/dashboard.html" ]; then
+    cp "$SCRIPT_DIR/webinterface/templates/dashboard.html" "$SLIPS_PATH/webinterface/templates/dashboard.html"
+    echo -e "    ${GREEN}[+]${NC} dashboard.html installed successfully"
+else
+    echo -e "    ${RED}[!]${NC} dashboard.html source file not found"
+    exit 1
+fi
+
 # Enable active blocking by default in Redis
 echo "Configuring stream ad blocker..."
 if command -v redis-cli &> /dev/null; then
