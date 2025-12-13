@@ -285,18 +285,49 @@ function updateDashboardPerformance() {
 }
 
 function loadDashboardStats() {
-  // Stats cards removed - no longer need to fetch or update them
+  // Fetch system information from general API
+  fetch('/general/stats')
+    .then(response => response.json())
+    .then(data => {
+      if (data) {
+        const versionEl = document.getElementById('dash_ips_version');
+        const uptimeEl = document.getElementById('dash_uptime');
+        const profilesEl = document.getElementById('dash_num_profiles');
+        const alertsEl = document.getElementById('dash_num_alerts');
+        
+        if (versionEl && data.version) versionEl.textContent = data.version;
+        if (uptimeEl && data.uptime) uptimeEl.textContent = data.uptime;
+        if (profilesEl && data.profiles !== undefined) profilesEl.textContent = data.profiles;
+        if (alertsEl && data.alerts !== undefined) alertsEl.textContent = data.alerts;
+      }
+    })
+    .catch(err => {
+      console.error('Error loading system info:', err);
+      // Set fallback values
+      const versionEl = document.getElementById('dash_ips_version');
+      const uptimeEl = document.getElementById('dash_uptime');
+      if (versionEl) versionEl.textContent = 'Unknown';
+      if (uptimeEl) uptimeEl.textContent = 'Unknown';
+    });
+  
+  // Fetch recent activity
+  const activityEl = document.getElementById('dash_recent_activity');
+  if (activityEl) {
+    activityEl.innerHTML = '<p class="text-muted mb-0 small">No recent activity</p>';
+  }
 }
 
 function initDashboard() {
   console.log('Initializing dashboard...');
   initDashboardCharts();
+  loadDashboardStats();
   updateDashboardPerformance();
   
   if (dashRefreshInterval) {
     clearInterval(dashRefreshInterval);
   }
   dashRefreshInterval = setInterval(() => {
+    loadDashboardStats();
     updateDashboardPerformance();
   }, DASH_REFRESH_INTERVAL);
 }
