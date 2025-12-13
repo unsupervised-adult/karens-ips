@@ -286,7 +286,7 @@ function updateDashboardPerformance() {
 
 function loadDashboardStats() {
   // Fetch system information from the new API endpoint
-  fetch('/api/system_info')
+  fetch('/api/system_info?v=' + Date.now())
     .then(response => response.json())
     .then(data => {
       const versionEl = document.getElementById('dash_ips_version');
