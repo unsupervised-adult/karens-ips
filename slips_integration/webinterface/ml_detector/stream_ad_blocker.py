@@ -138,6 +138,24 @@ class StreamAdBlocker:
             'ttvnw.net'
         ]
         
+        # Legitimate enterprise services (never block)
+        self.enterprise_whitelist = [
+            'tanium.com',         # Endpoint management
+            'rapid7.com',         # Security monitoring
+            'crowdstrike.com',
+            'sentinelone.com',
+            'carbon black.com',
+            'paloaltonetworks.com',
+            'okta.com',
+            'duo.com',
+            'office365.com',
+            'microsoftonline.com',
+            'office.com',
+            'microsoft.com',
+            'windows.net',
+            'azure.com'
+        ]
+        
         # Ad control plane domains (safe to block - only affect ad decisioning)
         self.ad_control_plane = [
             'doubleclick.net',
@@ -1170,6 +1188,16 @@ class StreamAdBlocker:
                 # If no domain found, use IP
                 if not domain:
                     domain = dst_ip
+                
+                # Skip enterprise/legitimate services
+                if domain != dst_ip:
+                    skip_flow = False
+                    for whitelist_domain in self.enterprise_whitelist:
+                        if whitelist_domain in domain.lower():
+                            skip_flow = True
+                            break
+                    if skip_flow:
+                        continue  # Skip to next flow in main loop
                 
                 # Multi-source detection pipeline
                 detection_sources = []

@@ -294,11 +294,7 @@ class MLAdClassifier:
         Hybrid classification: pattern matching + ML
         Returns: (is_ad, confidence, method)
         """
-        pattern_match = self.is_ad_domain_pattern(domain)
-        
-        if not pattern_match:
-            return False, 0.0, "pattern_rejected"
-        
+        # Extract features first (ML runs independently now)
         features = self.extract_flow_features(profile_data, dst_ip, dst_port)
         
         try:
@@ -306,13 +302,33 @@ class MLAdClassifier:
             ml_prediction = self.model.predict(features_scaled)[0]
             ml_confidence = self.model.predict_proba(features_scaled)[0]
             
+            # Return ML classification with actual confidence
             if ml_prediction == 1:
-                confidence = max(ml_confidence[1], 0.70)
-                return True, confidence, "hybrid_ml_pattern"
+                # Ad detected by ML
+                confidence = max(ml_confidence[1], 0.50)
+                
+                # Boost confidence if domain also matches ad pattern
+                pattern_match = self.is_ad_domain_pattern(domain)
+                if pattern_match:
+                    confidence = min(1.0, confidence + 0.15)
+                    return True, confidence, "hybrid_ml_pattern"
+                else:
+                    return True, confidence, "ml_only"
             else:
-                return False, ml_confidence[0], "ml_rejected_pattern"
-        except:
-            return True, 0.85, "pattern_only"
+                # Not an ad according to ML
+                # But check pattern as fallback for known ad domains
+                pattern_match = self.is_ad_domain_pattern(domain)
+                if pattern_match:
+                    return True, 0.75, "pattern_only"
+                else:
+                    return False, ml_confidence[0], "ml_rejected"
+        except Exception as e:
+            # ML failed, fall back to pattern matching
+            pattern_match = self.is_ad_domain_pattern(domain)
+            if pattern_match:
+                return True, 0.70, "pattern_only"
+            else:
+                return False, 0.0, "ml_error"
     
     def retrain_on_feedback(self, new_samples_X, new_labels_y):
         """Incrementally retrain model with new labeled data"""
