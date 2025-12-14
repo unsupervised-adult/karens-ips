@@ -59,4 +59,5 @@ slips_patches/
 !slips_patches/slips_files/core/database/
 !slips_patches/slips_files/core/database/redis_db/
 !slips_patches/slips_files/core/database/redis_db/database.py
+StratosphereLinuxIPS/
 blocklists/
