@@ -379,7 +379,7 @@ redis-cli -n 1 SET ml_detector:blocking_enabled 1                # 1=active, 0=m
 2. Analyzes QUIC flows (UDP port 443) for behavioral fingerprints
 3. Pattern matching on packet rates, byte sizes, duration, burst timing
 4. ML model (ad_classifier_model.pkl) provides additional classification
-5. Blocks via URL/IP blocklist or Suricata NFQUEUE flow dropping
+5. **Triple blocking:** conntrack flow drops, Suricata dataset injection, nftables IP blacklist
 6. No payload decryption - analyzes flow metadata only
 
 **Troubleshooting:**
@@ -387,21 +387,31 @@ redis-cli -n 1 SET ml_detector:blocking_enabled 1                # 1=active, 0=m
 # Check if service is receiving flows
 journalctl -u stream-ad-blocker --since '1 minute ago' | grep "Processing flow"
 
-# Verify SLIPS is publishing flows
+# Verify SLIPS is publishing flows (Zeek flows via Redis)
 redis-cli -n 0 PUBSUB CHANNELS | grep new_flow
 
-# Check for detection patterns
-journalctl -u stream-ad-blocker --since '5 minutes ago' | grep -E "quic_|preroll|ad_pod"
+# Check for ad detections and blocks
+journalctl -u stream-ad-blocker --since '5 minutes ago' | grep -E "BLOCKED|ad_pod|preroll"
 
-# View blocked IPs
-redis-cli -n 1 SMEMBERS stream_ad_blocker:blocked_ips
+# View conntrack flow drops (live connections terminated)
+sudo conntrack -L | wc -l  # Total connections
+redis-cli -n 1 GET stream_ad_blocker:stats  # Check flows_dropped counter
+
+# View Suricata dataset blocks (flow tuples)
+redis-cli -n 1 SMEMBERS stream_blocker:blocked_flows
+sudo cat /var/lib/suricata/datasets/llm-blocked-flows.lst
+
+# View nftables IP blacklist (persistent ad servers)
+sudo nft list set inet home blocked4 | grep "elements"
 
 # Clear all blocks
-redis-cli -n 1 DEL stream_ad_blocker:blocked_ips
-redis-cli -n 1 DEL stream_ad_blocker:blocked_urls
+redis-cli -n 1 DEL stream_blocker:blocked_flows
+sudo rm /var/lib/suricata/datasets/llm-blocked-flows.lst
+# Note: conntrack blocks are temporary (flow-level), nftables requires manual cleanup
 ```
 
 **Performance Tuning:**
+
 - Lower thresholds = more detections, more false positives
 - Higher thresholds = fewer false positives, may miss some ads
 - LLM zone (25-75%) captures borderline cases for training data
