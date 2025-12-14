@@ -2,37 +2,57 @@
 
 **SLIPS + Suricata IPS** extended for privacy, telemetry blocking, and streaming ad removal while maintaining full network security functionality.
 
+## ⚠️ Project Status (December 2025)
+
+**Production-Ready:**
+- ✅ Core IPS stack (SLIPS + Suricata + Zeek) with inline nftables blocking
+- ✅ Threat detection, behavioral analysis, C2 blocking
+- ✅ 350K+ telemetry/tracking domain blocklists (hagezi/perflyst)
+- ✅ NGINX HTTPS reverse proxy with authentication
+- ✅ Modular installer with 19 automated phases
+
+**Known Issues:**
+- ⚠️ **SLIPS Web UI** - Currently has app.py syntax error preventing startup (fix in progress)
+- ⚠️ **ML Detector Dashboard** - Inaccessible until Web UI fixed
+- ⚠️ **stream_ad_blocker** - Service installed but requires testing and configuration
+- ⚠️ **ad_flow_blocker** - SLIPS module code exists but not yet in installer
+
+**Recommendation:** Core IPS functionality is stable and working. ML/ad-blocking features are experimental. Use for network security; privacy extensions need additional configuration.
+
 ## Overview
 
 Built on Stratosphere SLIPS (behavioral IPS) and Suricata (signature-based IPS), this system adds privacy-focused extensions:
-- **Streaming ad blocking** via QUIC flow analysis (YouTube, Twitch, etc.)
-- **Telemetry filtering** with 350K+ tracking domain datasets
-- **Privacy protection** through TLS SNI inspection and DNS blocking
-- **Custom SLIPS modules** for flow-level ad removal
-- **ML-powered detection** with automatic training data collection
+- **Telemetry filtering** with 350K+ tracking domain datasets ✅ **WORKING**
+- **Privacy protection** through TLS SNI inspection and DNS blocking ✅ **WORKING**
+- **Streaming ad blocking (EXPERIMENTAL)** via QUIC flow analysis - needs configuration
+- **Custom SLIPS modules (IN DEVELOPMENT)** for flow-level ad removal
+- **ML-powered detection (EXPERIMENTAL)** with automatic training data collection
 
 Core security features remain intact: threat detection, C2 blocking, malware prevention, behavioral profiling.
 
 ## Features
 
-### Core IPS (SLIPS + Suricata)
+### Core IPS (SLIPS + Suricata) ✅ PRODUCTION-READY
 - **SLIPS Behavioral Analysis** - ML-powered threat detection, IP reputation, C2 detection
 - **Suricata Signature IPS** - 12+ threat intelligence sources, NFQUEUE inline blocking
 - **Zeek Protocol Analysis** - Flow extraction, protocol parsing, conn/dns/http logs
-- **Real-Time Blocking** - nftables IP blacklisting, flow-level drops via conntrack
+- **Real-Time Blocking** - nftables IP blacklisting, conntrack flow termination
+- **Modular Architecture** - 19-phase installer, systemd service management
+- **NGINX Reverse Proxy** - HTTPS access with basic authentication
 
-### Privacy & Ad Blocking Extensions
-- **Streaming Ad Blocking** - QUIC behavioral fingerprinting for encrypted video ads
+### Privacy & Telemetry Blocking ✅ WORKING
 - **Telemetry Filtering** - 350K+ tracking/analytics domains (hagezi, perflyst)
-- **TLS SNI Inspection** - Blocks HTTPS ads at handshake (bypasses encrypted DNS)
-- **Custom SLIPS Module** - ad_flow_blocker for surgical flow removal
+- **TLS SNI Inspection** - Blocks HTTPS trackers at handshake (bypasses encrypted DNS)
 - **Dataset-Based Blocking** - O(1) hash lookup, Suricata dataset integration
+- **DNS/HTTP/TLS Rules** - Unified blocklist across all protocol layers
 
-### Intelligence & Automation
-- **LLM Integration** - OpenAI/Ollama for threat analysis and ad classification
-- **Auto Training Data** - High/low confidence samples saved automatically
-- **Private IP Filtering** - RFC1918 exemptions prevent internal network false positives
-- **Web Management** - Live dashboards, ML detector metrics, configuration UI
+### Experimental Features ⚠️ IN DEVELOPMENT
+- **Streaming Ad Blocking (EXPERIMENTAL)** - QUIC behavioral fingerprinting (installed, needs testing)
+- **Custom SLIPS Module (NOT YET INSTALLED)** - ad_flow_blocker code exists, installer update needed
+- **ML Detector Dashboard (BROKEN)** - Web UI syntax error preventing startup
+- **LLM Integration (NOT CONFIGURED)** - Infrastructure ready, requires API keys
+- **Auto Training Data (UNTESTED)** - Code exists in stream_ad_blocker.py
+- **Web Management (PARTIALLY WORKING)** - NGINX proxy works, Flask app has startup issue
 
 ## Installation
 
@@ -458,7 +478,44 @@ GPL-2.0
 
 ## Troubleshooting
 
-**Services not starting:**
+### Known Issue: SLIPS Web UI Won't Start
+
+**Symptom:**
+```bash
+$ sudo systemctl status slips-webui
+● slips-webui.service - SLIPS Web Interface
+     Active: activating (auto-restart) (Result: exit-code)
+```
+
+**Error in logs:**
+```
+IndentationError: unexpected indent
+File "/opt/StratosphereLinuxIPS/webinterface/app.py", line 69
+```
+
+**Root Cause:**
+The slips_integration installer uses a pre-modified `app.py` file that has incorrect indentation from multiple ml_detector blueprint registrations.
+
+**Temporary Workaround:**
+The core IPS functionality (SLIPS analysis, Suricata blocking, threat detection) works fine without the web UI. You can monitor via command line:
+```bash
+# View SLIPS detections
+journalctl -fu slips | grep -i alert
+
+# View Suricata blocks
+tail -f /var/log/suricata/fast.log
+
+# Check Redis stats
+redis-cli -n 0 keys "*"
+redis-cli -n 1 HGETALL ml_detector:stats
+```
+
+**Permanent Fix:**
+A corrected installer is being prepared. For now, core IPS features work correctly even without the web interface.
+
+---
+
+### Services Not Starting
 
 ```bash
 systemctl status suricata slips
@@ -466,7 +523,7 @@ journalctl -xeu suricata
 suricata -T -c /etc/suricata/suricata.yaml
 ```
 
-**No blocking:**
+### No Blocking
 
 ```bash
 tail -f /var/log/suricata/fast.log
@@ -474,7 +531,7 @@ nft list ruleset | grep forward
 suricatasc -c "dataset-list"
 ```
 
-**Interface issues:**
+### Interface Issues
 
 ```bash
 ip link show br0
