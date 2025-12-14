@@ -146,7 +146,7 @@ create_directories() {
 }
 
 install_module() {
-    print_status "Installing SLIPS module..."
+    print_status "Installing SLIPS modules..."
 
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -163,6 +163,12 @@ install_module() {
     fi
 
     print_success "Module files copied"
+    
+    if [[ -d "${SCRIPT_DIR}/slips_integration/modules/ad_flow_blocker" ]]; then
+        print_status "Installing ad_flow_blocker module..."
+        cp -r "${SCRIPT_DIR}/slips_integration/modules/ad_flow_blocker" "${SLIPS_DIR}/modules/"
+        print_success "ad_flow_blocker module installed"
+    fi
 }
 
 install_models() {
@@ -258,6 +264,32 @@ configure_redis_thresholds() {
     fi
 }
 
+enable_slips_module() {
+    print_status "Enabling ad_flow_blocker in SLIPS config..."
+    
+    SLIPS_CONFIG="${SLIPS_DIR}/config/slips.yaml"
+    
+    if [[ -f "${SLIPS_CONFIG}" ]]; then
+        if grep -q "ad_flow_blocker" "${SLIPS_CONFIG}"; then
+            print_success "ad_flow_blocker already enabled"
+        else
+            sed -i '/^  enable:/a\    - ad_flow_blocker' "${SLIPS_CONFIG}"
+            print_success "ad_flow_blocker enabled in SLIPS config"
+        fi
+    else
+        print_warning "SLIPS config not found, skipping auto-enable"
+    fi
+    
+    if command -v conntrack &> /dev/null; then
+        print_success "conntrack already installed"
+    else
+        print_status "Installing conntrack for flow-level blocking..."
+        apt-get update -qq
+        apt-get install -y conntrack > /dev/null 2>&1
+        print_success "conntrack installed"
+    fi
+}
+
 set_permissions() {
     print_status "Setting permissions..."
 
@@ -307,12 +339,20 @@ print_next_steps() {
     echo "  - Redis detection thresholds set"
     echo "  - LLM auto-labeling range: 0.30 - 0.95"
     echo "  - Enterprise whitelist: Tanium, Rapid7, Microsoft, etc."
+    echo "  - ad_flow_blocker module enabled in SLIPS"
+    echo "  - conntrack installed for flow-level blocking"
     echo
     echo "System architecture:"
     echo "  - ML-first detection (runs on all flows)"
     echo "  - Pattern matching as confidence boost"
     echo "  - LLM auto-labeling for training data"
     echo "  - Self-improving hybrid ML+LLM pipeline"
+    echo "  - Flow-level ad blocking via conntrack (surgical precision)"
+    echo
+    echo "Blocking methods:"
+    echo "  - Slips blocking module: IP-level blocking (malicious IPs)"
+    echo "  - ad_flow_blocker module: Flow-level blocking (in-stream ads)"
+    echo "  - Thresholds: YouTube=0.60, CDN=0.85, ControlPlane=0.70"
     echo
     echo "Next steps:"
     echo
@@ -325,12 +365,12 @@ print_next_steps() {
     echo "2. Deploy the model:"
     echo "   sudo ./deployment/update_model.sh --model models/ad_detector.tflite"
     echo
-    echo "3. Enable in SLIPS:"
-    echo "   Edit ${SLIPS_DIR}/slips.conf"
-    echo "   Add 'ml_ad_detector' to modules list"
-    echo
-    echo "4. Restart SLIPS:"
+    echo "3. Restart SLIPS:"
     echo "   sudo systemctl restart slips"
+    echo
+    echo "4. Monitor ad flow blocking:"
+    echo "   tail -f ${SLIPS_DIR}/output/*/slips.log | grep 'FLOW BLOCKED'"
+    echo "   redis-cli -n 1 HGETALL stream_ad_blocker:stats"
     echo
     echo "Installation directory: ${ML_DETECTOR_DIR}"
     echo "Configuration: ${CONFIG_DIR}/ml_detector.yaml"
@@ -370,6 +410,7 @@ main() {
     install_config
     setup_database
     configure_redis_thresholds
+    enable_slips_module
     set_permissions
     validate_installation
 
