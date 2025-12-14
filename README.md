@@ -1,24 +1,38 @@
 # Karen's IPS
 
-Enterprise-grade Intrusion Prevention System combining ML behavioral analysis with signature-based detection for network security and traffic intelligence.
+**SLIPS + Suricata IPS** extended for privacy, telemetry blocking, and streaming ad removal while maintaining full network security functionality.
+
+## Overview
+
+Built on Stratosphere SLIPS (behavioral IPS) and Suricata (signature-based IPS), this system adds privacy-focused extensions:
+- **Streaming ad blocking** via QUIC flow analysis (YouTube, Twitch, etc.)
+- **Telemetry filtering** with 350K+ tracking domain datasets
+- **Privacy protection** through TLS SNI inspection and DNS blocking
+- **Custom SLIPS modules** for flow-level ad removal
+- **ML-powered detection** with automatic training data collection
+
+Core security features remain intact: threat detection, C2 blocking, malware prevention, behavioral profiling.
 
 ## Features
 
-- **Behavioral Analysis** - ML-powered threat detection with adaptive learning (SLIPS)
-- **QUIC Ad Blocking** - Encrypted stream behavioral fingerprinting (YouTube, Twitch, etc.)
-- **High-Performance IPS** - Suricata 8.0 in NFQUEUE bridge mode
-- **Dataset Intelligence** - 350K+ domain patterns (hagezi/perflyst) with O(1) hash lookup
-- **TLS SNI Inspection** - Deep packet inspection at TLS handshake (bypasses encrypted DNS)
-- **DNS Dataset Integration** - Unified blocklist database synced to Suricata datasets
-- **Manual Domain Blocking** - Add/view individual domains via web UI with SQLite backend
-- **LLM Intelligence** - OpenAI/Ollama integration for threat analysis and evidence correlation
-- **Bidirectional Correlation** - SLIPS ↔ Suricata threat intelligence sync
-- **Real-Time Dashboard** - Live flow statistics, ML detector metrics, behavioral profiling
-- **Unified Dashboard** - Network flows, telemetry analysis, configuration management
-- **Extensible Rules** - 12+ free threat intelligence sources
-- **Flow-Level Blocking** - Custom Slips module for surgical ad stream removal (conntrack)
-- **Auto Training Data** - Automatic dataset building from high-confidence detections (no LLM required)
-- **Private IP Filtering** - RFC1918/loopback exemption prevents false positives on internal networks
+### Core IPS (SLIPS + Suricata)
+- **SLIPS Behavioral Analysis** - ML-powered threat detection, IP reputation, C2 detection
+- **Suricata Signature IPS** - 12+ threat intelligence sources, NFQUEUE inline blocking
+- **Zeek Protocol Analysis** - Flow extraction, protocol parsing, conn/dns/http logs
+- **Real-Time Blocking** - nftables IP blacklisting, flow-level drops via conntrack
+
+### Privacy & Ad Blocking Extensions
+- **Streaming Ad Blocking** - QUIC behavioral fingerprinting for encrypted video ads
+- **Telemetry Filtering** - 350K+ tracking/analytics domains (hagezi, perflyst)
+- **TLS SNI Inspection** - Blocks HTTPS ads at handshake (bypasses encrypted DNS)
+- **Custom SLIPS Module** - ad_flow_blocker for surgical flow removal
+- **Dataset-Based Blocking** - O(1) hash lookup, Suricata dataset integration
+
+### Intelligence & Automation
+- **LLM Integration** - OpenAI/Ollama for threat analysis and ad classification
+- **Auto Training Data** - High/low confidence samples saved automatically
+- **Private IP Filtering** - RFC1918 exemptions prevent internal network false positives
+- **Web Management** - Live dashboards, ML detector metrics, configuration UI
 
 ## Installation
 
@@ -32,13 +46,14 @@ sudo ./karens-ips-installer.sh
 
 **What gets installed:**
 
-- Suricata 8.0 (NFQUEUE inline mode)
-- SLIPS ML behavioral engine
-- Stream Ad Blocker (QUIC behavioral fingerprinting)
-- Dataset-based pattern matching
-- Web management interface
-- Threat intelligence feeds
-- SystemD service integration
+- **SLIPS** - Stratosphere behavioral IPS with Zeek integration
+- **Suricata 8.0** - Signature-based IPS in NFQUEUE inline mode
+- **Zeek** - Protocol analysis engine for flow extraction
+- **Redis** - Pub/sub for SLIPS modules and statistics
+- **Ad Blocker Extensions** - stream_ad_blocker service + ad_flow_blocker SLIPS module
+- **Privacy Datasets** - hagezi/perflyst tracking domain lists (350K+ domains)
+- **Web UI** - Flask-based management interface with ML detector dashboard
+- **LLM Support** - Optional OpenAI/Ollama integration
 
 ## Quick Start
 
@@ -53,10 +68,18 @@ Default credentials: `/root/.karens-ips-credentials`
 **Service management:**
 
 ```bash
-systemctl status suricata slips slips-webui redis-server stream-ad-blocker
-systemctl restart suricata
-systemctl restart stream-ad-blocker
+# Core IPS services
+systemctl status slips suricata redis-server
+
+# Privacy/ad blocking extensions
+systemctl status stream-ad-blocker
+
+# SLIPS web interface
+systemctl status slips-webui
+
+# View logs
 journalctl -fu slips
+journalctl -fu suricata
 journalctl -fu stream-ad-blocker
 ```
 
@@ -69,21 +92,21 @@ journalctl -fu stream-ad-blocker
 
 ## Web UI
 
-**Dashboard** - Real-time network statistics, system health monitoring
+**Dashboard** - Real-time SLIPS/Suricata statistics, system health, threat overview
 
-**ML Detector** - Live flow analysis (29K+ flows), suspicious activity tracking, behavioral metrics
+**ML Detector** - Streaming ad detection, flow analysis, training data management
 
-**Network Analysis** - Flow visualization, behavioral profiling, evidence correlation
+**Network Analysis** - SLIPS behavioral profiling, flow visualization, evidence correlation
 
-**Intelligence** - Telemetry analysis, protocol inspection, pattern detection, LLM-powered threat analysis
+**Intelligence** - Telemetry analysis, pattern detection, LLM-powered threat/ad classification
 
-**Suricata Config** - Rule management, dataset configuration, source feeds, manual domain blocking
+**Suricata Config** - Rule management, privacy datasets (hagezi/perflyst), manual domain blocking
 
-**Configuration** - Network topology, dataset generation, LLM integration (OpenAI/Ollama)
+**Configuration** - Network topology, SLIPS settings, LLM integration (OpenAI/Ollama)
 
-**Operations** - Rule updates, source management, exception handling
+**Operations** - Threat intelligence updates, exception management
 
-**User Management** - Password changes, session management, authentication settings
+**User Management** - Authentication, password changes, session management
 
 ## Architecture
 
@@ -160,32 +183,37 @@ journalctl -fu stream-ad-blocker
 
 **Multi-Layer Defense:**
 
-1. **Suricata IPS** (Signature + Dataset)
-   - 350K+ domain hash table (O(1) lookup)
-   - TLS SNI inspection blocks HTTPS at handshake
-   - DNS/HTTP/TLS rules reference unified dataset
-   - Manual domain blocking via SQLite backend
-   - RFC1918 exemptions (won't block local DNS)
+1. **Suricata IPS** (Signature-Based Detection)
+   - NFQUEUE inline blocking on bridge interface
+   - 350K+ tracking/telemetry domain dataset (O(1) hash lookup)
+   - TLS SNI inspection blocks HTTPS ads/trackers at handshake
+   - DNS/HTTP/TLS rules reference unified privacy dataset
+   - Manual domain blocking via SQLite backend + web UI
+   - 12+ threat intelligence sources (Emerging Threats, abuse.ch, etc.)
 
-2. **SLIPS Behavioral Analysis** (ML + Modules)
+2. **SLIPS Behavioral Analysis** (ML + Zeek)
    - Zeek (Bro) for protocol analysis and flow extraction
-   - Redis DB 0 for pub/sub channels (new_flow, new_dns, tw_modified)
+   - Redis DB 0 pub/sub channels (new_flow, new_dns, tw_modified)
    - Native module system (IModule inheritance)
-   - IP reputation, behavioral profiling, C2 detection
+   - IP reputation, behavioral profiling, C2 detection, botnet tracking
    - Processes Zeek conn.log, dns.log, http.log
+   - **Extended:** ad_flow_blocker module for streaming ad removal
 
-3. **ad_flow_blocker** (Native Slips Module)
-   - Flow-level blocking via conntrack
-   - Surgical ad stream removal (not IP blacklisting)
-   - Private IP filtering (RFC1918/loopback/link-local)
-   - Subscribes to new_flow and new_dns Redis channels
+3. **ad_flow_blocker** (SLIPS Module Extension)
+   - Native SLIPS module for privacy-focused flow blocking
+   - Flow-level blocking via conntrack (surgical, not IP blacklisting)
+   - ML-based ad confidence scoring (thresholds: YouTube=0.60, CDN=0.85)
+   - Private IP filtering (RFC1918/loopback/link-local exemptions)
+   - Subscribes to SLIPS new_flow and new_dns Redis channels
+   - **Purpose:** Extends SLIPS for ad/telemetry blocking while preserving security
 
-4. **stream_ad_blocker** (Standalone Service)
-   - Redis DB 1 (separate from SLIPS)
-   - QUIC encrypted stream analysis
-   - ML confidence-based classification
-   - Auto training data (high/low confidence samples)
-   - Triple blocking: conntrack, Suricata dataset, nftables
+4. **stream_ad_blocker** (Standalone Privacy Service)
+   - Redis DB 1 (separate namespace from SLIPS)
+   - QUIC encrypted stream behavioral fingerprinting
+   - Detects video ads without payload decryption (YouTube, Twitch, etc.)
+   - ML flow classification with automatic training data collection
+   - Triple blocking: conntrack flow drops, Suricata dataset injection, nftables
+   - **Purpose:** Privacy-focused extension for streaming platform ad removal
 
 ## Rule Sources
 
