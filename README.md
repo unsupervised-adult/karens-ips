@@ -154,7 +154,7 @@ journalctl -fu stream-ad-blocker
          │      │  • Zeek flow sub    │  │  • nftables sets     │
          │      │  • ML ad scoring    │  │  • IP blacklist      │
          │      │  • conntrack drops  │  │  • Malicious IPs     │
-         │      │  • RFC1918 skip     │  └──────────────────────┘
+         │      │  • Skip RFC1918 dst │  └──────────────────────┘
          │      └─────────────────────┘
          │
          │      ┌──────────────────────────────────────────────────┐
@@ -165,7 +165,7 @@ journalctl -fu stream-ad-blocker
          │      │  • Auto training data collection                │
          │      │  • LLM queue (0.30-0.90 confidence)             │
          │      │  • Triple blocking: conntrack/dataset/nftables  │
-         │      │  • RFC1918 filtering                            │
+         │      │  • Skip RFC1918 destinations (not sources)      │
          │      └────────────┬─────────────────────────────────────┘
          │                   │
          │                   │  ┌────────────────────────────────┐
