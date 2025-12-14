@@ -2,40 +2,37 @@
 
 **SLIPS + Suricata IPS** extended for privacy, telemetry blocking, and streaming ad removal while maintaining full network security functionality.
 
-## ✅ Project Status (December 2025)
+## Project Status
 
-**All Systems Operational - Production Ready:**
-- ✅ Core IPS stack (SLIPS + Suricata + Zeek) with inline nftables blocking
-- ✅ Threat detection, behavioral analysis, C2 blocking
-- ✅ 350K+ telemetry/tracking domain blocklists (hagezi/perflyst)
-- ✅ **SLIPS Web UI with ML Detector dashboard** - fully functional
-- ✅ **stream_ad_blocker service** - running with auto training data collection
-- ✅ **ad_flow_blocker SLIPS module** - installed and operational
-- ✅ NGINX HTTPS reverse proxy with authentication
-- ✅ Modular installer with 19 automated phases
-- ✅ Triple blocking system (conntrack + datasets + nftables)
-- ✅ Automatic training data persistence
+**Operational Components:**
+- Core IPS stack (SLIPS + Suricata + Zeek) with inline nftables blocking
+- Threat detection, behavioral analysis, C2 blocking
+- 350K+ telemetry/tracking domain blocklists (hagezi/perflyst)
+- SLIPS Web UI with ML Detector dashboard
+- stream_ad_blocker service with automatic training data collection
+- ad_flow_blocker SLIPS module
+- NGINX HTTPS reverse proxy with authentication
+- Modular installer with 19 automated phases
+- Triple blocking system (conntrack + datasets + nftables)
 
-**Optional Features (Ready for Configuration):**
-- ⚠️ **LLM Integration** - UI complete, requires API keys (OpenAI/Ollama)
-- ⚠️ **Advanced Training** - Backup/restore/trim tools available in dashboard
-
-**Recommendation:** All core functionality working. System is production-ready. LLM features are optional but improve accuracy.
+**Optional Components:**
+- LLM Integration - requires API keys (OpenAI/Ollama)
+- Training data backup/restore/trim tools
 
 ## Overview
 
 Built on Stratosphere SLIPS (behavioral IPS) and Suricata (signature-based IPS), this system adds privacy-focused extensions:
-- **Telemetry filtering** with 350K+ tracking domain datasets ✅ **WORKING**
-- **Privacy protection** through TLS SNI inspection and DNS blocking ✅ **WORKING**
-- **Streaming ad blocking** via QUIC flow analysis ✅ **WORKING**
-- **Custom SLIPS modules** for flow-level ad removal ✅ **WORKING**
-- **ML-powered detection** with automatic training data collection ✅ **WORKING**
+- Telemetry filtering with 350K+ tracking domain datasets
+- Privacy protection through TLS SNI inspection and DNS blocking
+- Streaming ad blocking via QUIC flow analysis
+- Custom SLIPS modules for flow-level ad removal
+- ML-powered detection with automatic training data collection
 
 Core security features remain intact: threat detection, C2 blocking, malware prevention, behavioral profiling.
 
 ## Features
 
-### Core IPS (SLIPS + Suricata) ✅ PRODUCTION-READY
+### Core IPS (SLIPS + Suricata)
 - **SLIPS Behavioral Analysis** - ML-powered threat detection, IP reputation, C2 detection
 - **Suricata Signature IPS** - 12+ threat intelligence sources, NFQUEUE inline blocking
 - **Zeek Protocol Analysis** - Flow extraction, protocol parsing, conn/dns/http logs
@@ -43,19 +40,15 @@ Core security features remain intact: threat detection, C2 blocking, malware pre
 - **Modular Architecture** - 19-phase installer, systemd service management
 - **NGINX Reverse Proxy** - HTTPS access with basic authentication
 
-### Privacy & Telemetry Blocking ✅ WORKING
+### Privacy & Ad Blocking Extensions
 - **Telemetry Filtering** - 350K+ tracking/analytics domains (hagezi, perflyst)
 - **TLS SNI Inspection** - Blocks HTTPS trackers at handshake (bypasses encrypted DNS)
 - **Dataset-Based Blocking** - O(1) hash lookup, Suricata dataset integration
 - **DNS/HTTP/TLS Rules** - Unified blocklist across all protocol layers
-
-### Experimental Features ⚠️ IN DEVELOPMENT
-- **Streaming Ad Blocking (EXPERIMENTAL)** - QUIC behavioral fingerprinting (installed, needs testing)
-- **Custom SLIPS Module (NOT YET INSTALLED)** - ad_flow_blocker code exists, installer update needed
-- **ML Detector Dashboard (BROKEN)** - Web UI syntax error preventing startup
-- **LLM Integration (NOT CONFIGURED)** - Infrastructure ready, requires API keys
-- **Auto Training Data (UNTESTED)** - Code exists in stream_ad_blocker.py
-- **Web Management (PARTIALLY WORKING)** - NGINX proxy works, Flask app has startup issue
+- **Streaming Ad Blocking** - QUIC behavioral fingerprinting for encrypted video ads
+- **Custom SLIPS Module** - ad_flow_blocker for surgical flow removal
+- **LLM Integration** - Optional OpenAI/Ollama for flow classification
+- **Auto Training Data** - High/low confidence samples saved automatically
 
 ## Installation
 
