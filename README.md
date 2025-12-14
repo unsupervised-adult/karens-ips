@@ -16,6 +16,9 @@ Enterprise-grade Intrusion Prevention System combining ML behavioral analysis wi
 - **Real-Time Dashboard** - Live flow statistics, ML detector metrics, behavioral profiling
 - **Unified Dashboard** - Network flows, telemetry analysis, configuration management
 - **Extensible Rules** - 12+ free threat intelligence sources
+- **Flow-Level Blocking** - Custom Slips module for surgical ad stream removal (conntrack)
+- **Auto Training Data** - Automatic dataset building from high-confidence detections (no LLM required)
+- **Private IP Filtering** - RFC1918/loopback exemption prevents false positives on internal networks
 
 ## Installation
 
@@ -154,23 +157,56 @@ suricatasc -c "dataset-list"
 
 Detects and blocks encrypted video ads on YouTube, Twitch, and other platforms via flow pattern analysis without payload decryption.
 
+**Ad Flow Blocker (Native Slips Module):**
+
+Custom Slips module providing surgical flow-level ad removal using conntrack. Integrates with Slips behavioral analysis for intelligent ad detection.
+
+**Features:**
+- Native Slips module (IModule integration)
+- Subscribes to new_flow and new_dns Redis channels
+- Uses ML classifier for ad confidence scoring
+- Performs flow-level drops via conntrack (not IP blacklisting)
+- RFC1918/loopback/link-local filtering (prevents internal network false positives)
+- Thresholds: YouTube=0.60, CDN=0.85, ControlPlane=0.70
+- Auto-deployed via installer to /opt/StratosphereLinuxIPS/modules/ad_flow_blocker/
+
+**Training Data Collection:**
+
+Automatic dataset building without LLM requirement:
+- High-confidence detections (>0.90) auto-saved as 'ad' samples
+- Blocklist matches (1.0 confidence) auto-saved as 'ad' samples  
+- Low-confidence flows (<0.30) auto-saved as 'legitimate' samples (10% sampling)
+- Persists to training_data.json (max 10,000 samples, auto-trimmed)
+- Enables model retraining without manual labeling
+
 **Service Management:**
+**Service Management:**
+
 ```bash
 # Status check
 sudo systemctl status stream-ad-blocker
 journalctl -u stream-ad-blocker --since '10 minutes ago'
 
 # View real-time detections
-journalctl -fu stream-ad-blocker | grep -E "BLOCKED|detected"
+journalctl -fu stream-ad-blocker | grep -E "BLOCKED|detected|TRAIN"
 
 # Check detection stats
 redis-cli -n 1 HGETALL stream_ad_blocker:stats
 
+# View training data count
+redis-cli -n 1 GET ml_detector:training:count
+ls -lh /opt/StratosphereLinuxIPS/webinterface/ml_detector/training_data.json
+
 # View recent detections (JSON format)
 redis-cli -n 1 LRANGE ml_detector:recent_detections 0 10
 
-# Restart service after config changes
+# Check ad_flow_blocker Slips module
+ps aux | grep ad_flow_blocker
+tail -f /opt/StratosphereLinuxIPS/output/br0_*/slips.log | grep 'FLOW BLOCKED'
+
+# Restart services after config changes
 sudo systemctl restart stream-ad-blocker
+sudo systemctl restart slips
 ```
 
 **Redis Configuration Keys (Database 1):**
