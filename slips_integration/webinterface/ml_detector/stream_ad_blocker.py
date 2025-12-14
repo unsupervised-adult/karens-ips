@@ -268,6 +268,68 @@ class StreamAdBlocker:
             print(f"[!] Failed to initialize history DB: {e}")
             self.history_db = None
     
+    def save_training_sample(self, domain, dst_ip, confidence, method, flow_data, label):
+        """Save detection as training sample
+        
+        Args:
+            domain: Domain name or IP
+            dst_ip: Destination IP
+            confidence: ML confidence score
+            method: Detection method
+            flow_data: Flow metadata
+            label: 'ad' or 'legitimate'
+        """
+        try:
+            training_file = '/opt/StratosphereLinuxIPS/webinterface/ml_detector/training_data.json'
+            
+            # Load existing data
+            training_data = []
+            if os.path.exists(training_file):
+                try:
+                    with open(training_file, 'r') as f:
+                        training_data = json.load(f)
+                except json.JSONDecodeError:
+                    print(f"[!] Corrupted training data file, starting fresh")
+                    training_data = []
+            
+            # Create training sample
+            sample = {
+                'timestamp': datetime.now().isoformat(),
+                'domain': domain,
+                'dst_ip': dst_ip,
+                'confidence': confidence,
+                'method': method,
+                'label': label,
+                'flow_data': {
+                    'duration': flow_data.get('dur', 0),
+                    'bytes': flow_data.get('bytes', 0),
+                    'packets': flow_data.get('pkts', 0),
+                    'protocol': flow_data.get('proto', 'unknown'),
+                    'dst_port': flow_data.get('dport', 443)
+                },
+                'source': 'auto_labeled' if confidence > 0.90 or 'blocklist' in method else 'llm_labeled'
+            }
+            
+            training_data.append(sample)
+            
+            # Keep last 10,000 samples
+            if len(training_data) > 10000:
+                training_data = training_data[-10000:]
+            
+            # Save atomically
+            temp_file = training_file + '.tmp'
+            with open(temp_file, 'w') as f:
+                json.dump(training_data, f, indent=2)
+            os.replace(temp_file, training_file)
+            
+            # Update Redis counter
+            self.r_stats.incr('ml_detector:training:count')
+            
+            return True
+        except Exception as e:
+            print(f"[!] Error saving training sample: {e}")
+            return False
+    
     def start_llm_background_processor(self):
         """Start background thread to process LLM queue"""
         if self.llm_thread is not None and self.llm_thread.is_alive():
@@ -962,6 +1024,12 @@ class StreamAdBlocker:
         self.r_stats.ltrim('ml_detector:timeline', 0, 999)
 
         self.stats['ads_detected'] += 1
+        
+        # Save as training data if high confidence (auto-labeled)
+        # Blocklist matches (1.0) and high ML confidence (>0.90) are reliable labels
+        if confidence >= 0.90 or 'blocklist' in method.lower():
+            self.save_training_sample(domain, dst_ip, confidence, method, flow_data, 'ad')
+            print(f"[TRAIN] Saved ad sample: {domain} (confidence={confidence:.2%}, method={method})")
 
         # Check if blocking is enabled
         blocking_enabled = self.get_blocking_status()
@@ -1287,6 +1355,18 @@ class StreamAdBlocker:
                         self.learn_youtube_pattern(dst_ip, flow_data, True, combined_confidence)
                     
                     self.process_detection(domain, dst_ip, combined_confidence, method, flow_data)
+                else:
+                    # No detection - save as legitimate training sample (10% sample rate to balance dataset)
+                    if self.stats['total_analyzed'] % 10 == 0:
+                        # Only save if ML classifier exists and gave low confidence
+                        if self.classifier:
+                            is_ad_ml, ml_confidence, ml_method = self.classifier.classify_flow(
+                                domain, flow_data, dst_ip, 443
+                            )
+                            # Save if ML confidently says it's NOT an ad (<0.30)
+                            if ml_confidence < 0.30:
+                                self.save_training_sample(domain, dst_ip, ml_confidence, ml_method, flow_data, 'legitimate')
+                                print(f"[TRAIN] Saved legitimate sample: {domain} (confidence={ml_confidence:.2%})")
                 
                 # Periodically update stats (every 10 flows)
                 if self.stats['total_analyzed'] % 10 == 0:
