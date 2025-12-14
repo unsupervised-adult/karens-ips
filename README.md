@@ -88,20 +88,98 @@ journalctl -fu stream-ad-blocker
 ## Architecture
 
 ```
-Internet → br0 (bridge) → NFQUEUE → Suricata (datasets) → SLIPS (ML) → nftables
-                                         ↓                      ↓
-                                   EVE JSON              Redis DB
-                                         ↓                      ↓
-                                   Web UI ←→ SLIPS ↔ Suricata Sync
+                                    ┌─────────────────────────┐
+                                    │   Internet Traffic      │
+                                    └───────────┬─────────────┘
+                                                │
+                                    ┌───────────▼─────────────┐
+                                    │  br0 (Bridge Interface) │
+                                    └───────────┬─────────────┘
+                                                │
+                        ┌───────────────────────┼───────────────────────┐
+                        │                  NFQUEUE                      │
+                        │              (inline mode)                    │
+                        └───────────────────────┬───────────────────────┘
+                                                │
+                        ┌───────────────────────▼───────────────────────┐
+                        │           Suricata 8.0 IPS                    │
+                        │  • Signature detection                        │
+                        │  • Dataset blocking (350K+ domains)           │
+                        │  • TLS SNI inspection                         │
+                        │  • EVE JSON logging                           │
+                        └───────┬───────────────────────────────────────┘
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+        ┌───────────▼──────────┐  ┌────────▼─────────────────┐
+        │   EVE JSON Logs      │  │    Redis DB 0            │
+        │   (eve.json)         │  │    (SLIPS channels)      │
+        └───────────┬──────────┘  └────────┬─────────────────┘
+                    │                       │
+        ┌───────────▼─────────────────────┬─▼─────────────────────────┐
+        │              SLIPS Behavioral Analysis                       │
+        │  • Machine learning threat detection                         │
+        │  • Behavioral profiling                                      │
+        │  • IP reputation                                             │
+        │  • Native modules (ad_flow_blocker)                          │
+        └──────────┬────────────────────────────────────┬──────────────┘
+                   │                                    │
+        ┌──────────▼──────────┐              ┌─────────▼──────────────┐
+        │  ad_flow_blocker    │              │  Blocking Module       │
+        │  (Slips Module)     │              │  (nftables sets)       │
+        │  • Flow-level drops │              │  • IP blacklisting     │
+        │  • conntrack        │              │  • Malicious IPs       │
+        │  • Ad stream blocks │              │  • C2 blocking         │
+        │  • Private IP skip  │              └────────────────────────┘
+        └─────────────────────┘
+                   
+        ┌───────────────────────────────────────────────────────────────┐
+        │          stream_ad_blocker Service (Standalone)               │
+        │  • Redis DB 1 (separate namespace)                            │
+        │  • QUIC behavioral fingerprinting                             │
+        │  • ML flow classification                                     │
+        │  • Automatic training data collection                         │
+        │  • Blocking methods: conntrack, Suricata dataset, nftables    │
+        │  • Private IP filtering (RFC1918)                             │
+        └──────────┬────────────────────────────────────────────────────┘
+                   │
+        ┌──────────▼──────────────────────────────────────────────────┐
+        │                    Web Interface                            │
+        │  • Dashboard (stats, health monitoring)                     │
+        │  • ML Detector (flow analysis, detections)                  │
+        │  • Suricata Config (datasets, rules, manual blocking)       │
+        │  • Configuration (LLM, network topology)                    │
+        │  • Bidirectional Suricata ↔ SLIPS sync                      │
+        └─────────────────────────────────────────────────────────────┘
 ```
 
-**Dataset approach:**
+**Multi-Layer Defense:**
 
-- 3 Suricata rules (DNS/HTTP/TLS) reference 1 hash table
-- O(1) lookup for 350K+ domains (hagezi Pro, perflyst SmartTV/Android)
-- TLS SNI inspection blocks HTTPS traffic at handshake
-- DNS dataset integration with SQLite backend
-- RFC1918 exemptions (won't block local DNS)
+1. **Suricata IPS** (Signature + Dataset)
+   - 350K+ domain hash table (O(1) lookup)
+   - TLS SNI inspection blocks HTTPS at handshake
+   - DNS/HTTP/TLS rules reference unified dataset
+   - Manual domain blocking via SQLite backend
+   - RFC1918 exemptions (won't block local DNS)
+
+2. **SLIPS Behavioral Analysis** (ML + Modules)
+   - Redis DB 0 for flow analysis
+   - Native module system (IModule inheritance)
+   - IP reputation and behavioral profiling
+   - Integrates with Suricata via EVE JSON
+
+3. **ad_flow_blocker** (Native Slips Module)
+   - Flow-level blocking via conntrack
+   - Surgical ad stream removal (not IP blacklisting)
+   - Private IP filtering (RFC1918/loopback/link-local)
+   - Subscribes to new_flow and new_dns Redis channels
+
+4. **stream_ad_blocker** (Standalone Service)
+   - Redis DB 1 (separate from SLIPS)
+   - QUIC encrypted stream analysis
+   - ML confidence-based classification
+   - Auto training data (high/low confidence samples)
+   - Triple blocking: conntrack, Suricata dataset, nftables
 
 ## Rule Sources
 
