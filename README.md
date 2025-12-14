@@ -107,22 +107,27 @@ journalctl -fu stream-ad-blocker
                         │  • Dataset blocking (350K+ domains)           │
                         │  • TLS SNI inspection                         │
                         │  • EVE JSON logging                           │
-                        └───────┬───────────────────────────────────────┘
-                                │
-                    ┌───────────┴───────────┐
-                    │                       │
-        ┌───────────▼──────────┐  ┌────────▼─────────────────┐
-        │   EVE JSON Logs      │  │    Redis DB 0            │
-        │   (eve.json)         │  │    (SLIPS channels)      │
-        └───────────┬──────────┘  └────────┬─────────────────┘
-                    │                       │
-        ┌───────────▼─────────────────────┬─▼─────────────────────────┐
-        │              SLIPS Behavioral Analysis                       │
-        │  • Machine learning threat detection                         │
-        │  • Behavioral profiling                                      │
-        │  • IP reputation                                             │
-        │  • Native modules (ad_flow_blocker)                          │
-        └──────────┬────────────────────────────────────┬──────────────┘
+                        └───────────────────────────────────────────────┘
+                                                
+                                    ┌─────────────────────────┐
+                                    │   Zeek (Bro) Engine     │
+                                    │  • Protocol analysis    │
+                                    │  • Flow extraction      │
+                                    │  • Conn.log generation  │
+                                    └───────────┬─────────────┘
+                                                │
+                                    ┌───────────▼─────────────┐
+                                    │    Redis DB 0           │
+                                    │  (SLIPS pub/sub)        │
+                                    └───────────┬─────────────┘
+                                                │
+                        ┌───────────────────────▼───────────────────────┐
+                        │         SLIPS Behavioral Analysis             │
+                        │  • ML threat detection (Zeek flows)           │
+                        │  • Behavioral profiling                       │
+                        │  • IP reputation & C2 detection               │
+                        │  • Native modules (ad_flow_blocker)           │
+                        └──────────┬────────────────────────────────────┬──────────────┘
                    │                                    │
         ┌──────────▼──────────┐              ┌─────────▼──────────────┐
         │  ad_flow_blocker    │              │  Blocking Module       │
@@ -163,10 +168,11 @@ journalctl -fu stream-ad-blocker
    - RFC1918 exemptions (won't block local DNS)
 
 2. **SLIPS Behavioral Analysis** (ML + Modules)
-   - Redis DB 0 for flow analysis
+   - Zeek (Bro) for protocol analysis and flow extraction
+   - Redis DB 0 for pub/sub channels (new_flow, new_dns, tw_modified)
    - Native module system (IModule inheritance)
-   - IP reputation and behavioral profiling
-   - Integrates with Suricata via EVE JSON
+   - IP reputation, behavioral profiling, C2 detection
+   - Processes Zeek conn.log, dns.log, http.log
 
 3. **ad_flow_blocker** (Native Slips Module)
    - Flow-level blocking via conntrack
