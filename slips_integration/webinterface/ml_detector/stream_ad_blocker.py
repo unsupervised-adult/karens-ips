@@ -922,6 +922,11 @@ class StreamAdBlocker:
 
     def process_detection(self, domain, dst_ip, confidence, method, flow_data):
         """Process a detected ad and optionally block it"""
+        
+        # Skip private/internal IPs - don't even log them
+        if self.is_private_ip(dst_ip):
+            return None
+        
         now = datetime.now()
 
         # Create detection record
