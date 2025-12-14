@@ -82,6 +82,43 @@ check_prerequisites() {
         exit 1
     fi
     print_success "Sufficient disk space available"
+
+    TOTAL_MEM=$(free -g | awk '/^Mem:/{print $2}')
+    if [[ ${TOTAL_MEM} -lt 16 ]]; then
+        print_warning "Less than 16GB RAM detected (${TOTAL_MEM}GB)"
+        print_warning "System may experience memory pressure"
+    fi
+}
+
+setup_swap() {
+    print_status "Checking swap configuration..."
+
+    SWAP_SIZE=$(free -h | awk '/^Swap:/{print $2}')
+    if [[ "${SWAP_SIZE}" == "0B" ]]; then
+        print_warning "No swap detected"
+
+        AVAILABLE_SPACE=$(df / | tail -1 | awk '{print $4}')
+        REQUIRED_SPACE=$((5 * 1024 * 1024))
+
+        if [[ ${AVAILABLE_SPACE} -gt ${REQUIRED_SPACE} ]]; then
+            print_status "Creating 4GB swap file..."
+
+            fallocate -l 4G /swapfile
+            chmod 600 /swapfile
+            mkswap /swapfile
+            swapon /swapfile
+
+            if ! grep -q "/swapfile" /etc/fstab; then
+                echo "/swapfile none swap sw 0 0" >> /etc/fstab
+            fi
+
+            print_success "4GB swap created and enabled"
+        else
+            print_warning "Insufficient space for swap file (need 5GB)"
+        fi
+    else
+        print_success "Swap already configured (${SWAP_SIZE})"
+    fi
 }
 
 install_dependencies() {
@@ -205,6 +242,22 @@ EOF
     print_success "Database initialized"
 }
 
+configure_redis_thresholds() {
+    print_status "Configuring Redis detection thresholds..."
+
+    if redis-cli -p 6379 ping &> /dev/null; then
+        redis-cli -p 6379 HSET stream_ad_blocker:thresholds youtube_threshold 0.60 > /dev/null
+        redis-cli -p 6379 HSET stream_ad_blocker:thresholds cdn_threshold 0.85 > /dev/null
+        redis-cli -p 6379 HSET stream_ad_blocker:thresholds control_plane_threshold 0.70 > /dev/null
+        redis-cli -p 6379 HSET stream_ad_blocker:thresholds llm_min_threshold 0.30 > /dev/null
+        redis-cli -p 6379 HSET stream_ad_blocker:thresholds llm_max_threshold 0.95 > /dev/null
+
+        print_success "Detection thresholds configured"
+    else
+        print_warning "Redis not available, skipping threshold configuration"
+    fi
+}
+
 set_permissions() {
     print_status "Setting permissions..."
 
@@ -249,6 +302,18 @@ print_next_steps() {
     echo -e "${GREEN}ML AD DETECTOR INSTALLATION COMPLETE${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo
+    echo "Installation summary:"
+    echo "  - 4GB swap configured (if not present)"
+    echo "  - Redis detection thresholds set"
+    echo "  - LLM auto-labeling range: 0.30 - 0.95"
+    echo "  - Enterprise whitelist: Tanium, Rapid7, Microsoft, etc."
+    echo
+    echo "System architecture:"
+    echo "  - ML-first detection (runs on all flows)"
+    echo "  - Pattern matching as confidence boost"
+    echo "  - LLM auto-labeling for training data"
+    echo "  - Self-improving hybrid ML+LLM pipeline"
+    echo
     echo "Next steps:"
     echo
     echo "1. Train a model:"
@@ -270,6 +335,11 @@ print_next_steps() {
     echo "Installation directory: ${ML_DETECTOR_DIR}"
     echo "Configuration: ${CONFIG_DIR}/ml_detector.yaml"
     echo "Database: ${ML_DETECTOR_DIR}/data/detector.db"
+    echo "Redis thresholds: stream_ad_blocker:thresholds"
+    echo
+    SWAP_SIZE=$(free -h | awk '/^Swap:/{print $2}')
+    TOTAL_MEM=$(free -h | awk '/^Mem:/{print $2}')
+    echo "System resources: ${TOTAL_MEM} RAM, ${SWAP_SIZE} swap"
     echo
 }
 
@@ -292,12 +362,14 @@ main() {
 
     check_root
     check_prerequisites
+    setup_swap
     install_dependencies
     create_directories
     install_module
     install_models
     install_config
     setup_database
+    configure_redis_thresholds
     set_permissions
     validate_installation
 
