@@ -111,73 +111,95 @@ journalctl -fu stream-ad-blocker
 ## Architecture
 
 ```
-                                    ┌─────────────────────────┐
-                                    │   Internet Traffic      │
-                                    └───────────┬─────────────┘
-                                                │
-                                    ┌───────────▼─────────────┐
-                                    │  br0 (Bridge Interface) │
-                                    └───────────┬─────────────┘
-                                                │
-                        ┌───────────────────────┼───────────────────────┐
-                        │                  NFQUEUE                      │
-                        │              (inline mode)                    │
-                        └───────────────────────┬───────────────────────┘
-                                                │
-                        ┌───────────────────────▼───────────────────────┐
-                        │           Suricata 8.0 IPS                    │
-                        │  • Signature detection                        │
-                        │  • Dataset blocking (350K+ domains)           │
-                        │  • TLS SNI inspection                         │
-                        │  • EVE JSON logging                           │
-                        └───────────────────────────────────────────────┘
-                                                
-                                    ┌─────────────────────────┐
-                                    │   Zeek (Bro) Engine     │
-                                    │  • Protocol analysis    │
-                                    │  • Flow extraction      │
-                                    │  • Conn.log generation  │
-                                    └───────────┬─────────────┘
-                                                │
-                                    ┌───────────▼─────────────┐
-                                    │    Redis DB 0           │
-                                    │  (SLIPS pub/sub)        │
-                                    └───────────┬─────────────┘
-                                                │
-                        ┌───────────────────────▼───────────────────────┐
-                        │         SLIPS Behavioral Analysis             │
-                        │  • ML threat detection (Zeek flows)           │
-                        │  • Behavioral profiling                       │
-                        │  • IP reputation & C2 detection               │
-                        │  • Native modules (ad_flow_blocker)           │
-                        └──────────┬────────────────────────────────────┬──────────────┘
-                   │                                    │
-        ┌──────────▼──────────┐              ┌─────────▼──────────────┐
-        │  ad_flow_blocker    │              │  Blocking Module       │
-        │  (Slips Module)     │              │  (nftables sets)       │
-        │  • Flow-level drops │              │  • IP blacklisting     │
-        │  • conntrack        │              │  • Malicious IPs       │
-        │  • Ad stream blocks │              │  • C2 blocking         │
-        │  • Private IP skip  │              └────────────────────────┘
-        └─────────────────────┘
-                   
-        ┌───────────────────────────────────────────────────────────────┐
-        │          stream_ad_blocker Service (Standalone)               │
-        │  • Redis DB 1 (separate namespace)                            │
-        │  • QUIC behavioral fingerprinting                             │
-        │  • ML flow classification                                     │
-        │  • Automatic training data collection                         │
-        │  • Blocking methods: conntrack, Suricata dataset, nftables    │
-        │  • Private IP filtering (RFC1918)                             │
-        └──────────┬────────────────────────────────────────────────────┘
-                   │
-        ┌──────────▼──────────────────────────────────────────────────┐
-        │                    Web Interface                            │
-        │  • Dashboard (stats, health monitoring)                     │
-        │  • ML Detector (flow analysis, detections)                  │
-        │  • Suricata Config (datasets, rules, manual blocking)       │
-        │  • Configuration (LLM, network topology)                    │
-        │  • Bidirectional Suricata ↔ SLIPS sync                      │
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Internet Traffic                            │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                   ┌───────────▼───────────┐
+                   │ br0 (Bridge Interface)│
+                   └───────────┬───────────┘
+                               │
+                   ┌───────────▼───────────────────────┐
+                   │       NFQUEUE (inline)            │
+                   └───────────┬───────────────────────┘
+                               │
+        ┌──────────────────────┼──────────────────────┐
+        │                      │                      │
+┌───────▼─────────┐  ┌─────────▼──────────┐  ┌───────▼─────────┐
+│  Suricata 8.0   │  │  Zeek (Bro)        │  │  Packet Mirror  │
+│  • Signatures   │  │  • Protocol parse  │  │  (for Zeek)     │
+│  • 350K domains │  │  • Flow extraction │  └─────────────────┘
+│  • TLS SNI      │  │  • conn/dns/http   │
+│  • EVE JSON     │  │    log generation  │
+└────────┬────────┘  └─────────┬──────────┘
+         │                     │
+         │          ┌──────────▼──────────┐
+         │          │   Redis DB 0        │
+         │          │   • new_flow        │
+         │          │   • new_dns         │
+         │          │   • tw_modified     │
+         │          └──────────┬──────────┘
+         │                     │
+         │          ┌──────────▼──────────────────────────────────┐
+         │          │      SLIPS (Behavioral IPS)                 │
+         │          │  • ML threat detection (Zeek flows)         │
+         │          │  • IP reputation & C2 detection             │
+         │          │  • Behavioral profiling                     │
+         │          │  • Module system (IModule)                  │
+         │          └──────┬──────────────────┬───────────────────┘
+         │                 │                  │
+         │      ┌──────────▼──────────┐  ┌────▼─────────────────┐
+         │      │  ad_flow_blocker    │  │  SLIPS Blocking      │
+         │      │  (SLIPS Module)     │  │  Module              │
+         │      │  • Zeek flow sub    │  │  • nftables sets     │
+         │      │  • ML ad scoring    │  │  • IP blacklist      │
+         │      │  • conntrack drops  │  │  • Malicious IPs     │
+         │      │  • RFC1918 skip     │  └──────────────────────┘
+         │      └─────────────────────┘
+         │
+         │      ┌──────────────────────────────────────────────────┐
+         │      │    stream_ad_blocker (Privacy Extension)        │
+         │      │  • Redis DB 1 (separate namespace)              │
+         │      │  • QUIC flow fingerprinting                     │
+         │      │  • ML ad classifier (Random Forest)             │
+         │      │  • Auto training data collection                │
+         │      │  • LLM queue (0.30-0.90 confidence)             │
+         │      │  • Triple blocking: conntrack/dataset/nftables  │
+         │      │  • RFC1918 filtering                            │
+         │      └────────────┬─────────────────────────────────────┘
+         │                   │
+         │                   │  ┌────────────────────────────────┐
+         │                   └─→│  LLM Service (Optional)        │
+         │                      │  • OpenAI API / Ollama         │
+         │                      │  • Flow classification         │
+         │                      │  • Training data labeling      │
+         │                      │  • Threat analysis             │
+         │                      └────────────────────────────────┘
+         │
+         └──────────────────────┐
+                                │
+                    ┌───────────▼──────────────────────────────────┐
+                    │         Web Interface (Flask)                │
+                    │  • Dashboard (SLIPS/Suricata stats)          │
+                    │  • ML Detector (ad/privacy flow analysis)    │
+                    │  • Network Analysis (behavioral profiling)   │
+                    │  • Intelligence (LLM-powered analysis)       │
+                    │  • Suricata Config (datasets, manual block)  │
+                    │  • Configuration (LLM, SLIPS, thresholds)    │
+                    └──────────────────────────────────────────────┘
+```
+
+**Data Flow:**
+
+1. **Traffic Capture**: br0 bridge → NFQUEUE → Suricata + Zeek parallel processing
+2. **Suricata Path**: Signature matching → Dataset lookup → TLS SNI → Block/Allow → EVE JSON logs
+3. **Zeek Path**: Protocol parsing → conn/dns/http logs → Redis DB 0 pub/sub
+4. **SLIPS Analysis**: Subscribes to Zeek flows → ML behavioral analysis → Threat detection → nftables blocking
+5. **Ad Extensions**: 
+   - `ad_flow_blocker`: SLIPS module, Zeek flows → ML scoring → conntrack flow drops
+   - `stream_ad_blocker`: Standalone service, QUIC analysis → ML classifier → training data → LLM queue
+6. **LLM Integration**: Medium-confidence flows (0.30-0.90) → LLM labeling → training dataset
+7. **Web UI**: Real-time stats from Redis, Suricata EVE JSON, SLIPS evidence database
         └─────────────────────────────────────────────────────────────┘
 ```
 
