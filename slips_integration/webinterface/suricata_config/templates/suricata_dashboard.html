@@ -31,7 +31,6 @@
 
         <div class="tabs">
             <button class="tab-button active" data-tab="overview">Overview</button>
-            <button class="tab-button" data-tab="alerts">Alerts</button>
             <button class="tab-button" data-tab="rules">Custom Rules</button>
             <button class="tab-button" data-tab="config">Configuration</button>
             <button class="tab-button" data-tab="blocklists">DNS Blocklists</button>
@@ -58,41 +57,6 @@
                     <h3>Uptime</h3>
                     <div id="stat-uptime" class="stat-value">-</div>
                 </div>
-            </div>
-        </div>
-
-        <div id="alerts" class="tab-content">
-            <h2>Recent Alerts</h2>
-            <div class="controls">
-                <label>
-                    Severity:
-                    <select id="alert-severity-filter">
-                        <option value="">All</option>
-                        <option value="1">High (1)</option>
-                        <option value="2">Medium (2)</option>
-                        <option value="3">Low (3)</option>
-                    </select>
-                </label>
-                <button onclick="loadAlerts()" class="btn-refresh">Refresh</button>
-            </div>
-            <div id="alerts-table-container">
-                <table id="alerts-table">
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Source IP</th>
-                            <th>Dest IP</th>
-                            <th>Protocol</th>
-                            <th>Signature</th>
-                            <th>Severity</th>
-                            <th>Category</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="alerts-body">
-                        <tr><td colspan="8">Loading...</td></tr>
-                    </tbody>
-                </table>
             </div>
         </div>
 
