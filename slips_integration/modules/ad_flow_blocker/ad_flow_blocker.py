@@ -118,6 +118,30 @@ class AdFlowBlocker(IModule):
             self.cdn_threshold = 0.85
             self.control_plane_threshold = 0.70
 
+    def _is_private_ip(self, ip: str) -> bool:
+        """Check if IP is RFC1918 private or other non-routable address"""
+        try:
+            parts = [int(x) for x in ip.split('.')]
+            if len(parts) != 4:
+                return False
+            
+            if parts[0] == 10:
+                return True
+            if parts[0] == 172 and 16 <= parts[1] <= 31:
+                return True
+            if parts[0] == 192 and parts[1] == 168:
+                return True
+            if parts[0] == 127:
+                return True
+            if parts[0] == 169 and parts[1] == 254:
+                return True
+            if parts[0] >= 224:
+                return True
+                
+            return False
+        except (ValueError, IndexError):
+            return False
+
     def _is_video_platform(self, domain: str) -> bool:
         """Check if domain belongs to a video streaming platform"""
         if not domain:
@@ -251,6 +275,9 @@ class AdFlowBlocker(IModule):
             dst_ip = flow_dict.get('daddr', '')
             dst_port = flow_dict.get('dport', 0)
             protocol = flow_dict.get('proto', 'TCP')
+            
+            if self._is_private_ip(dst_ip):
+                return
             
             domain = self.domain_cache.get(dst_ip, '')
             
